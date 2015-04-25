@@ -1,0 +1,8 @@
+# Cargo lock file.
+Cargo.lock
+
+# Stupid mac files.
+.DS_Store
+
+# Target dir.
+/target
