@@ -4,7 +4,6 @@ extern crate parser_combinators as pcomb ;
 
 pub mod common ;
 pub mod solver_traits ;
-pub mod printer ;
 pub mod solver ;
 pub mod conf ;
 
