@@ -1,122 +1,20 @@
 #![ doc = "
-Implements all the printing and parsing methods for the SMT lib 2 standard.
+Printers for the different solvers.
 "]
 
-use std::process::{
-  Command, Child, Stdio
-} ;
-use std::io ;
-use std::ffi::OsStr ;
-use std::convert::AsRef ;
+use std::io::{Write} ;
 
 use ::conf::SolverConf ;
 use ::common::* ;
-use ::solver_traits::* ;
 
-
-/// Contains the actual z3 process.
-pub struct Solver {
-  // /// The command used to run the solver.
-  // cmd: Command,
-  /// The actual z3 child process.
-  kid: Child,
-  /// The solver specific information.
-  conf: SolverConf,
-}
-
-impl Solver {
-
-  /// Creates a new solver from a command and some arguments.
-  /// The command that will run is `<cmd> -in <args>`.
-  ///
-  /// Launches the child process.
-  pub fn new< S: AsRef<OsStr> >(
-    cmd: S, args: & [ S ]
-  ) -> io::Result<Self> {
-    // Building the command.
-    let mut cmd = Command::new(cmd) ;
-    cmd.arg("-in") ;
-    cmd.arg("-smt2") ;
-    cmd.args(args) ;
-    // Setting up pipes for child process.
-    cmd.stdin(Stdio::piped()) ;
-    cmd.stdout(Stdio::piped()) ;
-    cmd.stderr(Stdio::piped()) ;
-    // Spawning the child process.
-    match cmd.spawn() {
-      Ok(kid) => Ok(
-        Solver {
-          // cmd: cmd,
-          kid: kid,
-          conf: SolverConf::z3(),
-        }
-      ),
-      Err(e) => Err( e ),
-    }
-  }
-
-
-  /// Creates a new solver usind the default command.
-  /// The command that will run is `z3 -in -m`.
-  ///
-  /// Launches the child process.
-  pub fn new_z3() -> io::Result<Self> {
-    let args = vec![] ;
-    Solver::new("z3", & args)
-  }
-
-  /// Returns a pointer to the writer on the stdin of the process.
-  fn writer(& mut self) -> & mut io::Write {
-    if let Some( ref mut stdin ) = self.kid.stdin {
-      stdin
-    } else {
-      panic!("can't access stdin of child process")
-    }
-  }
-
-  /// Returns a pointer to the reader on the stdout of the process.
-  fn out_reader(& mut self) -> & mut io::Read {
-    if let Some( ref mut stdout ) = self.kid.stdout {
-      stdout
-    } else {
-      panic!("can't access stdout of child process")
-    }
-  }
-
-  /// Returns a pointer to the reader on the stderr of the process.
-  fn err_reader(& mut self) -> & mut io::Read {
-    if let Some( ref mut stderr ) = self.kid.stderr {
-      stderr
-    } else {
-      panic!("can't access stderr of child process")
-    }
-  }
-
-  /// Gets the standard error output of the process as a string.
-  pub fn out_as_string(& mut self) -> io::Result<String> {
-    let mut s = String::new() ;
-    match self.out_reader().read_to_string(& mut s) {
-      Ok(_) => Ok(s),
-      Err(e) => Err(e),
-    }
-  }
-
-  /// Gets the standard error output of the process as a string.
-  pub fn err_as_string(& mut self) -> io::Result<String> {
-    let mut s = String::new() ;
-    match self.err_reader().read_to_string(& mut s) {
-      Ok(_) => Ok(s),
-      Err(e) => Err(e),
-    }
-  }
-}
-
-impl<
-  Ident: Printable, Sort: Printable, Expr: Printable
-> Smt2Print<Ident, Sort, Expr> for Solver {
+pub trait GenericPrinter<
+  Ident: Printable,
+  Sort: Printable,
+  Expr: Printable,
+> : Writable {
 
   fn comment(
-    & mut self, lines: ::std::str::Lines
+    & mut self, _: & SolverConf, lines: ::std::str::Lines
   ) -> IoResUnit {
     let mut writer = self.writer() ;
     for line in lines { try!( write!(writer, ";; {}\n", line) ) } ;
@@ -126,13 +24,13 @@ impl<
   // |===| (Re)starting and terminating.
 
   fn reset(
-    & mut self
+    & mut self, _: & SolverConf
   ) -> IoResUnit {
     let mut writer = self.writer() ;
     write!(writer, "(reset)\n\n")
   }
   fn set_logic(
-    & mut self, logic: & Logic
+    & mut self, _: & SolverConf, logic: & Logic
   ) -> IoResUnit {
     let mut writer = self.writer() ;
     try!( write!(writer, "(set-logic ") ) ;
@@ -140,13 +38,13 @@ impl<
     write!(writer, ")\n\n")
   }
   fn set_option(
-    & mut self, option: & str, value: & str
+    & mut self, _: & SolverConf, option: & str, value: & str
   ) -> IoResUnit {
     let mut writer = self.writer() ;
     write!(writer, "(set-option {} {})\n\n", option, value)
   }
   fn exit(
-    & mut self
+    & mut self, _: & SolverConf
   ) -> IoResUnit {
     let mut writer = self.writer() ;
     write!(writer, "(exit)\n")
@@ -155,19 +53,19 @@ impl<
   // |===| Modifying the assertion stack.
 
   fn push(
-    & mut self, n: & u8
+    & mut self, _: & SolverConf, n: & u8
   ) -> IoResUnit {
     let mut writer = self.writer() ;
     write!(writer, "(push {})\n\n", n)
   }
   fn pop(
-    & mut self, n: & u8
+    & mut self, _: & SolverConf, n: & u8
   ) -> IoResUnit {
     let mut writer = self.writer() ;
     write!(writer, "(pop {})\n\n", n)
   }
   fn reset_assertions(
-    & mut self
+    & mut self, _: & SolverConf
   ) -> IoResUnit {
     let mut writer = self.writer() ;
     write!(writer, "(reset-assertions)\n\n")
@@ -176,7 +74,7 @@ impl<
   // |===| Introducing new symbols.
 
   fn declare_sort(
-    & mut self, sort: Sort, arity: & u8
+    & mut self, _: & SolverConf, sort: Sort, arity: & u8
   ) -> IoResUnit {
     let mut writer = self.writer() ;
     try!( write!(writer, "(declare-sort ") ) ;
@@ -184,7 +82,7 @@ impl<
     write!(writer, " {})\n\n", arity)
   }
   fn define_sort(
-    & mut self, sort: Sort, args: & [ Expr ], body: Expr
+    & mut self, _: & SolverConf, sort: Sort, args: & [ Expr ], body: Expr
   ) -> IoResUnit {
     let mut writer = self.writer() ;
     try!( write!(writer, "( define-sort ") ) ;
@@ -199,7 +97,7 @@ impl<
     write!(writer, "\n)\n\n")
   }
   fn declare_fun(
-    & mut self, symbol: Ident, args: & [ Sort ], out: Sort
+    & mut self, _: & SolverConf, symbol: Ident, args: & [ Sort ], out: Sort
   ) -> IoResUnit {
     let mut writer = self.writer() ;
     try!( write!(writer, "(declare-fun ") ) ;
@@ -214,7 +112,7 @@ impl<
     write!(writer, ")\n\n")
   }
   fn declare_const(
-    & mut self, symbol: Ident, out_sort: Sort
+    & mut self, _: & SolverConf, symbol: Ident, out_sort: Sort
   ) -> IoResUnit {
     let mut writer = self.writer() ;
     try!( write!(writer, "(declare-const ") ) ;
@@ -224,7 +122,7 @@ impl<
     write!(writer, ")\n\n")
   }
   fn define_fun(
-    & mut self,
+    & mut self, _: & SolverConf,
     symbol: Ident, args: & [ (Ident, Sort) ], out: Sort, body: Expr
   ) -> IoResUnit {
     let mut writer = self.writer() ;
@@ -246,7 +144,7 @@ impl<
     write!(writer, "\n)\n\n")
   }
   fn define_funs_rec(
-    & mut self,
+    & mut self, _: & SolverConf,
     funs: & [ (Ident, & [ (Ident, Sort) ], Sort, Expr) ]
   ) -> IoResUnit {
     let mut writer = self.writer() ;
@@ -282,7 +180,7 @@ impl<
     write!(writer, "\n )\n)\n\n")
   }
   fn define_fun_rec(
-    & mut self,
+    & mut self, _: & SolverConf,
     symbol: Ident, args: & [ (Ident, Sort) ], out: Sort, body: Expr
   ) -> IoResUnit {
     let mut writer = self.writer() ;
@@ -315,7 +213,7 @@ impl<
   // |===| Asserting and inspecting formulas.
 
   fn assert(
-    & mut self, expr: Expr
+    & mut self, _: & SolverConf, expr: Expr
   ) -> IoResUnit {
     let mut writer = self.writer() ;
     try!( write!(writer, "(assert\n  ") ) ;
@@ -323,7 +221,7 @@ impl<
     write!(writer, "\n)")
   }
   fn get_assertions(
-    & mut self
+    & mut self, _: & SolverConf
   ) -> IoResUnit {
     let mut writer = self.writer() ;
     write!(writer, "(get-assertions)\n\n")
@@ -332,17 +230,16 @@ impl<
   // |===| Checking for satisfiability.
 
   fn check_sat(
-    & mut self
+    & mut self, _: & SolverConf
   ) -> IoResUnit {
     let mut writer = self.writer() ;
     write!(writer, "(check-sat)\n\n")
   }
   fn check_sat_assuming(
-    & mut self, bool_vars: & [ Ident ]
+    & mut self, conf: & SolverConf, bool_vars: & [ Ident ]
   ) -> IoResUnit {
-    let cmd = self.conf.check_sat_assuming ;
     let mut writer = self.writer() ;
-    try!( write!(writer, "({}\n ", cmd) );
+    try!( write!(writer, "({}\n ", conf.check_sat_assuming) );
     for v in bool_vars {
       try!( write!(writer, " ") ) ;
       try!( v.to_smt2(writer) )
@@ -353,7 +250,7 @@ impl<
   // |===| Inspecting models.
 
   fn get_value(
-    & mut self, exprs: & [ Expr ]
+    & mut self, _: & SolverConf, exprs: & [ Expr ]
   ) -> IoResUnit {
     let mut writer = self.writer() ;
     try!( write!(writer, "(get-value") ) ;
@@ -364,13 +261,13 @@ impl<
     write!(writer, "\n)\n\n")
   }
   fn get_assignment(
-    & mut self
+    & mut self, _: & SolverConf
   ) -> IoResUnit {
     let mut writer = self.writer() ;
     write!(writer, "(get-assignment)\n\n")
   }
   fn get_model(
-    & mut self
+    & mut self, _: & SolverConf
   ) -> IoResUnit {
     let mut writer = self.writer() ;
     write!(writer, "(get-model)\n\n")
@@ -379,19 +276,19 @@ impl<
   // |===| Inspecting proofs.
 
   fn get_unsat_assumptions(
-    & mut self
+    & mut self, _: & SolverConf
   ) -> IoResUnit {
     let mut writer = self.writer() ;
     write!(writer, "(get-unsat-assumptions)\n\n")
   }
   fn get_proof(
-    & mut self
+    & mut self, _: & SolverConf
   ) -> IoResUnit {
     let mut writer = self.writer() ;
     write!(writer, "(get-proof)\n\n")
   }
   fn get_unsat_core(
-    & mut self
+    & mut self, _: & SolverConf
   ) -> IoResUnit {
     let mut writer = self.writer() ;
     write!(writer, "(get-unsat-core)\n\n")
@@ -400,13 +297,13 @@ impl<
   // |===| Inspecting settings.
 
   fn get_info(
-    & mut self, flag: & str
+    & mut self, _: & SolverConf, flag: & str
   ) -> IoResUnit {
     let mut writer = self.writer() ;
     write!(writer, "(get-info {})\n\n", flag)
   }
   fn get_option(
-    & mut self, option: & str
+    & mut self, _: & SolverConf, option: & str
   ) -> IoResUnit {
     let mut writer = self.writer() ;
     write!(writer, "(get-option {})\n\n", option)
@@ -415,80 +312,15 @@ impl<
   // |===| Script information.
 
   fn set_info(
-    & mut self, attribute: & str
+    & mut self, _: & SolverConf, attribute: & str
   ) -> IoResUnit {
     let mut writer = self.writer() ;
     write!(writer, "(set-info {})\n\n", attribute)
   }
   fn echo(
-    & mut self, text: & str
+    & mut self, _: & SolverConf, text: & str
   ) -> IoResUnit {
     let mut writer = self.writer() ;
     write!(writer, "(echo \"{}\")\n\n", text)
   }
 }
-
-
-/// Can parse the result of SMT lib 2 queries.
-impl<
-  Ident, Value, Expr, Proof
-> Smt2Parse<Ident, Value, Expr, Proof> for Solver {
-
-  fn parse_success(& mut self) -> IoResUnit {
-    Ok(())
-  }
-
-  fn parse_assertions(& mut self) -> IoRes<Option<Vec<Expr>>> {
-    Ok(None)
-  }
-
-  fn parse_check_sat(& mut self) -> IoResBool {
-    Ok(false)
-  }
-
-  fn parse_value(& mut self) -> IoRes<Option<Vec<Value>>> {
-    Ok(None)
-  }
-  fn parse_assignment(& mut self) -> IoRes<Option<Vec<(Ident, Value)>>> {
-    Ok(None)
-  }
-  fn parse_model(& mut self) -> IoRes<Option<Vec<(Ident, Value)>>> {
-    Ok(None)
-  }
-
-  fn parse_unsat_assumptions(& mut self) -> IoRes<Option<Vec<Ident>>> {
-    Ok(None)
-  }
-  fn parse_proof(& mut self) -> IoRes<Option<Proof>> {
-    Ok(None)
-  }
-  fn parse_unsat_core(& mut self) -> IoRes<Option<Vec<Ident>>> {
-    Ok(None)
-  }
-
-  fn parse_info(& mut self) -> IoRes<Option<String>> {
-    Ok(None)
-  }
-  fn parse_option(& mut self) -> IoRes<Option<String>> {
-    Ok(None)
-  }
-
-}
-
-impl<
-  Ident: Printable,
-  Value,
-  Sort: Printable,
-  Expr: Printable,
-  Proof,
-> Smt2GetNow<Ident, Value, Sort, Expr, Proof> for Solver {}
-
-impl<
-  Ident: Printable,
-  Value,
-  Sort: Printable,
-  Expr: Printable,
-  Proof,
-> Smt2Solver<Ident, Value, Sort, Expr, Proof> for Solver {}
-
-

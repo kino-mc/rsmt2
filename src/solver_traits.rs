@@ -5,6 +5,17 @@ Interfaces for solvers.
 use ::common::* ;
 
 
+pub trait Smt2Solver<
+  Ident: Printable,
+  Value,
+  Sort: Printable,
+  Expr: Printable,
+  Proof,
+>:  Smt2Print<Ident, Sort, Expr> +
+    Smt2Parse<Ident, Value, Expr, Proof> +
+    Smt2GetNow<Ident, Value, Sort, Expr, Proof> {
+}
+
 /// Can print SMT lib 2 commands.
 pub trait Smt2Print<
   Ident: Printable,
@@ -115,6 +126,9 @@ pub trait Smt2Print<
 /// Can parse the result of SMT lib 2 queries.
 pub trait Smt2Parse<Ident, Value, Expr, Proof> {
 
+  /// Parses a `success` result.
+  fn parse_success(& mut self) -> IoResUnit ;
+
   /// Parses the result of a `get-assertion` query.
   fn parse_assertions(& mut self) -> IoRes<Option<Vec<Expr>>> ;
 
@@ -145,8 +159,8 @@ pub trait Smt2Parse<Ident, Value, Expr, Proof> {
 /// Can issue an SMT lib 2 query and parse its result.
 pub trait Smt2GetNow<
   Ident: Printable,
-  Sort: Printable,
   Value,
+  Sort: Printable,
   Expr: Printable,
   Proof
 > : Smt2Print<

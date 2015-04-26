@@ -1,15 +1,19 @@
 use std::io::Write ;
-use std::io ;
+
+extern crate parser_combinators as pcomb ;
 
 pub mod common ;
 pub mod solver_traits ;
-pub mod driver ;
+pub mod printer ;
 pub mod solver ;
+pub mod conf ;
 
 use common::* ;
-use solver_traits::Smt2Print ;
-use driver::GenericPrinter ;
+use solver_traits::Smt2Solver ;
+use solver::Solver ;
 
+
+#[derive(Clone, Copy)]
 struct Ident(& 'static str) ;
 impl Printable for Ident {
   fn to_smt2(& self, writer: & mut Write) -> IoResUnit {
@@ -17,39 +21,33 @@ impl Printable for Ident {
   }
 }
 
-struct Test { pub stdout: io::Stdout }
-impl Writable for Test {
-  fn writer(& mut self) -> & mut Write {
-    & mut self.stdout
-  }
-}
-impl GenericPrinter<Ident, Ident, Ident> for Test {
-  #[inline]
-  fn check_sat_assuming_command(& self) -> & 'static str {
-    "check-sat-assuming"
-  }
-  // fn as_printer(& mut self) -> & mut Smt2Print<Ident,Ident,Ident> {
-  //   (self as & mut GenericPrinter<Ident,Ident,Ident>)
-  // }
-}
 
 
-fn main() { 
+fn main() {
   println!("") ;
-  println!("Creating test.") ;
-  let mut test = Test { stdout: io::stdout() } ;
-  println!("reset:") ;
-  test.comment(
-    "This is a comment.\nHere is another line.".lines()
-  ).unwrap() ;
-  test.reset().unwrap() ;
-  test.declare_fun(Ident("f"), & [Ident("in1"), Ident("in2")], Ident("out")) ;
-  test.define_fun(
-    Ident("f"),
-    & [ (Ident("a"), Ident("in1")), (Ident("b"), Ident("in2")) ],
-    Ident("out"),
-    Ident("a + b - 4")
-  ) ;
-  test.check_sat_assuming(& [Ident("a1"), Ident("a2")]) ;
+
+  let (a,b) = (Ident("a"), Ident("b")) ;
+  let b00l = Ident("bool") ;
+  let a_or_b = Ident("(or a b)") ;
+  let mut the_solver = Solver::new_z3().unwrap() ;
+  {
+    let mut solver = (& mut the_solver) as (
+      & mut Smt2Solver<Ident, Ident, Ident, Ident, Ident>
+    ) ;
+    solver.declare_const(a, b00l).unwrap() ;
+    solver.declare_const(b, b00l).unwrap() ;
+    solver.assert(a_or_b).unwrap() ;
+    solver.check_sat().unwrap() ;
+    solver.get_model().unwrap() ;
+    solver.exit().unwrap() ;
+  }
+  println!("Error:") ;
+  for line in the_solver.err_as_string() {
+    println!("  {}", line) ;
+  } ;
+  println!("Output:") ;
+  for line in the_solver.out_as_string() {
+    println!("  {}", line) ;
+  } ;
   println!("") ;
 }
