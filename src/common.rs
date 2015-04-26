@@ -12,9 +12,15 @@ pub type IoResBool = io::Result<bool> ;
 pub type IoRes<T> = io::Result<T> ;
 
 /// Can be printed to the SMT lib 2 standard.
-pub trait Printable : Sized {
+pub trait Printable {
   /// Prints something in the SMT lib 2 standard.
   fn to_smt2(& self, writer: & mut io::Write) -> IoResUnit ;
+}
+
+/// Can produce a writer.
+pub trait Writable {
+  /// Returns a writer.
+  fn writer(& mut self) -> & mut io::Write ;
 }
 
 
@@ -60,3 +66,40 @@ impl Printable for Logic {
   }
 }
 
+
+/// Parse methods. Not all of them are necessary depending on the queries you
+/// will use. See each method for details.
+pub trait ParseSmt2<Ident, Value, Expr, Proof> : io::Read {
+  /// Parses an ident from self, viewed as a reader.
+  ///
+  /// ## Required by
+  ///
+  /// * `get-assignment`
+  /// * `get-model`
+  /// * `get-unsat-assumptions`
+  /// * `get-unsat-core`
+  fn parse_ident(& mut self) -> Ident ;
+
+  /// Parses a value from self, viewed as a reader.
+  ///
+  /// ## Required by
+  ///
+  /// * `get-value`
+  /// * `get-assignment`
+  /// * `get-model`
+  fn parse_value(& mut self) -> Value ;
+
+  /// Parses an expression from self, viewed as a reader.
+  ///
+  /// ## Required by
+  ///
+  /// * `get_assertions`
+  fn parse_expr(& mut self) -> Expr ;
+
+  /// Parses a proof from self, viewed as a reader.
+  ///
+  /// ## Required by
+  ///
+  /// * `get_proof`
+  fn parse_proof(& mut self) -> Proof ;
+}

@@ -10,7 +10,6 @@ pub trait Smt2Print<
   Ident: Printable,
   Sort: Printable,
   Expr: Printable,
-  Model
 > {
 
   /// Prints a comment.
@@ -54,15 +53,15 @@ pub trait Smt2Print<
   ) -> IoResUnit ;
   /// Prints a `define-fun` command.
   fn define_fun(
-    & mut self, symbol: Ident, args: & [ (Expr, Sort) ], out: Sort, body: Expr
+    & mut self, symbol: Ident, args: & [ (Ident, Sort) ], out: Sort, body: Expr
   ) -> IoResUnit ;
   /// Prints a `define-funs-rec` command.
   fn define_funs_rec(
-    & mut self, funs: & [ (Ident, & [ (Expr, Sort) ], Sort, Expr) ]
+    & mut self, funs: & [ (Ident, & [ (Ident, Sort) ], Sort, Expr) ]
   ) -> IoResUnit ;
   /// Prints a `define-fun-rec` command.
   fn define_fun_rec(
-    & mut self, symbol: Ident, args: & [ (Expr, Sort) ], out: Sort, body: Expr
+    & mut self, symbol: Ident, args: & [ (Ident, Sort) ], out: Sort, body: Expr
   ) -> IoResUnit ;
 
   // |===| Asserting and inspecting formulas.
@@ -77,7 +76,7 @@ pub trait Smt2Print<
   /// Prints a `check-sat` command.
   fn check_sat(& mut self) -> IoResUnit ;
   /// Prints a `check-sat-assuming` command.
-  fn check_sat_assuming(& mut self, bool_vars: & [ Expr ]) -> IoResUnit ;
+  fn check_sat_assuming(& mut self, bool_vars: & [ Ident ]) -> IoResUnit ;
 
   // |===| Inspecting models.
 
@@ -149,10 +148,9 @@ pub trait Smt2GetNow<
   Sort: Printable,
   Value,
   Expr: Printable,
-  Model,
   Proof
 > : Smt2Print<
-  Ident, Sort, Expr, Model
+  Ident, Sort, Expr
 > + Smt2Parse<
   Ident, Value, Expr, Proof
 > {
@@ -169,7 +167,7 @@ pub trait Smt2GetNow<
     self.parse_check_sat()
   }
   /// Issues a `check-sat-assuming` query and parses the result.
-  fn check_sat_assuming_now(& mut self, bool_vars: & [ Expr ]) -> IoResBool {
+  fn check_sat_assuming_now(& mut self, bool_vars: & [ Ident ]) -> IoResBool {
     try!(self.check_sat_assuming(bool_vars)) ;
     self.parse_check_sat()
   }
