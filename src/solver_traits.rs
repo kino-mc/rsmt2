@@ -11,17 +11,13 @@ pub trait Smt2Solver<
   Sort: Printable,
   Expr: Printable,
   Proof,
->:  Smt2Print<Ident, Sort, Expr> +
+>:  Smt2Print +
     Smt2Parse<Ident, Value, Expr, Proof> +
     Smt2GetNow<Ident, Value, Sort, Expr, Proof> {
 }
 
 /// Can print SMT lib 2 commands.
-pub trait Smt2Print<
-  Ident: Printable,
-  Sort: Printable,
-  Expr: Printable,
-> {
+pub trait Smt2Print {
 
   /// Prints a comment.
   fn comment(& mut self, lines: ::std::str::Lines) -> IoResUnit ;
@@ -49,36 +45,38 @@ pub trait Smt2Print<
   // |===| Introducing new symbols.
 
   /// Prints a `declare-sort` command.
-  fn declare_sort(& mut self, sort: Sort, arity: & u8) -> IoResUnit ;
+  fn declare_sort<Sort: Printable>(
+    & mut self, sort: Sort, arity: & u8
+  ) -> IoResUnit ;
   /// Prints a `define-sort` command.
-  fn define_sort(
+  fn define_sort<Sort: Printable, Expr: Printable>(
     & mut self, sort: Sort, args: & [ Expr ], body: Expr
   ) -> IoResUnit ;
   /// Prints a `declare-fun` command.
-  fn declare_fun(
+  fn declare_fun<Sort: Printable, Ident: Printable>(
     & mut self, symbol: Ident, in_sorts: & [ Sort ], out_sort: Sort
   ) -> IoResUnit ;
   /// Prints a `declare-const` command.
-  fn declare_const(
+  fn declare_const<Sort: Printable, Ident: Printable>(
     & mut self, symbol: Ident, out_sort: Sort
   ) -> IoResUnit ;
   /// Prints a `define-fun` command.
-  fn define_fun(
+  fn define_fun<Sort: Printable, Ident: Printable, Expr: Printable>(
     & mut self, symbol: Ident, args: & [ (Ident, Sort) ], out: Sort, body: Expr
   ) -> IoResUnit ;
   /// Prints a `define-funs-rec` command.
-  fn define_funs_rec(
+  fn define_funs_rec<Sort: Printable, Ident: Printable, Expr: Printable>(
     & mut self, funs: & [ (Ident, & [ (Ident, Sort) ], Sort, Expr) ]
   ) -> IoResUnit ;
   /// Prints a `define-fun-rec` command.
-  fn define_fun_rec(
+  fn define_fun_rec<Sort: Printable, Ident: Printable, Expr: Printable>(
     & mut self, symbol: Ident, args: & [ (Ident, Sort) ], out: Sort, body: Expr
   ) -> IoResUnit ;
 
   // |===| Asserting and inspecting formulas.
 
   /// Prints an `assert` command.
-  fn assert(& mut self, expr: Expr) -> IoResUnit ;
+  fn assert<Expr: Printable>(& mut self, expr: Expr) -> IoResUnit ;
   /// Prints an `get-assertions` command.
   fn get_assertions(& mut self) -> IoResUnit ;
 
@@ -87,12 +85,14 @@ pub trait Smt2Print<
   /// Prints a `check-sat` command.
   fn check_sat(& mut self) -> IoResUnit ;
   /// Prints a `check-sat-assuming` command.
-  fn check_sat_assuming(& mut self, bool_vars: & [ Ident ]) -> IoResUnit ;
+  fn check_sat_assuming<Ident: Printable>(
+    & mut self, bool_vars: & [ Ident ]
+  ) -> IoResUnit ;
 
   // |===| Inspecting models.
 
   /// Prints a `get-value` command.
-  fn get_value(& mut self, exprs: & [ Expr ]) -> IoResUnit ;
+  fn get_value<Expr: Printable>(& mut self, exprs: & [ Expr ]) -> IoResUnit ;
   /// Prints a `get-assignment` command.
   fn get_assignment(& mut self) -> IoResUnit ;
   /// Prints a `get-model` command.
@@ -163,11 +163,7 @@ pub trait Smt2GetNow<
   Sort: Printable,
   Expr: Printable,
   Proof
-> : Smt2Print<
-  Ident, Sort, Expr
-> + Smt2Parse<
-  Ident, Value, Expr, Proof
-> {
+> : Smt2Print + Smt2Parse<Ident, Value, Expr, Proof> {
 
   /// Issues a `get-assertion` query and parses the result.
   fn get_assertions_now(& mut self) -> IoRes<Option<Vec<Expr>>> {

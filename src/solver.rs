@@ -44,13 +44,15 @@ impl Solver {
     cmd.stderr(Stdio::piped()) ;
     // Spawning the child process.
     match cmd.spawn() {
-      Ok(kid) => Ok(
-        Solver {
+      Ok(kid) => {
+        let mut solver = Solver {
           // cmd: cmd,
           kid: kid,
           conf: SolverConf::z3(),
-        }
-      ),
+        } ;
+        solver.set_option(":print-success", "true").unwrap() ;
+        Ok( solver )
+      },
       Err(e) => Err( e ),
     }
   }
@@ -111,9 +113,7 @@ impl Solver {
   }
 }
 
-impl<
-  Ident: Printable, Sort: Printable, Expr: Printable
-> Smt2Print<Ident, Sort, Expr> for Solver {
+impl Smt2Print for Solver {
 
   fn comment(
     & mut self, lines: ::std::str::Lines
@@ -175,7 +175,7 @@ impl<
 
   // |===| Introducing new symbols.
 
-  fn declare_sort(
+  fn declare_sort<Sort: Printable>(
     & mut self, sort: Sort, arity: & u8
   ) -> IoResUnit {
     let mut writer = self.writer() ;
@@ -183,7 +183,7 @@ impl<
     try!( sort.to_smt2(writer) ) ;
     write!(writer, " {})\n\n", arity)
   }
-  fn define_sort(
+  fn define_sort<Sort: Printable, Expr: Printable>(
     & mut self, sort: Sort, args: & [ Expr ], body: Expr
   ) -> IoResUnit {
     let mut writer = self.writer() ;
@@ -198,7 +198,7 @@ impl<
     try!( body.to_smt2(writer) ) ;
     write!(writer, "\n)\n\n")
   }
-  fn declare_fun(
+  fn declare_fun<Sort: Printable, Ident: Printable>(
     & mut self, symbol: Ident, args: & [ Sort ], out: Sort
   ) -> IoResUnit {
     let mut writer = self.writer() ;
@@ -213,7 +213,7 @@ impl<
     try!( out.to_smt2(writer) ) ;
     write!(writer, ")\n\n")
   }
-  fn declare_const(
+  fn declare_const<Sort: Printable, Ident: Printable>(
     & mut self, symbol: Ident, out_sort: Sort
   ) -> IoResUnit {
     let mut writer = self.writer() ;
@@ -223,12 +223,12 @@ impl<
     try!( out_sort.to_smt2(writer) ) ;
     write!(writer, ")\n\n")
   }
-  fn define_fun(
+  fn define_fun<Sort: Printable, Ident: Printable, Expr: Printable>(
     & mut self,
     symbol: Ident, args: & [ (Ident, Sort) ], out: Sort, body: Expr
   ) -> IoResUnit {
     let mut writer = self.writer() ;
-    try!( write!(writer, "(declare-fun ") ) ;
+    try!( write!(writer, "(define-fun ") ) ;
     try!( symbol.to_smt2(writer) ) ;
     try!( write!(writer, " ( ") ) ;
     for arg in args {
@@ -245,7 +245,7 @@ impl<
     try!( body.to_smt2(writer) ) ;
     write!(writer, "\n)\n\n")
   }
-  fn define_funs_rec(
+  fn define_funs_rec<Sort: Printable, Ident: Printable, Expr: Printable>(
     & mut self,
     funs: & [ (Ident, & [ (Ident, Sort) ], Sort, Expr) ]
   ) -> IoResUnit {
@@ -281,7 +281,7 @@ impl<
     } ;
     write!(writer, "\n )\n)\n\n")
   }
-  fn define_fun_rec(
+  fn define_fun_rec<Sort: Printable, Ident: Printable, Expr: Printable>(
     & mut self,
     symbol: Ident, args: & [ (Ident, Sort) ], out: Sort, body: Expr
   ) -> IoResUnit {
@@ -314,7 +314,7 @@ impl<
 
   // |===| Asserting and inspecting formulas.
 
-  fn assert(
+  fn assert<Expr: Printable>(
     & mut self, expr: Expr
   ) -> IoResUnit {
     let mut writer = self.writer() ;
@@ -337,7 +337,7 @@ impl<
     let mut writer = self.writer() ;
     write!(writer, "(check-sat)\n\n")
   }
-  fn check_sat_assuming(
+  fn check_sat_assuming<Ident: Printable>(
     & mut self, bool_vars: & [ Ident ]
   ) -> IoResUnit {
     let cmd = self.conf.check_sat_assuming ;
@@ -352,7 +352,7 @@ impl<
 
   // |===| Inspecting models.
 
-  fn get_value(
+  fn get_value<Expr: Printable>(
     & mut self, exprs: & [ Expr ]
   ) -> IoResUnit {
     let mut writer = self.writer() ;
