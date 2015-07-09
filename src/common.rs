@@ -4,6 +4,15 @@ Basic types used by the library.
 
 use std::io ;
 
+/// Unexpected result for an SMT lib 2 command.
+pub enum UnexSmtResult {
+  Unsupported,
+  Error(String)
+}
+
+/// Generic type for the parsing of an SMT lib 2 command.
+pub type SmtParseResult<T> = Result<T, UnexSmtResult> ;
+
 /// Alias for `io` results of unit.
 pub type IoResUnit = io::Result<()> ;
 /// Alias for `io` results of `bool`.
