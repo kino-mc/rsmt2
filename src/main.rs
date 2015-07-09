@@ -1,6 +1,6 @@
 use std::io::Write ;
 
-#[macro_use(parser)]
+#[macro_use(parser, parse_try)]
 extern crate parse_comb ;
 
 // extern crate parser_combinators as pcomb ;
@@ -52,47 +52,53 @@ use common::* ;
 // }
 
 
-use parse_comb::Token ;
-use parse_comb::Result ;
+use parse_comb::{Token, Result} ;
 use parse_comb::lexer::LexerCursor ;
 
-parser!(
-  fn unex_smt_result: UnexSmtResult {
-    | (
-      ["unsupported"] => _ => { UnexSmtResult::Unsupported }
-    )
-    | (
-      ( ( ["("], ["error"], ["\""] )
-        > { r"^[^\x22]*" } <
-        ( ["\""], [")"] ) ) => err => {
-        UnexSmtResult::Error(err.tkn)
-      }
-    )
-  }
-) ;
+// parser!(
+//   fn unex_smt_result: UnexSmtResult {
+//     | (
+//       ["unsupported"] => _ => { UnexSmtResult::Unsupported }
+//     )
+//     | (
+//       ( ( ["("], ["error"], ["\""] )
+//         > { r"^[^\x22]*" } <
+//         ( ["\""], [")"] ) ) => err => {
+//         UnexSmtResult::Error(err.tkn)
+//       }
+//     )
+//   }
+// ) ;
 
-parser!(
-  fn checksat_result: SmtParseResult<bool> {
-    | (unex_smt_result => err => {Err(err)} )
-    | (["sat"] => _ => {Ok(true)} )
-    | (["unsat"] => _ => {Ok(false)} )
-  }
-) ;
+// parser!(
+//   fn checksat_result: SmtParseResult<bool> {
+//     | (unex_smt_result => err => {Err(err)} )
+//     | (["sat"] => _ => {Ok(true)} )
+//     | (["unsat"] => _ => {Ok(false)} )
+//   }
+// ) ;
 
 parser!(
   fn ident_parser: Token {
-    { r"^[a-zA-Z][a-zA-Z_]*$]" }
+    { r"^[a-zA-Z][a-zA-Z_]*" }
   }
 ) ;
 
-macro_rules! try_parse {
-  ($e:expr) => (
-    match $e {
-      Result::Ok(res, lexer) => (res, lexer),
-      Result::Err(e) => return Result::Err(e),
-    }
-  )
-}
+// parser!(
+//   fn bool_parser: bool {
+//     | (["false"] => _ => { false })
+//     | (["true"] => _ => { true })
+//   }
+// ) ;
+
+// macro_rules! try_parse {
+//   ($e:expr) => (
+//     match $e {
+//       Result::Ok(res, lexer) => (res, lexer),
+//       Result::Err(e) => return Result::Err(e),
+//     }
+//   )
+// }
 
 
 trait SmtPrinter<Term> {
@@ -112,7 +118,7 @@ trait SmtPrinter<Term> {
 
 parser!(
   fn define_fun_head: () {
-    (["("], ["define-fun"]) => (_,_) => { () }
+    ["(define-fun"] => _ => { () }
   }
 ) ;
 parser!(
@@ -122,7 +128,7 @@ parser!(
 ) ;
 parser!(
   fn model_head: () {
-    (["("], ["model"]) => (_,_) => { () }
+    ["(model"] => _ => { () }
   }
 ) ;
 parser!(
@@ -137,17 +143,17 @@ trait SmtParser<Term> {
   fn define_fun_parser(
     & mut self, lexer: & LexerCursor
   ) -> Result<(Term,Term)> {
-    let (_, lexer) = try_parse!( define_fun_head(& lexer) ) ;
-    let (term1, lexer) = try_parse!( self.parse_term(& lexer) ) ;
-    let (term2, lexer) = try_parse!( self.parse_term(& lexer) ) ;
-    let (_, lexer) = try_parse!( define_fun_tail(& lexer) ) ;
+    let (_, lexer) = parse_try!( define_fun_head(& lexer) ) ;
+    let (term1, lexer) = parse_try!( self.parse_term(& lexer) ) ;
+    let (term2, lexer) = parse_try!( self.parse_term(& lexer) ) ;
+    let (_, lexer) = parse_try!( define_fun_tail(& lexer) ) ;
     Result::Ok( (term1, term2), lexer )
   }
 
   fn get_model_parser(
     & mut self, lexer: & LexerCursor
   ) -> Result<Vec<(Term,Term)>> {
-    let (_, lexer) = try_parse!( model_head(& lexer) ) ;
+    let (_, lexer) = parse_try!( model_head(& lexer) ) ;
     let mut res = Vec::new() ;
     let mut lexer = lexer ;
     loop {
@@ -156,14 +162,38 @@ trait SmtParser<Term> {
           res.push( (var,val) ) ;
           lexer = nu_lexer
         },
-        _ => break,
+        Result::Err(_) => break,
       }
     } ;
-    let (_, lexer) = try_parse!( model_tail(& lexer) ) ;
+    let (_, lexer) = parse_try!( model_tail(& lexer) ) ;
     Result::Ok( res, lexer )
   }
 }
 
-fn main () {
-  println!("whatever")
+struct Dummy ;
+
+impl SmtParser<String> for Dummy {
+  fn parse_term(& mut self, lexer: & LexerCursor) -> Result<String> {
+    let (tkn, lexer) = parse_try!(ident_parser(lexer)) ;
+    Result::Ok(tkn.tkn, lexer)
+  }
 }
+
+fn main () {
+  println!("whatever") ;
+  let mut dummy = Dummy ;
+  let test_string =
+    "(model (define-fun a true ) (define-fun b false ) )".to_string() ;
+  let lexer = parse_comb::lexer::Lexer::of_string(
+    & test_string, & parse_comb::lexer::simple_is_whitespace
+  ) ;
+  match dummy.get_model_parser(
+    & parse_comb::lexer::LexerCursor::of_lexer(lexer)
+  ) {
+    Result::Ok(pairs, _) => for (var,val) in pairs {
+      println!("> {} = {}", var, val)
+    },
+    Result::Err(e) => println!("Error: {}", e),
+  }
+}
+
