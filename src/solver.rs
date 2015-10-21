@@ -2,9 +2,7 @@
 Implements all the printing and parsing methods for the SMT lib 2 standard.
 "]
 
-use std::process::{
-  Command, Child, Stdio
-} ;
+use std::process::{ Command, Child, Stdio } ;
 use std::io ;
 use std::ffi::OsStr ;
 use std::convert::AsRef ;
@@ -14,22 +12,22 @@ use ::common::* ;
 use ::solver_traits::* ;
 
 
-/// Contains the actual z3 process.
+/** Contains the actual solver process. */
 pub struct Solver {
-  // /// The command used to run the solver.
+  // /** The command used to run the solver. */
   // cmd: Command,
-  /// The actual z3 child process.
+  /** The actual solver child process. */
   kid: Child,
-  /// The solver specific information.
+  /** The solver specific information. */
   conf: SolverConf,
 }
 
 impl Solver {
 
-  /// Creates a new solver from a command and some arguments.
-  /// The command that will run is `<cmd> -in <args>`.
-  ///
-  /// Launches the child process.
+  /** Creates a new solver from a command and some arguments.
+  The command that will run is `<cmd> -in <args>`.
+
+  Launches the child process. */
   pub fn new< S: AsRef<OsStr> >(
     cmd: S, args: & [ S ]
   ) -> io::Result<Self> {

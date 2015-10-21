@@ -1,199 +1,259 @@
+#[macro_use]
+extern crate regex ;
+#[macro_use]
+extern crate nom ;
+
+use std::str::FromStr ;
 use std::io::Write ;
+use std::str ;
 
-#[macro_use(parser, parse_try)]
-extern crate parse_comb ;
+use nom::{IResult,digit,multispace};
+use nom::IResult::*;
 
-// extern crate parser_combinators as pcomb ;
+use SExpr::* ;
 
-pub mod common ;
-// pub mod solver_traits ;
-// pub mod solver ;
-// pub mod conf ;
+mod common ;
 
 use common::* ;
-// use solver_traits::* ;
-// use solver::Solver ;
 
+#[derive(Debug)]
+struct SVar { pub id: String }
 
-// #[derive(Clone, Copy)]
-// struct Ident(& 'static str) ;
-// impl Printable for Ident {
-//   fn to_smt2(& self, writer: & mut Write) -> IoResUnit {
-//     write!(writer, "{}", self.0)
-//   }
-// }
+#[derive(Debug)]
+enum SExpr {
+  Var(String),
+  SVar0(SVar),
+  SVar1(SVar),
+  BConst(bool),
+  IConst(usize),
+  RConst(usize,usize),
+  Lambda(String, Vec<SExpr>),
+}
 
+#[derive(Debug,Clone,Copy)]
+struct Offset(usize,usize) ;
 
-
-// fn main() {
-//   println!("") ;
-
-//   let (a,b) = (Ident("a"), Ident("b")) ;
-//   let b00l = Ident("bool") ;
-//   let a_or_b = Ident("(or a b)") ;
-//   let mut solver = Solver::new_z3().unwrap() ;
-
-//   solver.declare_const(a, b00l).unwrap() ;
-//   solver.declare_const(b, b00l).unwrap() ;
-//   solver.assert(a_or_b).unwrap() ;
-//   solver.check_sat().unwrap() ;
-//   solver.get_model().unwrap() ;
-//   solver.exit().unwrap() ;
-
-//   println!("Error:") ;
-//   for line in solver.err_as_string().unwrap().lines() {
-//     println!("  {}", line) ;
-//   } ;
-//   println!("Output:") ;
-//   for line in solver.out_as_string().unwrap().lines() {
-//     println!("  {}", line) ;
-//   } ;
-//   println!("") ;
-// }
-
-
-use parse_comb::{Token, Result} ;
-use parse_comb::lexer::LexerCursor ;
-
-// parser!(
-//   fn unex_smt_result: UnexSmtResult {
-//     | (
-//       ["unsupported"] => _ => { UnexSmtResult::Unsupported }
-//     )
-//     | (
-//       ( ( ["("], ["error"], ["\""] )
-//         > { r"^[^\x22]*" } <
-//         ( ["\""], [")"] ) ) => err => {
-//         UnexSmtResult::Error(err.tkn)
-//       }
-//     )
-//   }
-// ) ;
-
-// parser!(
-//   fn checksat_result: SmtParseResult<bool> {
-//     | (unex_smt_result => err => {Err(err)} )
-//     | (["sat"] => _ => {Ok(true)} )
-//     | (["unsat"] => _ => {Ok(false)} )
-//   }
-// ) ;
-
-parser!(
-  fn ident_parser: Token {
-    { r"^[a-zA-Z][a-zA-Z_]*" }
-  }
-) ;
-
-// parser!(
-//   fn bool_parser: bool {
-//     | (["false"] => _ => { false })
-//     | (["true"] => _ => { true })
-//   }
-// ) ;
-
-// macro_rules! try_parse {
-//   ($e:expr) => (
-//     match $e {
-//       Result::Ok(res, lexer) => (res, lexer),
-//       Result::Err(e) => return Result::Err(e),
-//     }
-//   )
-// }
-
-
-trait SmtPrinter<Term> {
-  fn print_term(& mut self, w: & mut Write, term: & Term) -> IoResUnit ;
-  fn assert(& mut self, w: & mut Write, term: & Term) -> IoResUnit {
-    try!( write!(w, "(assert ") ) ;
-    try!( self.print_term(w, term) ) ;
-    write!(w, ")\n")
-  }
-  fn checksat(& mut self, w: & mut Write) -> IoResUnit {
-    write!(w, "(check-sat)\n")
-  }
-  fn get_model(& mut self, w: & mut Write) -> IoResUnit {
-    write!(w, "(get-model)\n")
+impl PrintSmt2<Offset> for SExpr {
+  fn to_smt2(& self, writer: & mut Write, offset: Offset) -> IoResUnit {
+    match * self {
+      Var(ref s) => write!(writer, "|{}|", s),
+      SVar0(ref sv) => write!(writer, "|{}@{}|", sv.id, offset.0),
+      SVar1(ref sv) => write!(writer, "|{}@{}|", sv.id, offset.1),
+      BConst(ref b) => write!(writer, "{}", b),
+      IConst(ref i) => write!(writer, "{}", i),
+      RConst(ref n, ref d) => write!(writer, "(/ {} {})", n, d),
+      Lambda(ref sym, ref args) => {
+        try!( write!(writer, "({}", sym) ) ;
+        for arg in args {
+          try!( arg.to_smt2(writer, offset) )
+        } ;
+        write!(writer, ")")
+      },
+    }
   }
 }
 
-parser!(
-  fn define_fun_head: () {
-    ["(define-fun"] => _ => { () }
-  }
-) ;
-parser!(
-  fn define_fun_tail: () {
-    [")"] => _ => { () }
-  }
-) ;
-parser!(
-  fn model_head: () {
-    ["(model"] => _ => { () }
-  }
-) ;
-parser!(
-  fn model_tail: () {
-    [")"] => _ => { () }
-  }
-) ;
 
-trait SmtParser<Term> {
-  fn parse_term(& mut self, lexer: & LexerCursor) -> Result<Term> ;
-
-  fn define_fun_parser(
-    & mut self, lexer: & LexerCursor
-  ) -> Result<(Term,Term)> {
-    let (_, lexer) = parse_try!( define_fun_head(& lexer) ) ;
-    let (term1, lexer) = parse_try!( self.parse_term(& lexer) ) ;
-    let (term2, lexer) = parse_try!( self.parse_term(& lexer) ) ;
-    let (_, lexer) = parse_try!( define_fun_tail(& lexer) ) ;
-    Result::Ok( (term1, term2), lexer )
-  }
-
-  fn get_model_parser(
-    & mut self, lexer: & LexerCursor
-  ) -> Result<Vec<(Term,Term)>> {
-    let (_, lexer) = parse_try!( model_head(& lexer) ) ;
-    let mut res = Vec::new() ;
-    let mut lexer = lexer ;
-    loop {
-      match self.define_fun_parser(& lexer) {
-        Result::Ok( (var, val), nu_lexer ) => {
-          res.push( (var,val) ) ;
-          lexer = nu_lexer
-        },
-        Result::Err(_) => break,
-      }
-    } ;
-    let (_, lexer) = parse_try!( model_tail(& lexer) ) ;
-    Result::Ok( res, lexer )
-  }
+named!{ var<SExpr>,
+  chain!(
+    tag!("|") ~
+    id: is_not!("@|") ~
+    int: opt!(
+      preceded!(
+        char!('@'),
+        alt!( char!('0') | char!('1') )
+      )
+    ) ~
+    tag!("|"),
+    || match int {
+      None => Var(
+        str::from_utf8(id).unwrap().to_string()
+      ),
+      Some('0') => SVar0(
+        SVar {
+          id: str::from_utf8(id).unwrap().to_string()
+        }
+      ),
+      Some('1') => SVar1(
+        SVar {
+          id: str::from_utf8(id).unwrap().to_string()
+        }
+      ),
+      _ => unreachable!(),
+    }
+  )
 }
 
-struct Dummy ;
-
-impl SmtParser<String> for Dummy {
-  fn parse_term(& mut self, lexer: & LexerCursor) -> Result<String> {
-    let (tkn, lexer) = parse_try!(ident_parser(lexer)) ;
-    Result::Ok(tkn.tkn, lexer)
-  }
+named!{ b_const<SExpr>,
+  map_res!(
+    alt!( tag!("true") | tag!("false") ),
+    |s| match FromStr::from_str(str::from_utf8(s).unwrap()) {
+      Err(e) => Err(e),
+      Ok(b) => Ok(BConst(b)),
+    }
+  )
 }
 
-fn main () {
-  println!("whatever") ;
-  let mut dummy = Dummy ;
-  let test_string =
-    "(model (define-fun a true ) (define-fun b false ) )".to_string() ;
-  let lexer = parse_comb::lexer::Lexer::of_string(
-    & test_string, & parse_comb::lexer::simple_is_whitespace
-  ) ;
-  match dummy.get_model_parser(
-    & parse_comb::lexer::LexerCursor::of_lexer(lexer)
-  ) {
-    Result::Ok(pairs, _) => for (var,val) in pairs {
-      println!("> {} = {}", var, val)
-    },
-    Result::Err(e) => println!("Error: {}", e),
-  }
+named!{ i_const<SExpr>,
+  map_res!(
+    map_res!(digit, str::from_utf8),
+    |s| match FromStr::from_str(s) {
+      Err(e) => Err(e),
+      Ok(i) => Ok(IConst(i)),
+    }
+  )
 }
+
+named!{ r_const<SExpr>,
+  chain!(
+    tag!("(") ~
+    opt!(multispace) ~
+    tag!("/") ~
+    multispace ~
+    lhs: digit ~
+    multispace ~
+    rhs: digit ~
+    opt!(multispace) ~
+    tag!(")"),
+    || RConst(
+      FromStr::from_str(str::from_utf8(lhs).unwrap()).unwrap(),
+      FromStr::from_str(str::from_utf8(rhs).unwrap()).unwrap()
+    )
+  )
+}
+
+named!{ lambda<SExpr>,
+  chain!(
+    tag!("(") ~
+    opt!(multispace) ~
+    sym: alt!(
+      tag!("*") | tag!("/")
+    ) ~
+    multispace ~
+    args: separated_list!(
+      multispace, sexpr
+    ) ~
+    opt!(multispace) ~
+    tag!(")"),
+    || Lambda(
+      FromStr::from_str(str::from_utf8(sym).unwrap()).unwrap(),
+      args
+    )
+  )
+}
+
+named!{ sexpr<SExpr>,
+  alt!(
+    i_const | r_const | b_const | var | lambda |
+    delimited!(
+      char!('('),
+      delimited!(
+        opt!(multispace),
+        sexpr,
+        opt!(multispace)
+      ),
+      char!(')')
+    )
+  )
+}
+
+named!{ top_sexpr<SExpr>,
+  delimited!(
+    opt!(multispace),
+    sexpr,
+    opt!(multispace)
+  )
+}
+
+fn print_parse_result<'a, I>(res: IResult<'a, I, SExpr>) {
+  match res {
+    Done(_,b) => println!("> {:?}", b),
+    Error(e) => println!("> error | {:?}", e),
+    Incomplete(n) => println!("> incomplete | {:?}", n),
+  } ;
+  println!("")
+}
+
+
+pub fn run_common() {
+  let bool_str = b"false" ;
+  println!("sexpr(\"{}\")", str::from_utf8(bool_str).unwrap()) ;
+  print_parse_result(top_sexpr(bool_str)) ;
+
+  let int_str = b"742" ;
+  println!("sexpr(\"{}\")", str::from_utf8(int_str).unwrap()) ;
+  print_parse_result(top_sexpr(int_str)) ;
+
+  let rat_str = b"(/ 742 5)" ;
+  println!("sexpr(\"{}\")", str::from_utf8(rat_str).unwrap()) ;
+  print_parse_result(top_sexpr(rat_str)) ;
+
+  let var_str = b"|a fucking identifier|" ;
+  println!("sexpr(\"{}\")", str::from_utf8(var_str).unwrap()) ;
+  print_parse_result(top_sexpr(var_str)) ;
+
+  let var_str = b"(|a fucking identifier|)" ;
+  println!("sexpr(\"{}\")", str::from_utf8(var_str).unwrap()) ;
+  print_parse_result(top_sexpr(var_str)) ;
+
+  let svar_str = b"|a fucking state var @0|" ;
+  println!("sexpr(\"{}\")", str::from_utf8(svar_str).unwrap()) ;
+  print_parse_result(top_sexpr(svar_str)) ;
+
+  let svar_str = b"|a fucking state var @1|" ;
+  println!("sexpr(\"{}\")", str::from_utf8(svar_str).unwrap()) ;
+  print_parse_result(top_sexpr(svar_str)) ;
+
+  let expr_str = b"(* |svar  @1| 7 (/ 7 352))" ;
+  println!("sexpr(\"{}\")", str::from_utf8(expr_str).unwrap()) ;
+  print_parse_result(top_sexpr(expr_str)) ;
+
+  let expr_str = b"( (* |svar  @1| 7 (/ 7 352))      )" ;
+  println!("sexpr(\"{}\")", str::from_utf8(expr_str).unwrap()) ;
+  print_parse_result(top_sexpr(expr_str)) ;
+
+  ()
+}
+
+
+pub fn run_common_file() {
+  use std::io::{BufReader} ;
+  use std::fs::File ;
+  use std::path::Path ;
+
+  use nom::{ReadProducer, Stepper} ;
+  use nom::StepperState::* ;
+
+  let path = Path::new("rsc/test") ;
+  let f = File::open(path).unwrap() ;
+  let reader = BufReader::new(f) ;
+  let rp = ReadProducer::new(reader, 1000) ;
+  let mut stepper = Stepper::new(rp) ;
+
+  loop {
+    match stepper.step(top_sexpr) {
+      Value(expr) => println!("| {:?}", expr),
+      step => { println!("\\ {:?}", step) ; break }
+    }
+  } ;
+
+  ()
+}
+
+
+fn main() {
+  println!("\n") ;
+
+  run_common() ;
+
+  println!("\n") ;
+
+  run_common_file() ;
+
+  println!("\n") ;
+
+  ()
+}
+
+
 

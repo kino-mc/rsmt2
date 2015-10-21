@@ -4,10 +4,10 @@ A wrapper around the z3 SMT solver.
 
 "]
 
-extern crate parse_comb ;
+extern crate nom ;
 
 pub mod common ;
-// pub mod conf ;
+pub mod conf ;
 // pub mod solver_traits ;
 // pub mod solver ;
 
