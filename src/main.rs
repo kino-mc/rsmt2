@@ -13,13 +13,16 @@ use nom::IResult::*;
 use SExpr::* ;
 
 mod common ;
+mod conf ;
+mod parse ;
+mod solver ;
 
 use common::* ;
 
-#[derive(Debug)]
+#[derive(Debug,Clone)]
 struct SVar { pub id: String }
 
-#[derive(Debug)]
+#[derive(Debug,Clone)]
 enum SExpr {
   Var(String),
   SVar0(SVar),
@@ -240,6 +243,67 @@ pub fn run_common_file() {
   ()
 }
 
+pub fn run_solver() {
+  use ::conf::* ;
+  use ::solver::* ;
+  use std::process::Command ;
+
+  let conf = SolverConf::z3() ;
+  let cmd = Command::new("z3") ;
+
+  let mut solver = match Solver::mk(cmd, conf, ()) {
+    Ok(solver) => solver,
+    Err(e) => panic!("{:?}", e),
+  } ;
+
+  let v1 = Var("v1".to_string()) ;
+  let sv = SVar{ id: "sv".to_string() } ;
+  let sv_at_0 = SVar0(sv) ;
+  let lambda1 = Lambda(
+    "and".to_string(), vec![v1.clone(), sv_at_0.clone()]
+  ) ;
+  let lambda2 = Lambda(
+    "not".to_string(), vec![sv_at_0.clone()]
+  ) ;
+  let offset1 = Offset(7,6) ;
+  let offset2 = Offset(6,5) ;
+
+  println!("declaring {:?}", v1) ;
+  solver.declare_fun(& v1, offset1, &[], "bool") ;
+  println!("declaring {:?}, offset is {:?}", sv_at_0, offset1) ;
+  solver.declare_fun(& sv_at_0, offset1, &[], "bool") ;
+  println!("asserting {:?}, offset is {:?}", lambda1, offset1) ;
+  solver.assert(& lambda1, offset1) ;
+  println!("check-sat") ;
+  solver.check_sat() ;
+  match solver.parse_check_sat() {
+    Ok(true) => println!("sat"),
+    Ok(false) => println!("unsat"),
+    Err(e) => println!("error: {:?}", e),
+  } ;
+  println!("declaring {:?}, offset is {:?}", sv_at_0, offset2) ;
+  solver.declare_fun(& sv_at_0, offset2, &[], "bool") ;
+  println!("asserting {:?}, offset is {:?}", lambda2, offset2) ;
+  solver.assert(& lambda2, offset2) ;
+  println!("check-sat") ;
+  solver.check_sat() ;
+  match solver.parse_check_sat() {
+    Ok(true) => println!("sat"),
+    Ok(false) => println!("unsat"),
+    Err(e) => println!("error: {:?}", e),
+  } ;
+  println!("asserting {:?}, offset is {:?}", lambda2, offset1) ;
+  solver.assert(& lambda2, offset1) ;
+  println!("check-sat") ;
+  solver.check_sat() ;
+  match solver.parse_check_sat() {
+    Ok(true) => println!("sat"),
+    Ok(false) => println!("unsat"),
+    Err(e) => println!("error: {:?}", e),
+  } ;
+  ()
+}
+
 
 fn main() {
   println!("\n") ;
@@ -249,6 +313,10 @@ fn main() {
   println!("\n") ;
 
   run_common_file() ;
+
+  println!("\n") ;
+
+  run_solver() ;
 
   println!("\n") ;
 

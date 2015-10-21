@@ -5,8 +5,6 @@ use std::process::Command ;
 
 use common::UnexSmtRes ;
 
-use ::Solver ;
-
 use self::SolverStyle::* ;
 
 /** A configuration item is either a keyword or unsupported. */
@@ -87,11 +85,11 @@ impl SolverConf {
   }
 
 
-  /** Creates a solver instance. */
-  #[inline(always)]
-  pub fn mk<Parser>(
-    self, cmd: Command, parser: Parser
-  ) -> io::Result<Solver<Parser>> {
-    Solver::mk(cmd, self, parser)
-  }
+  // /** Creates a solver instance. */
+  // #[inline(always)]
+  // pub fn mk<Parser>(
+  //   self, cmd: Command, parser: Parser
+  // ) -> io::Result<Solver<Parser>> {
+  //   Solver::mk(cmd, self, parser)
+  // }
 }

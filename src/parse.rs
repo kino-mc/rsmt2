@@ -8,11 +8,11 @@ use common::{ UnexSmtRes, SmtRes } ;
 use common::UnexSmtRes::* ;
 
 
-named!{ unsupported<UnexSmtRes>,
+named!{ pub unsupported<UnexSmtRes>,
   map!( tag!("unsupported"), |_| Unsupported )
 }
 
-named!{ error<UnexSmtRes>,
+named!{ pub error<UnexSmtRes>,
   chain!(
     char!('(') ~
     opt!(multispace) ~
@@ -27,12 +27,12 @@ named!{ error<UnexSmtRes>,
   )
 }
 
-named!{ unexpected<UnexSmtRes>, alt!( unsupported | error ) }
+named!{ pub unexpected<UnexSmtRes>, alt!( unsupported | error ) }
 
 
 pub type SuccessRes = SmtRes<()> ;
 
-named!{ success<SuccessRes>,
+named!{ pub success<SuccessRes>,
   alt!(
     map!( tag!("success"), |_| Ok(()) ) |
     map!( unexpected, |e| Err(e) )
@@ -42,7 +42,7 @@ named!{ success<SuccessRes>,
 
 pub type CheckSatRes = SmtRes<bool> ;
 
-named!{ check_sat<CheckSatRes>,
+named!{ pub check_sat<CheckSatRes>,
   alt!(
     map!( tag!("sat"), |_| Ok(true) ) |
     map!( tag!("unsat"), |_| Ok(false) ) |

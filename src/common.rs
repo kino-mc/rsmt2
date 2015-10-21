@@ -3,6 +3,7 @@ Basic types used by the library.
 */
 
 use std::io ;
+use std::process ;
 
 use nom::IResult ;
 
@@ -35,6 +36,12 @@ printing info, typically the unrolling depth in model-checking. */
 pub trait PrintSmt2<T> {
   /** Prints something in the SMT lib 2 standard. */
   fn to_smt2(& self, writer: & mut io::Write, info: T) -> IoResUnit ;
+}
+
+impl<'a> PrintSmt2<()> for & 'a str {
+  fn to_smt2(& self, writer: & mut io::Write, _: ()) -> IoResUnit {
+    write!(writer, "{}", self)
+  }
 }
 
 
@@ -127,5 +134,71 @@ pub trait ParseSmt2<Ident, Value, Expr, Proof> : io::Read {
   fn parse_proof<'a, F>(& self) -> F
   where F: Fn(&'a [u8]) -> IResult<&'a [u8], Proof> ;
 }
+
+
+
+
+/** Wrapper a `Child` to implement `Read`. */
+pub struct Kid {
+  kid: process::Child,
+}
+
+impl Kid {
+
+  /** Creates a new Kid. */
+  #[inline(always)]
+  pub fn mk(kid: process::Child) -> Self { Kid { kid: kid } }
+
+  /** A reference on the underlying child. */
+  #[inline(always)]
+  pub fn get(& self) -> & process::Child { & self.kid }
+
+  /** Unwraps the underlying child. */
+  #[inline(always)]
+  pub fn unwrap(self) -> process::Child { self.kid }
+
+  /** Kills the underlying child. */
+  pub fn kill(mut self) -> IoResUnit{ self.kid.kill() }
+
+  /** A reference on the child's stdin. */
+  #[inline(always)]
+  pub fn stdin(& mut self) -> Option<& mut process::ChildStdin> {
+    match self.kid.stdin {
+      None => None, Some(ref mut stdin) => Some(stdin)
+    }
+  }
+
+  /** A reference on the child's stderr. */
+  #[inline(always)]
+  pub fn stderr(& mut self) -> Option<& mut process::ChildStderr> {
+    match self.kid.stderr {
+      None => None, Some(ref mut stderr) => Some(stderr)
+    }
+  }
+
+  /** A reference on the child's stdout. */
+  #[inline(always)]
+  pub fn stdout(& mut self) -> Option<& mut process::ChildStdout> {
+    match self.kid.stdout {
+      None => None, Some(ref mut stdout) => Some(stdout)
+    }
+  }
+
+}
+
+impl<'a> io::Read for & 'a mut Kid {
+  fn read(& mut self, buf: &mut [u8]) -> io::Result<usize> {
+    use ::std::io::{ Read, Error, ErrorKind } ;
+    match self.kid.stdout {
+      None => Err(
+        Error::new(
+          ErrorKind::Other, "cannot access reader of child process"
+        )
+      ),
+      Some(ref mut stdout) => stdout.read(buf)
+    }
+  }
+}
+
 
 
