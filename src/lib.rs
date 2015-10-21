@@ -6,11 +6,12 @@
 * Add inline to many of the commands in solver.
 */
 
+#[macro_use]
 extern crate nom ;
 
 pub mod common ;
 pub mod conf ;
-
+pub mod parse ;
 
 
 use std::process::{ Command, Child, Stdio } ;
@@ -20,7 +21,6 @@ use std::convert::AsRef ;
 
 use common::* ;
 use conf::SolverConf ;
-
 
 
 /** Contains the actual solver process. */
@@ -119,11 +119,11 @@ impl<
 
   /** Prints some text as comments. Input is sanitized in case it contains
   newlines. */
-  fn comment(& mut self, txt: & str) -> IoResUnit {
+  pub fn comment(& mut self, txt: & str) -> IoResUnit {
     self.comments(txt.lines())
   }
   /** Prints some lines as SMT lib 2 comments. */
-  fn comments(
+  pub fn comments(
     & mut self, lines: ::std::str::Lines
   ) -> IoResUnit {
     let mut writer = self.writer() ;
@@ -136,14 +136,14 @@ impl<
 
   /** Resets the underlying solver. Restarts the kid process if no reset
   command is supported. */
-  fn reset(
+  pub fn reset(
     & mut self
   ) -> IoResUnit {
     let mut writer = self.writer() ;
     write!(writer, "(reset)\n\n")
   }
   /** Sets the logic. */
-  fn set_logic(
+  pub fn set_logic(
     & mut self, logic: & Logic
   ) -> IoResUnit {
     let mut writer = self.writer() ;
@@ -152,14 +152,14 @@ impl<
     write!(writer, ")\n\n")
   }
   /** Set option command. */
-  fn set_option(
+  pub fn set_option(
     & mut self, option: & str, value: & str
   ) -> IoResUnit {
     let mut writer = self.writer() ;
     write!(writer, "(set-option {} {})\n\n", option, value)
   }
   /** Shuts the solver down. */
-  fn exit(
+  pub fn exit(
     & mut self
   ) -> IoResUnit {
     let mut writer = self.writer() ;
@@ -170,21 +170,21 @@ impl<
   // |===| Modifying the assertion stack.
 
   /** Pushes `n` layers on the assertion stack. */
-  fn push(
+  pub fn push(
     & mut self, n: & u8
   ) -> IoResUnit {
     let mut writer = self.writer() ;
     write!(writer, "(push {})\n\n", n)
   }
   /** Pops `n` layers off the assertion stack. */
-  fn pop(
+  pub fn pop(
     & mut self, n: & u8
   ) -> IoResUnit {
     let mut writer = self.writer() ;
     write!(writer, "(pop {})\n\n", n)
   }
   /** Resets the assertions in the solver. */
-  fn reset_assertions(
+  pub fn reset_assertions(
     & mut self
   ) -> IoResUnit {
     let mut writer = self.writer() ;
@@ -195,7 +195,7 @@ impl<
   // |===| Introducing new symbols.
 
   /** Declares a new sort. */
-  fn declare_sort<Sort: PrintSmt2<()>>(
+  pub fn declare_sort<Sort: PrintSmt2<()>>(
     & mut self, sort: Sort, arity: & u8
   ) -> IoResUnit {
     let mut writer = self.writer() ;
@@ -204,7 +204,7 @@ impl<
     write!(writer, " {})\n\n", arity)
   }
   /** Defines a new sort. */
-  fn define_sort<Sort: PrintSmt2<()>, Expr: PrintSmt2<()>>(
+  pub fn define_sort<Sort: PrintSmt2<()>, Expr: PrintSmt2<()>>(
     & mut self, sort: Sort, args: & [ Expr ], body: Expr
   ) -> IoResUnit {
     let mut writer = self.writer() ;
@@ -220,7 +220,7 @@ impl<
     write!(writer, "\n)\n\n")
   }
   /** Declares a new function symbol. */
-  fn declare_fun<Sort: PrintSmt2<()>, Ident: PrintSmt2<()>>(
+  pub fn declare_fun<Sort: PrintSmt2<()>, Ident: PrintSmt2<()>>(
     & mut self, symbol: Ident, args: & [ Sort ], out: Sort
   ) -> IoResUnit {
     let mut writer = self.writer() ;
@@ -236,7 +236,7 @@ impl<
     write!(writer, ")\n\n")
   }
   /** Declares a new constant. */
-  fn declare_const<Sort: PrintSmt2<()>, Ident: PrintSmt2<()>>(
+  pub fn declare_const<Sort: PrintSmt2<()>, Ident: PrintSmt2<()>>(
     & mut self, symbol: Ident, out_sort: Sort
   ) -> IoResUnit {
     let mut writer = self.writer() ;
@@ -247,7 +247,7 @@ impl<
     write!(writer, ")\n\n")
   }
   /** Defines a new function symbol. */
-  fn define_fun<
+  pub fn define_fun<
     Sort: PrintSmt2<()>, Ident: PrintSmt2<()>, Expr: PrintSmt2<()>
   >(
     & mut self,
@@ -272,7 +272,7 @@ impl<
     write!(writer, "\n)\n\n")
   }
   /** Defines some new (possibily mutually) recursive functions. */
-  fn define_funs_rec<
+  pub fn define_funs_rec<
     Sort: PrintSmt2<()>, Ident: PrintSmt2<()>, Expr: PrintSmt2<()>
   >(
     & mut self, funs: & [ (Ident, & [ (Ident, Sort) ], Sort, Expr) ]
@@ -310,7 +310,7 @@ impl<
     write!(writer, "\n )\n)\n\n")
   }
   /** Defines a new recursive function. */
-  fn define_fun_rec<
+  pub fn define_fun_rec<
     Sort: PrintSmt2<()>, Ident: PrintSmt2<()>, Expr: PrintSmt2<()>
   >(
     & mut self,  symbol: Ident, args: & [ (Ident, Sort) ], out: Sort, body: Expr
@@ -346,7 +346,7 @@ impl<
   // |===| Asserting and inspecting formulas.
 
   /** Asserts an expression with some print information. */
-  fn assert<PrintInfo, Expr: PrintSmt2<PrintInfo>>(
+  pub fn assert<PrintInfo, Expr: PrintSmt2<PrintInfo>>(
     & mut self, expr: Expr, info: PrintInfo
   ) -> IoResUnit {
     let mut writer = self.writer() ;
@@ -355,13 +355,13 @@ impl<
     write!(writer, "\n)")
   }
   /** Asserts an expression without any print info. `ninfo` = no info. */
-  fn ninfo_assert<Expr: PrintSmt2<()>>(
+  pub fn ninfo_assert<Expr: PrintSmt2<()>>(
     & mut self, expr: Expr
   ) -> IoResUnit {
     self.assert(expr, ())
   }
   /** Get assertions command. */
-  fn get_assertions(
+  pub fn get_assertions(
     & mut self
   ) -> IoResUnit {
     let mut writer = self.writer() ;
@@ -372,12 +372,12 @@ impl<
   // |===| Checking for satisfiability.
 
   /** Check-sat command. */
-  fn check_sat(& mut self) -> IoResUnit {
+  pub fn check_sat(& mut self) -> IoResUnit {
     let mut writer = self.writer() ;
     write!(writer, "(check-sat)\n\n")
   }
   /** Check-sat assuming command. */
-  fn check_sat_assuming<PrintInfo: Copy, Ident: PrintSmt2<PrintInfo>>(
+  pub fn check_sat_assuming<PrintInfo: Copy, Ident: PrintSmt2<PrintInfo>>(
     & mut self, bool_vars: & [ Ident ], info: PrintInfo
   ) -> IoResUnit {
     match self.conf.check_sat_assuming() {
@@ -394,7 +394,7 @@ impl<
     }
   }
   /** Check-sat assuming command, no info version. */
-  fn ninfo_check_sat_assuming<Ident: PrintSmt2<()>>(
+  pub fn ninfo_check_sat_assuming<Ident: PrintSmt2<()>>(
     & mut self, bool_vars: & [ Ident ]
   ) -> IoResUnit {
     self.check_sat_assuming(bool_vars, ())
@@ -404,7 +404,7 @@ impl<
   // |===| Inspecting models.
 
   /** Get value command. */
-  fn get_value<PrintInfo: Copy, Expr: PrintSmt2<PrintInfo>>(
+  pub fn get_value<PrintInfo: Copy, Expr: PrintSmt2<PrintInfo>>(
     & mut self, exprs: & [ Expr ], info: PrintInfo
   ) -> IoResUnit {
     let mut writer = self.writer() ;
@@ -416,18 +416,18 @@ impl<
     write!(writer, "\n)\n\n")
   }
   /** Get value command, no info version. */
-  fn ninfo_get_value<Expr: PrintSmt2<()>>(
+  pub fn ninfo_get_value<Expr: PrintSmt2<()>>(
     & mut self, exprs: & [ Expr]
   ) -> IoResUnit {
     self.get_value(exprs, ())
   }
   /** Get assignment command. */
-  fn get_assignment(& mut self) -> IoResUnit {
+  pub fn get_assignment(& mut self) -> IoResUnit {
     let mut writer = self.writer() ;
     write!(writer, "(get-assignment)\n\n")
   }
   /** Get model command. */
-  fn get_model(& mut self) -> IoResUnit {
+  pub fn get_model(& mut self) -> IoResUnit {
     let mut writer = self.writer() ;
     write!(writer, "(get-model)\n\n")
   }
@@ -436,21 +436,21 @@ impl<
   // |===| Inspecting proofs.
 
   /** Get unsat assumptions command. */
-  fn get_unsat_assumptions(
+  pub fn get_unsat_assumptions(
     & mut self
   ) -> IoResUnit {
     let mut writer = self.writer() ;
     write!(writer, "(get-unsat-assumptions)\n\n")
   }
   /** Get proof command. */
-  fn get_proof(
+  pub fn get_proof(
     & mut self
   ) -> IoResUnit {
     let mut writer = self.writer() ;
     write!(writer, "(get-proof)\n\n")
   }
   /** Get unsat core command. */
-  fn get_unsat_core(
+  pub fn get_unsat_core(
     & mut self
   ) -> IoResUnit {
     let mut writer = self.writer() ;
@@ -460,14 +460,14 @@ impl<
   // |===| Inspecting settings.
 
   /** Get info command. */
-  fn get_info(
+  pub fn get_info(
     & mut self, flag: & str
   ) -> IoResUnit {
     let mut writer = self.writer() ;
     write!(writer, "(get-info {})\n\n", flag)
   }
   /** Get option command. */
-  fn get_option(
+  pub fn get_option(
     & mut self, option: & str
   ) -> IoResUnit {
     let mut writer = self.writer() ;
@@ -477,20 +477,41 @@ impl<
   // |===| Script information.
 
   /** Set info command. */
-  fn set_info(
+  pub fn set_info(
     & mut self, attribute: & str
   ) -> IoResUnit {
     let mut writer = self.writer() ;
     write!(writer, "(set-info {})\n\n", attribute)
   }
   /** Echo command. */
-  fn echo(
+  pub fn echo(
     & mut self, text: & str
   ) -> IoResUnit {
     let mut writer = self.writer() ;
     write!(writer, "(echo \"{}\")\n\n", text)
   }
+
+
+  // |===| Parsing simple stuff.
+
+  pub fn parse_success(& mut self) -> IoResUnit {
+    Ok(())
+  }
+
+  pub fn parse_check_sat(& mut self) -> IoResBool {
+    Ok(false)
+  }
 }
+
+
+
+// impl<
+//   Ident, Value, Expr, Proof, Parser: ParseSmt2<Ident, Value, Expr, Proof>
+// > Solver<Parser> {
+
+
+// }
+
 
 
 // /** Can parse the result of SMT lib 2 queries. */
@@ -498,16 +519,8 @@ impl<
 //   Ident, Value, Expr, Proof
 // > Smt2Parse<Ident, Value, Expr, Proof> for Solver {
 
-//   fn parse_success(& mut self) -> IoResUnit {
-//     Ok(())
-//   }
-
 //   fn parse_assertions(& mut self) -> IoRes<Option<Vec<Expr>>> {
 //     Ok(None)
-//   }
-
-//   fn parse_check_sat(& mut self) -> IoResBool {
-//     Ok(false)
 //   }
 
 //   fn parse_value(& mut self) -> IoRes<Option<Vec<Value>>> {

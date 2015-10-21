@@ -18,12 +18,15 @@ pub type IoRes<T> = io::Result<T> ;
 
 /** Unexpected result for an SMT lib 2 command. */
 #[derive(Debug)]
-pub enum UnexSmtResult {
+pub enum UnexSmtRes {
   /** An unsupported command was issue. */
   Unsupported,
   /** A command produced an error. */
   Error(String)
 }
+
+/** Result of an SMT query. */
+pub type SmtRes<T> = Result<T, UnexSmtRes> ;
 
 
 
@@ -81,7 +84,7 @@ impl PrintSmt2<()> for Logic {
 
 
 /** Generic type for the parsing of an SMT lib 2 command. */
-pub type SmtParseResult<T> = Result<T, UnexSmtResult> ;
+pub type SmtParseResult<T> = Result<T, UnexSmtRes> ;
 
 
 
@@ -124,3 +127,5 @@ pub trait ParseSmt2<Ident, Value, Expr, Proof> : io::Read {
   fn parse_proof<'a, F>(& self) -> F
   where F: Fn(&'a [u8]) -> IResult<&'a [u8], Proof> ;
 }
+
+

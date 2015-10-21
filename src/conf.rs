@@ -3,18 +3,18 @@
 use std::io ;
 use std::process::Command ;
 
-use common::UnexSmtResult ;
+use common::UnexSmtRes ;
 
 use ::Solver ;
 
 use self::SolverStyle::* ;
 
 /** A configuration item is either a keyword or unsupported. */
-pub type ConfItem = Result<& 'static str, UnexSmtResult> ;
+pub type ConfItem = Result<& 'static str, UnexSmtRes> ;
 
 /** Value of an unsupported configuration item. */
 #[inline(always)]
-fn unsupported() -> ConfItem { Err(UnexSmtResult::Unsupported) }
+fn unsupported() -> ConfItem { Err(UnexSmtRes::Unsupported) }
 /** Keyword for a configuration item. */
 #[inline(always)]
 fn supported(keyword: & 'static str) -> ConfItem { Ok(keyword) }
