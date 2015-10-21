@@ -1,8 +1,11 @@
-#![ doc = "
-Solver configuration, contains backend solver specific info.
-"]
+/*! Solver configuration, contains backend solver specific info. */
+
+use std::io ;
+use std::process::Command ;
 
 use common::UnexSmtResult ;
+
+use ::Solver ;
 
 use self::SolverStyle::* ;
 
@@ -81,5 +84,14 @@ impl SolverConf {
   #[inline(always)]
   pub fn check_sat_assuming(& self) -> & ConfItem {
     & self.check_sat_assuming
+  }
+
+
+  /** Creates a solver instance. */
+  #[inline(always)]
+  pub fn mk<Parser>(
+    self, cmd: Command, parser: Parser
+  ) -> io::Result<Solver<Parser>> {
+    Solver::mk(cmd, self, parser)
   }
 }

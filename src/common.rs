@@ -17,6 +17,7 @@ pub type IoRes<T> = io::Result<T> ;
 
 
 /** Unexpected result for an SMT lib 2 command. */
+#[derive(Debug)]
 pub enum UnexSmtResult {
   /** An unsupported command was issue. */
   Unsupported,
