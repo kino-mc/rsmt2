@@ -272,8 +272,10 @@ pub fn run_solver() {
   solver.declare_fun(& v1, offset1, &[], "bool") ;
   println!("declaring {:?}, offset is {:?}", sv_at_0, offset1) ;
   solver.declare_fun(& sv_at_0, offset1, &[], "bool") ;
+
   println!("asserting {:?}, offset is {:?}", lambda1, offset1) ;
   solver.assert(& lambda1, offset1) ;
+
   println!("check-sat") ;
   solver.check_sat() ;
   match solver.parse_check_sat() {
@@ -281,10 +283,13 @@ pub fn run_solver() {
     Ok(false) => println!("unsat"),
     Err(e) => println!("error: {:?}", e),
   } ;
+
   println!("declaring {:?}, offset is {:?}", sv_at_0, offset2) ;
   solver.declare_fun(& sv_at_0, offset2, &[], "bool") ;
+
   println!("asserting {:?}, offset is {:?}", lambda2, offset2) ;
   solver.assert(& lambda2, offset2) ;
+
   println!("check-sat") ;
   solver.check_sat() ;
   match solver.parse_check_sat() {
@@ -292,8 +297,10 @@ pub fn run_solver() {
     Ok(false) => println!("unsat"),
     Err(e) => println!("error: {:?}", e),
   } ;
+
   println!("asserting {:?}, offset is {:?}", lambda2, offset1) ;
   solver.assert(& lambda2, offset1) ;
+
   println!("check-sat") ;
   solver.check_sat() ;
   match solver.parse_check_sat() {
@@ -301,6 +308,9 @@ pub fn run_solver() {
     Ok(false) => println!("unsat"),
     Err(e) => println!("error: {:?}", e),
   } ;
+
+  solver.kill() ;
+
   ()
 }
 
