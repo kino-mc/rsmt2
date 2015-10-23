@@ -4,14 +4,15 @@ Implements all the printing and parsing methods for the SMT lib 2 standard.
 
 
 use std::process::{ Command, Child, Stdio } ;
+use std::fmt::Debug ;
 use std::io ;
 use std::io::{ Write, Read } ;
 use std::process ;
 use std::ffi::OsStr ;
 use std::convert::AsRef ;
 
-
 use common::* ;
+use common::stepper::* ;
 use conf::SolverConf ;
 use parse::* ;
 
@@ -28,8 +29,29 @@ macro_rules! try_writer {
   )
 }
 
+macro_rules! stepper_of {
+  ($e:expr) => (
+    {
+      use nom::ReadProducer ;
+      let producer = ReadProducer::new(& mut $e, 1000) ;
+      Stepper::new(producer)
+    }
+  )
+}
+
+macro_rules! take_step {
+  ($stepper:expr, $parser:expr) => (
+    match $stepper.current_step($parser) {
+      nome::StepperState::Continue => $stepper.step($parser),
+      res => res,
+    }
+  )
+}
+
 /** Contains the actual solver process. */
-pub struct Solver<Parser> {
+pub struct Solver<
+  Parser: ParseSmt2
+> {
   /** The command used to run the solver. */
   cmd: Command,
   /** The actual solver child process. */
@@ -42,8 +64,7 @@ pub struct Solver<Parser> {
 
 impl<
   /* Parsing-related type parameters. */
-  // Ident, Value, Expr, Proof,
-  Parser
+  Parser: ParseSmt2
 > Solver<Parser> {
 
   /** Creates a new solver. */
@@ -442,22 +463,22 @@ impl<
   // |===| Inspecting models.
 
   /** Get value command. */
-  pub fn get_value<PrintInfo: Copy, Expr: PrintSmt2<PrintInfo>>(
+  pub fn get_values<PrintInfo: Copy, Expr: PrintSmt2<PrintInfo>>(
     & mut self, exprs: & [ Expr ], info: PrintInfo
   ) -> IoResUnit {
     let mut writer = try_writer!( self.writer() ) ;
-    try!( write!(writer, "(get-value") ) ;
+    try!( write!(writer, "(get-value (") ) ;
     for e in exprs {
       try!( write!(writer, "\n  ") ) ;
       try!( e.to_smt2(writer, info) )
     } ;
-    write!(writer, "\n)\n\n")
+    write!(writer, "\n) )\n\n")
   }
   /** Get value command, no info version. */
-  pub fn ninfo_get_value<Expr: PrintSmt2<()>>(
+  pub fn ninfo_get_values<Expr: PrintSmt2<()>>(
     & mut self, exprs: & [ Expr]
   ) -> IoResUnit {
-    self.get_value(exprs, ())
+    self.get_values(exprs, ())
   }
   /** Get assignment command. */
   pub fn get_assignment(& mut self) -> IoResUnit {
@@ -533,10 +554,8 @@ impl<
   // |===| Parsing simple stuff.
 
   pub fn parse_success(& mut self) -> SuccessRes {
-    use nom::{ ReadProducer, Stepper } ;
     use nom::StepperState::* ;
-    let producer = ReadProducer::new(& mut self.kid, 1000) ;
-    let mut stepper = Stepper::new(producer) ;
+    let mut stepper = stepper_of!(self.kid) ;
     loop {
       match stepper.step( success ) {
         Value( Ok(()) ) => println!("parsed success"),
@@ -548,10 +567,8 @@ impl<
   }
 
   pub fn parse_check_sat(& mut self) -> CheckSatRes {
-    use nom::{ ReadProducer, Stepper } ;
     use nom::StepperState::* ;
-    let producer = ReadProducer::new(& mut self.kid, 1000) ;
-    let mut stepper = Stepper::new(producer) ;
+    let mut stepper = stepper_of!(self.kid) ;
     loop {
       match stepper.step( check_sat ) {
         Value( res ) => return res,
@@ -559,18 +576,60 @@ impl<
         step => panic!("{:?}", step),
       }
     }
-    Ok(false)
+  }
+
+  pub fn parse_values(& mut self) -> SmtRes<Vec<(
+    Parser::Expr, Parser::Value
+  )>> where Parser::Value: Debug, Parser::Expr: Debug {
+    use nom::StepperState::* ;
+    use parse::{ open_paren, close_paren, unexpected } ;
+    let parser = & self.parser ;
+    let mut stepper = stepper_of!(self.kid) ;
+    loop {
+      match stepper.step (
+        closure!(
+          alt!(
+            map!( unexpected, |e| Some(e) ) |
+            map!( open_paren, |_| None )
+          )
+        )
+      ) {
+        Value( Some(err) ) => return Err(err),
+        Value( None ) => break,
+        ParserError(::nom::Err::Position(p,txt)) => {
+          panic!("at {}: \"{}\"", p, ::std::str::from_utf8(txt).unwrap())
+        },
+        step => panic!("{:?}", step),
+      }
+    }
+    let mut vec = vec![] ;
+    loop {
+      match stepper.current_step(
+        closure!(
+          alt!(
+            map!(open_paren, |_| false) | map!(close_paren, |_| true)
+          )
+        )
+      ) {
+        Value(closed) => if closed { return Ok(vec) },
+        step => panic!("{:?}", step),
+      } ;
+      let expr = match stepper.current_step(|array| parser.parse_expr(array)) {
+        Value(expr) => expr,
+        step => panic!("{:?}", step),
+      } ;
+      let val = match stepper.current_step(|array| parser.parse_value(array)) {
+        Value(value) => value,
+        step => panic!("{:?}", step),
+      } ;
+      match stepper.current_step(close_paren) {
+        Value(_) => (),
+        step => panic!("{:?}", step),
+      } ;
+      vec.push((expr,val)) ;
+    }
   }
 }
-
-
-
-// impl<
-//   Ident, Value, Expr, Proof, Parser: ParseSmt2<Ident, Value, Expr, Proof>
-// > Solver<Parser> {
-
-
-// }
 
 
 

@@ -96,7 +96,12 @@ pub type SmtParseResult<T> = Result<T, UnexSmtRes> ;
 
 
 /** Parse methods. Not all of them are necessary depending on the queries wanted. See each method for details.*/
-pub trait ParseSmt2<Ident, Value, Expr, Proof> : io::Read {
+pub trait ParseSmt2 {
+  type Ident ;
+  type Value ;
+  type Expr ;
+  type Proof ;
+
   /** Parses an ident from self, viewed as a reader.
   
   Required by
@@ -105,8 +110,7 @@ pub trait ParseSmt2<Ident, Value, Expr, Proof> : io::Read {
   * `get-model`
   * `get-unsat-assumptions`
   * `get-unsat-core` */
-  fn parse_ident<'a, F>(& self) -> F
-  where F: Fn(&'a [u8]) -> IResult<&'a [u8], Ident> ;
+  fn parse_ident<'a>(& self, & 'a [u8]) -> IResult<'a, & 'a [u8], Self::Ident> ;
 
   /** Parses a value from self, viewed as a reader.
 
@@ -115,26 +119,41 @@ pub trait ParseSmt2<Ident, Value, Expr, Proof> : io::Read {
   * `get-value`
   * `get-assignment`
   * `get-model` */
-  fn parse_value<'a, F>(& self) -> F
-  where F: Fn(&'a [u8]) -> IResult<&'a [u8], Value> ;
+  fn parse_value<'a>(& self, & 'a [u8]) -> IResult<'a, & 'a [u8], Self::Value> ;
 
   /** Parses an expression from self, viewed as a reader.
 
   Required by
 
   * `get_assertions` */
-  fn parse_expr<'a, F>(& self) -> F
-  where F: Fn(&'a [u8]) -> IResult<&'a [u8], Expr> ;
+  fn parse_expr<'a>(& self, & 'a [u8]) -> IResult<'a, & 'a [u8], Self::Expr> ;
 
   /** Parses a proof from self, viewed as a reader.
 
   Required by
 
   * `get_proof` */
-  fn parse_proof<'a, F>(& self) -> F
-  where F: Fn(&'a [u8]) -> IResult<&'a [u8], Proof> ;
+  fn parse_proof<'a>(& self, & 'a [u8]) -> IResult<'a, & 'a [u8], Self::Proof> ;
 }
 
+impl ParseSmt2 for () {
+  type Ident = () ;
+  type Value = () ;
+  type Expr = () ;
+  type Proof = () ;
+  fn parse_ident<'a>(& self, _: & 'a [u8]) -> IResult<'a, & 'a [u8], Self::Ident> {
+    panic!("parser on () called")
+  }
+  fn parse_value<'a>(& self, _: & 'a [u8]) -> IResult<'a, & 'a [u8], Self::Value> {
+    panic!("parser on () called")
+  }
+  fn parse_expr<'a>(& self, _: & 'a [u8]) -> IResult<'a, & 'a [u8], Self::Expr> {
+    panic!("parser on () called")
+  }
+  fn parse_proof<'a>(& self, _: & 'a [u8]) -> IResult<'a, & 'a [u8], Self::Proof> {
+    panic!("parser on () called")
+  }
+}
 
 
 
@@ -195,10 +214,120 @@ impl<'a> io::Read for & 'a mut Kid {
           ErrorKind::Other, "cannot access reader of child process"
         )
       ),
-      Some(ref mut stdout) => stdout.read(buf)
+      Some(ref mut stdout) => {
+        let out = stdout.read(buf) ;
+        out
+      }
     }
   }
 }
 
 
 
+pub mod stepper {
+  use nom::{
+    StepperState, Producer, IResult, ProducerState
+  } ;
+  use nom::StepperState::* ;
+
+
+  pub struct Stepper<T: Producer> {
+    acc: Vec<u8>,
+    remaining: Vec<u8>,
+    producer: T,
+  }
+
+  impl<T: Producer> Stepper<T> {
+    pub fn new(producer: T) -> Stepper<T> {
+      Stepper { acc: Vec::new(), remaining: Vec::new(), producer: producer }
+    }
+
+    pub fn read(& mut self) -> Result<bool,u32> {
+      self.acc.clear() ;
+      self.acc.extend(self.remaining.iter().cloned()) ;
+      let state = self.producer.produce() ;
+      match state {
+        ProducerState::Data(v) => {
+          self.acc.extend(v.iter().cloned()) ;
+          Ok(false)
+        },
+        ProducerState::Eof(v) => {
+          self.acc.extend(v.iter().cloned()) ;
+          if self.acc.is_empty() { Ok(true) } else { Ok(false) }
+        },
+        ProducerState::Continue => Ok(false),
+        ProducerState::ProducerError(u) => Err(u),
+      }
+    }
+
+
+    pub fn current_step<'a, F, O>(
+      & 'a mut self, parser: F
+    ) -> StepperState<'a, O>
+    where F: Fn(&'a [u8]) -> IResult<&'a [u8],O> {
+      self.acc.clear() ;
+      self.acc.extend(self.remaining.iter().cloned()) ;
+
+      match parser(&(self.acc)[..]) {
+        IResult::Done(i, o) => {
+          self.remaining.clear() ;
+          self.remaining.extend(i.iter().cloned()) ;
+          StepperState::Value(o)
+        },
+        IResult::Error(e) => {
+          self.remaining.clear() ;
+          self.remaining.extend(self.acc.iter().cloned()) ;
+          StepperState::ParserError(e)
+        },
+        IResult::Incomplete(_) =>
+          StepperState::Continue,
+      }
+    }
+
+
+    pub fn step<'a, F, O>(
+      & 'a mut self, parser: F
+    ) -> StepperState<'a, O>
+    where F: Fn(&'a [u8]) -> IResult<&'a [u8],O> {
+      self.acc.clear() ;
+      self.acc.extend(self.remaining.iter().cloned()) ;
+
+      /* Incomplete, need more data. */
+      let state = self.producer.produce() ;
+
+      match state {
+        ProducerState::Data(v) => {
+          self.acc.extend(v.iter().cloned())
+        },
+        ProducerState::Eof(v) => {
+          self.acc.extend(v.iter().cloned())
+        },
+        ProducerState::Continue =>
+          return StepperState::Continue,
+        ProducerState::ProducerError(u) =>
+          return StepperState::ProducerError(u),
+      }
+
+      if self.acc.is_empty() { return StepperState::Eof }
+
+      match parser(&(self.acc)[..]) {
+        IResult::Done(i, o) => {
+          self.remaining.clear() ;
+          self.remaining.extend(i.iter().cloned()) ;
+          return StepperState::Value(o)
+        },
+        IResult::Error(e) => {
+          self.remaining.clear() ;
+          self.remaining.extend(self.acc.iter().cloned()) ;
+          return StepperState::ParserError(e)
+        },
+        IResult::Incomplete(_) => {
+          self.remaining.clear() ;
+          self.remaining.extend(self.acc.iter().cloned()) ;
+          return StepperState::Continue
+        },
+      }
+    }
+  }
+
+}
