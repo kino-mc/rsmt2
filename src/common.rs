@@ -110,7 +110,10 @@ pub trait ParseSmt2 {
   * `get-model`
   * `get-unsat-assumptions`
   * `get-unsat-core` */
-  fn parse_ident<'a>(& self, & 'a [u8]) -> IResult<'a, & 'a [u8], Self::Ident> ;
+  #[inline(always)]
+  fn parse_ident<'a>(
+    & self, & 'a [u8]
+  ) -> IResult<'a, & 'a [u8], Self::Ident> ;
 
   /** Parses a value from self, viewed as a reader.
 
@@ -119,21 +122,30 @@ pub trait ParseSmt2 {
   * `get-value`
   * `get-assignment`
   * `get-model` */
-  fn parse_value<'a>(& self, & 'a [u8]) -> IResult<'a, & 'a [u8], Self::Value> ;
+  #[inline(always)]
+  fn parse_value<'a>(
+    & self, & 'a [u8]
+  ) -> IResult<'a, & 'a [u8], Self::Value> ;
 
   /** Parses an expression from self, viewed as a reader.
 
   Required by
 
   * `get_assertions` */
-  fn parse_expr<'a>(& self, & 'a [u8]) -> IResult<'a, & 'a [u8], Self::Expr> ;
+  #[inline(always)]
+  fn parse_expr<'a>(
+    & self, & 'a [u8]
+  ) -> IResult<'a, & 'a [u8], Self::Expr> ;
 
   /** Parses a proof from self, viewed as a reader.
 
   Required by
 
   * `get_proof` */
-  fn parse_proof<'a>(& self, & 'a [u8]) -> IResult<'a, & 'a [u8], Self::Proof> ;
+  #[inline(always)]
+  fn parse_proof<'a>(
+    & self, & 'a [u8]
+  ) -> IResult<'a, & 'a [u8], Self::Proof> ;
 }
 
 impl ParseSmt2 for () {
@@ -216,6 +228,7 @@ impl<'a> io::Read for & 'a mut Kid {
       ),
       Some(ref mut stdout) => {
         let out = stdout.read(buf) ;
+        // println!("> read = \"{}\"", ::std::str::from_utf8(buf).unwrap()) ;
         out
       }
     }
@@ -223,14 +236,15 @@ impl<'a> io::Read for & 'a mut Kid {
 }
 
 
-
+/** Hack around the `Stepper` from `nom` to handle parsing of a child
+process. */
 pub mod stepper {
   use nom::{
     StepperState, Producer, IResult, ProducerState
   } ;
   use nom::StepperState::* ;
 
-
+  /** Stepper designed for child processes. */
   pub struct Stepper<T: Producer> {
     acc: Vec<u8>,
     remaining: Vec<u8>,
@@ -238,29 +252,12 @@ pub mod stepper {
   }
 
   impl<T: Producer> Stepper<T> {
+    /** Creates a new stepper. */
     pub fn new(producer: T) -> Stepper<T> {
       Stepper { acc: Vec::new(), remaining: Vec::new(), producer: producer }
     }
 
-    pub fn read(& mut self) -> Result<bool,u32> {
-      self.acc.clear() ;
-      self.acc.extend(self.remaining.iter().cloned()) ;
-      let state = self.producer.produce() ;
-      match state {
-        ProducerState::Data(v) => {
-          self.acc.extend(v.iter().cloned()) ;
-          Ok(false)
-        },
-        ProducerState::Eof(v) => {
-          self.acc.extend(v.iter().cloned()) ;
-          if self.acc.is_empty() { Ok(true) } else { Ok(false) }
-        },
-        ProducerState::Continue => Ok(false),
-        ProducerState::ProducerError(u) => Err(u),
-      }
-    }
-
-
+    /** Attempts to parse the output that was previously retrieved. Does **not** read on the producer.*/
     pub fn current_step<'a, F, O>(
       & 'a mut self, parser: F
     ) -> StepperState<'a, O>
@@ -284,7 +281,7 @@ pub mod stepper {
       }
     }
 
-
+    /** Reads on the producer and attemps to parse something. */
     pub fn step<'a, F, O>(
       & 'a mut self, parser: F
     ) -> StepperState<'a, O>

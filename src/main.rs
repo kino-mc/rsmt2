@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 #[macro_use]
 extern crate regex ;
 #[macro_use]
@@ -170,12 +172,14 @@ named!{ top_sexpr<SExpr>,
 
 struct Parser ;
 impl ParseSmt2 for Parser {
-  type Ident = () ;
+  type Ident = SExpr ;
   type Value = SExpr ;
   type Expr = SExpr ;
   type Proof = () ;
-  fn parse_ident<'a>(& self, _: & 'a [u8]) -> IResult<'a, & 'a [u8], Self::Ident> {
-    panic!("parser on () called")
+  fn parse_ident<'a>(
+    & self, array: & 'a [u8]
+  ) -> IResult<'a, & 'a [u8], Self::Ident> {
+    top_sexpr(array)
   }
   fn parse_value<'a>(
     & self, array: & 'a [u8]
@@ -202,7 +206,7 @@ fn print_parse_result<'a, I>(res: IResult<'a, I, SExpr>) {
 }
 
 
-pub fn run_common() {
+pub fn run_parser() {
   let bool_str = b"false" ;
   println!("sexpr(\"{}\")", str::from_utf8(bool_str).unwrap()) ;
   print_parse_result(top_sexpr(bool_str)) ;
@@ -243,7 +247,7 @@ pub fn run_common() {
 }
 
 
-pub fn run_common_file() {
+pub fn run_parser_file() {
   use std::io::{BufReader} ;
   use std::fs::File ;
   use std::path::Path ;
@@ -280,8 +284,8 @@ pub fn run_solver() {
     Err(e) => panic!("{:?}", e),
   } ;
 
-  let v1 = Var("v1".to_string()) ;
-  let sv = SVar{ id: "sv".to_string() } ;
+  let v1 = Var("v 1".to_string()) ;
+  let sv = SVar{ id: "s v".to_string() } ;
   let sv_at_0 = SVar0(sv) ;
   let lambda1 = Lambda(
     "and".to_string(), vec![v1.clone(), sv_at_0.clone()]
@@ -293,17 +297,17 @@ pub fn run_solver() {
   let offset2 = Offset(1,0) ;
 
   println!("declaring {:?}", v1) ;
-  solver.declare_fun(& v1, offset1, &[], "bool") ;
+  solver.declare_fun(& v1, offset1, &[], "bool").unwrap() ;
   println!("declaring {:?}, offset is {:?}", sv_at_0, offset1) ;
-  solver.declare_fun(& sv_at_0, offset1, &[], "bool") ;
+  solver.declare_fun(& sv_at_0, offset1, &[], "bool").unwrap() ;
   println!("") ;
 
   println!("asserting {:?}, offset is {:?}", lambda1, offset1) ;
-  solver.assert(& lambda1, offset1) ;
+  solver.assert(& lambda1, offset1).unwrap() ;
   println!("") ;
 
   println!("check-sat") ;
-  solver.check_sat() ;
+  solver.check_sat().unwrap() ;
   match solver.parse_check_sat() {
     Ok(true) => println!("sat"),
     Ok(false) => println!("unsat"),
@@ -312,15 +316,15 @@ pub fn run_solver() {
   println!("") ;
 
   println!("declaring {:?}, offset is {:?}", sv_at_0, offset2) ;
-  solver.declare_fun(& sv_at_0, offset2, &[], "bool") ;
+  solver.declare_fun(& sv_at_0, offset2, &[], "bool").unwrap() ;
   println!("") ;
 
   println!("asserting {:?}, offset is {:?}", lambda2, offset2) ;
-  solver.assert(& lambda2, offset2) ;
+  solver.assert(& lambda2, offset2).unwrap() ;
   println!("") ;
 
   println!("check-sat") ;
-  solver.check_sat() ;
+  solver.check_sat().unwrap() ;
   match solver.parse_check_sat() {
     Ok(true) => println!("sat"),
     Ok(false) => println!("unsat"),
@@ -329,7 +333,7 @@ pub fn run_solver() {
   println!("") ;
 
   println!("get_value") ;
-  solver.get_values( & [ sv_at_0 ], offset1 ) ;
+  solver.get_values( & [ sv_at_0 ], offset1 ).unwrap() ;
   match solver.parse_values() {
     Ok(values) => {
       for (e,v) in values.into_iter() {
@@ -340,34 +344,46 @@ pub fn run_solver() {
   } ;
   println!("") ;
 
+  println!("get_model") ;
+  solver.get_model().unwrap() ;
+  match solver.parse_model() {
+    Ok(model) => {
+      for (id,v) in model.into_iter() {
+        println!("  {:?} = {:?}", id, v)
+      }
+    },
+    Err(e) => println!("error: {:?}", e),
+  } ;
+  println!("") ;
+
   println!("asserting {:?}, offset is {:?}", lambda2, offset1) ;
-  solver.assert(& lambda2, offset1) ;
+  solver.assert(& lambda2, offset1).unwrap() ;
   println!("") ;
 
   println!("check-sat") ;
-  solver.check_sat() ;
+  solver.check_sat().unwrap() ;
   match solver.parse_check_sat() {
     Ok(true) => println!("sat"),
     Ok(false) => println!("unsat"),
     Err(e) => println!("error: {:?}", e),
   } ;
 
-  solver.kill() ;
+  solver.kill().unwrap() ;
 
   ()
 }
 
 
 fn main() {
-  println!("\n") ;
+  println!("\n|===| Testing parser.") ;
 
-  run_common() ;
+  run_parser() ;
 
-  println!("\n") ;
+  println!("\n|===| Testing parser on a file.") ;
 
-  run_common_file() ;
+  run_parser_file() ;
 
-  println!("\n") ;
+  println!("\n|===| Testing solver.") ;
 
   run_solver() ;
 

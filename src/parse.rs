@@ -2,7 +2,7 @@
 
 use std::str ;
 
-use nom::{ multispace, IResult } ;
+use nom::multispace ;
 
 use common::{ UnexSmtRes, SmtRes } ;
 use common::UnexSmtRes::* ;

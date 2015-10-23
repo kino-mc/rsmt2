@@ -2,14 +2,13 @@
 
 # To do
 
-* Cleaner error handling in solver commands (see `check_sat_assuming`).
-* Add `inline` to many (probably not all) of the commands in solver.
+* cleaner error handling in solver commands (see `check_sat_assuming`)
+* add `inline` to many (probably not all) of the commands in solver
+* update `nom` to remove the hack on `Stepper` for child processes
 */
 
 #[macro_use]
 extern crate nom ;
-
-use nom::ReadProducer ;
 
 pub mod common ;
 pub mod conf ;

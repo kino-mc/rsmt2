@@ -1,8 +1,5 @@
 /*! Solver configuration, contains backend solver specific info. */
 
-use std::io ;
-use std::process::Command ;
-
 use common::UnexSmtRes ;
 
 use self::SolverStyle::* ;
