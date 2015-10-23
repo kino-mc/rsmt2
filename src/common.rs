@@ -32,11 +32,16 @@ pub enum UnexSmtRes {
   /** An unsupported command was issue. */
   Unsupported,
   /** A command produced an error. */
-  Error(String)
+  Error(String),
+  /** An input/output error occured. */
+  IOError(io::Error),
 }
 
 /** Result of an SMT query. */
 pub type SmtRes<T> = Result<T, UnexSmtRes> ;
+
+/** Result of an SMT statement. */
+pub type UnitSmtRes = SmtRes<()> ;
 
 
 

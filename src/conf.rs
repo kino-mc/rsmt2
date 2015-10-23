@@ -42,6 +42,8 @@ impl SolverStyle {
         options: vec![
           "-in", "-smt2"
         ],
+        parse_success: false,
+        unsat_cores: false,
         check_sat_assuming: supported("check-sat"),
       },
       CVC4 => SolverConf {
@@ -49,6 +51,8 @@ impl SolverStyle {
         options: vec![
           "--smtlib-strict", "-qqqqq", "--interactive"
         ],
+        parse_success: false,
+        unsat_cores: false,
         check_sat_assuming: unsupported(),
       },
     }
@@ -62,6 +66,10 @@ pub struct SolverConf {
   style: SolverStyle,
   /** Options to call the solver with. */
   options: Vec<& 'static str>,
+  /** Parse success. */
+  parse_success: bool,
+  /** Triggers unsat-core production. */
+  unsat_cores: bool,
   /** Keyword for check-sat with assumptions. */
   check_sat_assuming: ConfItem,
 }
@@ -82,12 +90,38 @@ impl SolverConf {
 
   /** Options of the configuration. */
   #[inline(always)]
-  pub fn options(& self) -> & [& 'static str] { & self.options }
+  pub fn get_options(& self) -> & [& 'static str] { & self.options }
+
+  /** Indicates if parse success is active. */
+  #[inline(always)]
+  pub fn get_parse_success(& self) -> bool { self.parse_success }
 
   /** Keyword for check-sat with assumptions. */
   #[inline(always)]
-  pub fn check_sat_assuming(& self) -> & ConfItem {
+  pub fn get_check_sat_assuming(& self) -> & ConfItem {
     & self.check_sat_assuming
+  }
+
+  /** Adds an option to the configuration. */
+  #[inline(always)]
+  pub fn option(mut self, o: & 'static str) -> Self {
+    self.options.push(o) ;
+    self
+  }
+
+  /** Activates parse sucess. */
+  #[inline(always)]
+  #[cfg(not(no_parse_success))]
+  pub fn print_success(mut self) -> Self {
+    self.parse_success = true ;
+    self
+  }
+
+  /** Activates unsat-core production. */
+  #[inline(always)]
+  pub fn unsat_cores(mut self) -> Self {
+    self.unsat_cores = true ;
+    self
   }
 
 
