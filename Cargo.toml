@@ -10,10 +10,6 @@ readme = "README.md"
 keywords = ["SMT", "SAT", "satisfiability", "wrapper", "solver"]
 license = "MIT/Apache-2.0"
 
-[[bin]]
-name = "rsmt2_bin"
-doc = false
-
 [dependencies]
 regex = "0.1.41"
 nom = "~0.5.0"

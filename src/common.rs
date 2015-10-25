@@ -28,7 +28,7 @@ pub type IoRes<T> = io::Result<T> ;
 /** Unexpected result for an SMT Lib 2 command. */
 #[derive(Debug)]
 pub enum UnexSmtRes {
-  /** An unsupported command was issue. */
+  /** An unsupported command was issued. */
   Unsupported,
   /** A command produced an error. */
   Error(String),
@@ -45,14 +45,17 @@ pub type UnitSmtRes = SmtRes<()> ;
 
 /** A symbol printable in the SMT Lib 2 standard. */
 pub trait Sym2Smt {
+  /** Prints a symbol to a writer. */
   fn sym_to_smt2(& self, writer: & mut io::Write) -> IoResUnit ;
 }
 /** An expression printable in the SMT Lib 2 standard. */
 pub trait Expr2Smt {
+  /** Prints an expression to a writer. */
   fn expr_to_smt2(& self, writer: & mut io::Write) -> IoResUnit ;
 }
 /** A sort printable in the SMT Lib 2 standard. */
 pub trait Sort2Smt {
+  /** Prints a sort to a writer. */
   fn sort_to_smt2(& self, writer: & mut io::Write) -> IoResUnit ;
 }
 
@@ -86,9 +89,13 @@ pub type SmtParseResult<T> = Result<T, UnexSmtRes> ;
 Not all of them are necessary depending on the queries wanted. See each method
 for details.*/
 pub trait ParseSmt2 {
+  /** Type of identifiers in the user's structure. */
   type Ident : ::std::fmt::Debug ;
+  /** Type of values in the user's structure. */
   type Value : ::std::fmt::Debug ;
+  /** Type of expressions in the user's structure. */
   type Expr :  ::std::fmt::Debug ;
+  /** Type of proofs in the user's structure. */
   type Proof : ::std::fmt::Debug ;
 
   /** Parses an ident from self, viewed as a reader.
@@ -142,16 +149,24 @@ impl ParseSmt2 for () {
   type Value = () ;
   type Expr = () ;
   type Proof = () ;
-  fn parse_ident<'a>(& self, _: & 'a [u8]) -> IResult<'a, & 'a [u8], Self::Ident> {
+  fn parse_ident<'a>(
+    & self, _: & 'a [u8]
+  ) -> IResult<'a, & 'a [u8], Self::Ident> {
     panic!("parser on () called")
   }
-  fn parse_value<'a>(& self, _: & 'a [u8]) -> IResult<'a, & 'a [u8], Self::Value> {
+  fn parse_value<'a>(
+    & self, _: & 'a [u8]
+  ) -> IResult<'a, & 'a [u8], Self::Value> {
     panic!("parser on () called")
   }
-  fn parse_expr<'a>(& self, _: & 'a [u8]) -> IResult<'a, & 'a [u8], Self::Expr> {
+  fn parse_expr<'a>(
+    & self, _: & 'a [u8]
+  ) -> IResult<'a, & 'a [u8], Self::Expr> {
     panic!("parser on () called")
   }
-  fn parse_proof<'a>(& self, _: & 'a [u8]) -> IResult<'a, & 'a [u8], Self::Proof> {
+  fn parse_proof<'a>(
+    & self, _: & 'a [u8]
+  ) -> IResult<'a, & 'a [u8], Self::Proof> {
     panic!("parser on () called")
   }
 }
@@ -184,6 +199,7 @@ pub enum Logic {
 }
 
 impl Logic {
+  /** Prints the logic in a writer in SMT Lib 2 format. */
   pub fn to_smt2(& self, writer: & mut io::Write, _: ()) -> IoResUnit {
     use self::Logic::* ;
     match * self {
