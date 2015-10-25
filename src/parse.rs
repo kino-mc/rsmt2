@@ -65,18 +65,6 @@ named!{ pub open_paren<()>,
 
 pub type OpenParen = SmtRes<()> ;
 
-named!{ pub unexp_or_open_paren<OpenParen>,
-  alt!(
-    map!( unexpected, |e| Err(e) ) |
-    map!( open_paren, |_| Ok(()) )
-  )
-}
-
 named!{ pub close_paren<()>,
   map!( preceded!( opt!(multispace), char!(')') ), |_| () )
-}
-
-
-named!{ pub define_fun,
-  delimited!( opt!(multispace), tag!("define-fun"), opt!(multispace) )
 }

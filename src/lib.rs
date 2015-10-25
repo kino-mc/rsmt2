@@ -11,15 +11,17 @@
 
 # To do
 
-* cleaner error handling in solver commands (see `check_sat_assuming`)
-* add `inline` to many (probably not all) of the commands in solver
 * update `nom` to remove the hack on `Stepper` for child processes
 */
 
 #[macro_use]
 extern crate nom ;
 
-pub mod common ;
-pub mod conf ;
-pub mod parse ;
-pub mod solver ;
+mod common ;
+mod conf ;
+mod parse ;
+mod solver ;
+
+pub use common::* ;
+pub use conf::* ;
+pub use solver::* ;

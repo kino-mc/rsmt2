@@ -60,7 +60,7 @@ impl SolverStyle {
 }
 
 
-/** Solver specific commands and parsing functions. */
+/** Configuration and solver specific info. */
 pub struct SolverConf {
   /** Solver style. */
   style: SolverStyle,

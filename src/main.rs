@@ -7,8 +7,6 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-#![allow(dead_code)]
-
 #[macro_use]
 extern crate regex ;
 #[macro_use]
@@ -22,6 +20,7 @@ use nom::{IResult,digit,multispace};
 use nom::IResult::*;
 
 use SExpr::* ;
+use Var::* ;
 
 mod common ;
 mod conf ;
@@ -30,29 +29,57 @@ mod solver ;
 
 use common::* ;
 
+#[derive(Debug,Clone,Copy)]
+struct Offset(usize,usize) ;
+
+type Sym = String ;
+
 #[derive(Debug,Clone)]
-struct SVar { pub id: String }
+enum Var {
+  Const(Sym),
+  SVar0(Sym),
+  SVar1(Sym),
+}
+
+#[derive(Debug,Clone)]
+struct Symbol(Var, Offset) ;
+
+impl SymPrintSmt2 for Symbol {
+  fn sym_to_smt2(& self, writer: & mut Write) -> IoResUnit {
+    match * self {
+      Symbol( Const(ref sym), _) => write!(
+        writer, "|{}|", sym
+      ),
+      Symbol( SVar0(ref sym), ref off) => write!(
+        writer, "|{}@{}|", sym, off.0
+      ),
+      Symbol( SVar1(ref sym), ref off) => write!(
+        writer, "|{}@{}|", sym, off.1
+      ),
+    }
+  }
+}
 
 #[derive(Debug,Clone)]
 enum SExpr {
-  Var(String),
-  SVar0(SVar),
-  SVar1(SVar),
+  Id(Var),
   BConst(bool),
   IConst(usize),
   RConst(usize,usize),
   Lambda(String, Vec<SExpr>),
 }
 
-#[derive(Debug,Clone,Copy)]
-struct Offset(usize,usize) ;
-
-impl PrintSmt2<Offset> for SExpr {
+impl SExpr {
+  fn unroll(& self, off: Offset) -> Unrolled {
+    Unrolled(self, off)
+  }
   fn to_smt2(& self, writer: & mut Write, offset: Offset) -> IoResUnit {
     match * self {
-      Var(ref s) => write!(writer, "|{}|", s),
-      SVar0(ref sv) => write!(writer, "|{}@{}|", sv.id, offset.0),
-      SVar1(ref sv) => write!(writer, "|{}@{}|", sv.id, offset.1),
+      Id(ref var) => match * var {
+        Var::Const(ref s) => write!(writer, "|{}|", s),
+        Var::SVar0(ref s) => write!(writer, "|{}@{}|", s, offset.0),
+        Var::SVar1(ref s) => write!(writer, "|{}@{}|", s, offset.1),
+      },
       BConst(ref b) => write!(writer, "{}", b),
       IConst(ref i) => write!(writer, "{}", i),
       RConst(ref n, ref d) => write!(writer, "(/ {} {})", n, d),
@@ -64,6 +91,14 @@ impl PrintSmt2<Offset> for SExpr {
         write!(writer, ")")
       },
     }
+  }
+}
+
+struct Unrolled<'a>(& 'a SExpr, Offset) ;
+
+impl<'a> ExprPrintSmt2 for Unrolled<'a> {
+  fn expr_to_smt2(& self, writer: & mut Write) -> IoResUnit {
+    self.0.to_smt2(writer, self.1)
   }
 }
 
@@ -80,18 +115,14 @@ named!{ var<SExpr>,
     ) ~
     tag!("|"),
     || match int {
-      None => Var(
-        str::from_utf8(id).unwrap().to_string()
+      None => Id(
+        Const( str::from_utf8(id).unwrap().to_string() )
       ),
-      Some('0') => SVar0(
-        SVar {
-          id: str::from_utf8(id).unwrap().to_string()
-        }
+      Some('0') => Id(
+        SVar0( str::from_utf8(id).unwrap().to_string() )
       ),
-      Some('1') => SVar1(
-        SVar {
-          id: str::from_utf8(id).unwrap().to_string()
-        }
+      Some('1') => Id(
+        SVar1( str::from_utf8(id).unwrap().to_string() )
       ),
       _ => unreachable!(),
     }
@@ -283,6 +314,7 @@ pub fn run_parser_file() {
 pub fn run_solver() {
   use ::conf::* ;
   use ::solver::* ;
+  use ::solver::sync::* ;
   use std::process::Command ;
 
   let conf = SolverConf::z3() ;
@@ -293,31 +325,34 @@ pub fn run_solver() {
     Err(e) => panic!("{:?}", e),
   } ;
 
-  let v1 = Var("v 1".to_string()) ;
-  let sv = SVar{ id: "s v".to_string() } ;
+  let v1 = Const("v 1".to_string()) ;
+  let sv = "s v".to_string() ;
   let sv_at_0 = SVar0(sv) ;
   let lambda1 = Lambda(
-    "and".to_string(), vec![v1.clone(), sv_at_0.clone()]
+    "and".to_string(), vec![Id(v1.clone()), Id(sv_at_0.clone())]
   ) ;
   let lambda2 = Lambda(
-    "not".to_string(), vec![sv_at_0.clone()]
+    "not".to_string(), vec![Id(sv_at_0.clone())]
   ) ;
   let offset1 = Offset(0,1) ;
   let offset2 = Offset(1,0) ;
 
   println!("declaring {:?}", v1) ;
-  solver.declare_fun(& v1, offset1, &[], "bool").unwrap() ;
+  solver.declare_fun(
+    & Symbol(v1.clone(), offset1), &[], "bool"
+  ).unwrap() ;
   println!("declaring {:?}, offset is {:?}", sv_at_0, offset1) ;
-  solver.declare_fun(& sv_at_0, offset1, &[], "bool").unwrap() ;
+  solver.declare_fun(
+    & Symbol(sv_at_0.clone(), offset1), &[], "bool"
+  ).unwrap() ;
   println!("") ;
 
   println!("asserting {:?}, offset is {:?}", lambda1, offset1) ;
-  solver.assert(& lambda1, offset1).unwrap() ;
+  solver.assert(& lambda1.unroll(offset1)).unwrap() ;
   println!("") ;
 
   println!("check-sat") ;
-  solver.check_sat().unwrap() ;
-  match solver.parse_check_sat() {
+  match solver.check_sat() {
     Ok(true) => println!("sat"),
     Ok(false) => println!("unsat"),
     Err(e) => println!("error: {:?}", e),
@@ -325,16 +360,17 @@ pub fn run_solver() {
   println!("") ;
 
   println!("declaring {:?}, offset is {:?}", sv_at_0, offset2) ;
-  solver.declare_fun(& sv_at_0, offset2, &[], "bool").unwrap() ;
+  solver.declare_fun(
+    & Symbol(sv_at_0.clone(), offset2), &[], "bool"
+  ).unwrap() ;
   println!("") ;
 
   println!("asserting {:?}, offset is {:?}", lambda2, offset2) ;
-  solver.assert(& lambda2, offset2).unwrap() ;
+  solver.assert(& lambda2.unroll(offset2)).unwrap() ;
   println!("") ;
 
   println!("check-sat") ;
-  solver.check_sat().unwrap() ;
-  match solver.parse_check_sat() {
+  match solver.check_sat() {
     Ok(true) => println!("sat"),
     Ok(false) => println!("unsat"),
     Err(e) => println!("error: {:?}", e),
@@ -342,8 +378,9 @@ pub fn run_solver() {
   println!("") ;
 
   println!("get_value") ;
-  solver.get_values( & [ sv_at_0 ], offset1 ).unwrap() ;
-  match solver.parse_values() {
+  match solver.get_values(
+    & [ Id(sv_at_0.clone()).unroll(offset1) ]
+  ) {
     Ok(values) => {
       for (e,v) in values.into_iter() {
         println!("  {:?} = {:?}", e, v)
@@ -354,8 +391,7 @@ pub fn run_solver() {
   println!("") ;
 
   println!("get_model") ;
-  solver.get_model().unwrap() ;
-  match solver.parse_model() {
+  match solver.get_model() {
     Ok(model) => {
       for (id,v) in model.into_iter() {
         println!("  {:?} = {:?}", id, v)
@@ -366,12 +402,11 @@ pub fn run_solver() {
   println!("") ;
 
   println!("asserting {:?}, offset is {:?}", lambda2, offset1) ;
-  solver.assert(& lambda2, offset1).unwrap() ;
+  solver.assert(& lambda2.unroll(offset1)).unwrap() ;
   println!("") ;
 
   println!("check-sat") ;
-  solver.check_sat().unwrap() ;
-  match solver.parse_check_sat() {
+  match solver.check_sat() {
     Ok(true) => println!("sat"),
     Ok(false) => println!("unsat"),
     Err(e) => println!("error: {:?}", e),
