@@ -44,7 +44,7 @@ enum Var {
 #[derive(Debug,Clone)]
 struct Symbol(Var, Offset) ;
 
-impl SymPrintSmt2 for Symbol {
+impl Sym2Smt for Symbol {
   fn sym_to_smt2(& self, writer: & mut Write) -> IoResUnit {
     match * self {
       Symbol( Const(ref sym), _) => write!(
@@ -96,7 +96,7 @@ impl SExpr {
 
 struct Unrolled<'a>(& 'a SExpr, Offset) ;
 
-impl<'a> ExprPrintSmt2 for Unrolled<'a> {
+impl<'a> Expr2Smt for Unrolled<'a> {
   fn expr_to_smt2(& self, writer: & mut Write) -> IoResUnit {
     self.0.to_smt2(writer, self.1)
   }

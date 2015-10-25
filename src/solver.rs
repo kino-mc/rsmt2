@@ -408,7 +408,7 @@ impl<
 
   /** Declares a new sort. */
   #[inline]
-  pub fn declare_sort<Sort: SortPrintSmt2>(
+  pub fn declare_sort<Sort: Sort2Smt>(
     & mut self, sort: Sort, arity: & u8
   ) -> UnitSmtRes {
     parse_success!(
@@ -425,7 +425,7 @@ impl<
   /** Defines a new sort. */
   #[inline]
   pub fn define_sort<
-    Sort: SortPrintSmt2, Expr: ExprPrintSmt2
+    Sort: Sort2Smt, Expr: Expr2Smt
   >(
     & mut self, sort: Sort, args: & [ Expr ], body: Expr
   ) -> UnitSmtRes {
@@ -453,7 +453,7 @@ impl<
   }
   /** Declares a new function symbol. */
   #[inline]
-  pub fn declare_fun<Sort: SortPrintSmt2, Sym: SymPrintSmt2> (
+  pub fn declare_fun<Sort: Sort2Smt, Sym: Sym2Smt> (
     & mut self, symbol: & Sym, args: & [ Sort ], out: Sort
   ) -> UnitSmtRes {
     parse_success!(
@@ -480,7 +480,7 @@ impl<
   }
   /** Declares a new constant. */
   #[inline]
-  pub fn declare_const<Sort: SortPrintSmt2, Sym: SymPrintSmt2> (
+  pub fn declare_const<Sort: Sort2Smt, Sym: Sym2Smt> (
     & mut self, symbol: Sym, out_sort: Sort
   ) -> UnitSmtRes {
     parse_success!(
@@ -499,7 +499,7 @@ impl<
   /** Defines a new function symbol. */
   #[inline]
   pub fn define_fun<
-    Sort: SortPrintSmt2, Sym: SymPrintSmt2, Expr: ExprPrintSmt2
+    Sort: Sort2Smt, Sym: Sym2Smt, Expr: Expr2Smt
   >(
     & mut self,
     symbol: Sym, args: & [ (Sym, Sort) ], out: Sort, body: Expr
@@ -535,7 +535,7 @@ impl<
   /** Defines some new (possibily mutually) recursive functions. */
   #[inline]
   pub fn define_funs_rec<
-    Sort: SortPrintSmt2, Sym: SymPrintSmt2, Expr: ExprPrintSmt2
+    Sort: Sort2Smt, Sym: Sym2Smt, Expr: Expr2Smt
   >(
     & mut self, funs: & [ (Sym, & [ (Sym, Sort) ], Sort, Expr) ]
   ) -> UnitSmtRes {
@@ -586,7 +586,7 @@ impl<
   /** Defines a new recursive function. */
   #[inline]
   pub fn define_fun_rec<
-    Sort: SortPrintSmt2, Sym: SymPrintSmt2, Expr: ExprPrintSmt2
+    Sort: Sort2Smt, Sym: Sym2Smt, Expr: Expr2Smt
   >(
     & mut self,  symbol: Sym, args: & [ (Sym, Sort) ], out: Sort, body: Expr
   ) -> UnitSmtRes {
@@ -634,7 +634,7 @@ impl<
 
   /** Asserts an expression with some print information. */
   #[inline]
-  pub fn assert<Expr: ExprPrintSmt2>(& mut self, expr: & Expr) -> UnitSmtRes {
+  pub fn assert<Expr: Expr2Smt>(& mut self, expr: & Expr) -> UnitSmtRes {
     parse_success!(
       self for {
         let mut writer = try_writer!( self.writer() ) ;
@@ -971,7 +971,7 @@ impl<Parser: ParseSmt2> async::Asynced<
 }
 
 
-impl<Parser: ParseSmt2, Ident: SymPrintSmt2> async::AsyncedIdentPrint<
+impl<Parser: ParseSmt2, Ident: Sym2Smt> async::AsyncedIdentPrint<
   Parser::Ident, Parser::Value, Parser::Expr, Parser::Proof, Ident
 > for Solver<Parser> {
 
@@ -996,7 +996,7 @@ impl<Parser: ParseSmt2, Ident: SymPrintSmt2> async::AsyncedIdentPrint<
 }
 
 
-impl<Parser: ParseSmt2, Expr: ExprPrintSmt2> async::AsyncedExprPrint<
+impl<Parser: ParseSmt2, Expr: Expr2Smt> async::AsyncedExprPrint<
   Parser::Ident, Parser::Value, Parser::Expr, Parser::Proof, Expr
 > for Solver<Parser> {
 
@@ -1022,11 +1022,11 @@ impl<Parser: ParseSmt2> sync::Synced<
   Parser::Ident, Parser::Value, Parser::Expr, Parser::Proof
 > for Solver<Parser> {}
 
-impl<Parser: ParseSmt2, Ident: SymPrintSmt2> sync::SyncedIdentPrint<
+impl<Parser: ParseSmt2, Ident: Sym2Smt> sync::SyncedIdentPrint<
   Parser::Ident, Parser::Value, Parser::Expr, Parser::Proof, Ident
 > for Solver<Parser> {}
 
-impl<Parser: ParseSmt2, Expr: ExprPrintSmt2> sync::SyncedExprPrint<
+impl<Parser: ParseSmt2, Expr: Expr2Smt> sync::SyncedExprPrint<
   Parser::Ident, Parser::Value, Parser::Expr, Parser::Proof, Expr
 > for Solver<Parser> {}
 
@@ -1125,7 +1125,7 @@ pub mod async {
 
   /** Asynchronous queries with ident printing. */
   pub trait AsyncedIdentPrint<
-    PIdent, PValue, PExpr, PProof, Ident: SymPrintSmt2
+    PIdent, PValue, PExpr, PProof, Ident: Sym2Smt
   > : Asynced<PIdent, PValue, PExpr, PProof> {
     /** Check-sat with assumptions command. */
     fn check_sat_assuming(& mut self, & [ Ident ]) -> UnitSmtRes ;
@@ -1133,7 +1133,7 @@ pub mod async {
 
   /** Asynchronous queries with expr printing. */
   pub trait AsyncedExprPrint<
-    PIdent, PValue, PExpr, PProof, Expr: ExprPrintSmt2
+    PIdent, PValue, PExpr, PProof, Expr: Expr2Smt
   > : Asynced<PIdent, PValue, PExpr, PProof> {
     /** Get-values command. */
     fn get_values(& mut self, & [ Expr ]) -> UnitSmtRes ;
@@ -1196,7 +1196,7 @@ pub mod sync {
 
   /** Synchrous queries with ident printing. */
   pub trait SyncedIdentPrint<
-    PIdent, PValue, PExpr, PProof, Ident: SymPrintSmt2
+    PIdent, PValue, PExpr, PProof, Ident: Sym2Smt
   > : AsyncedIdentPrint<
     PIdent, PValue, PExpr, PProof, Ident
   > {
@@ -1216,7 +1216,7 @@ pub mod sync {
 
   /** Synchrous queries with expr printing. */
   pub trait SyncedExprPrint<
-    PIdent, PValue, PExpr, PProof, Expr: ExprPrintSmt2
+    PIdent, PValue, PExpr, PProof, Expr: Expr2Smt
   > : AsyncedExprPrint<
     PIdent, PValue, PExpr, PProof, Expr
   > {

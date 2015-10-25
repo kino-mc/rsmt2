@@ -44,29 +44,29 @@ pub type UnitSmtRes = SmtRes<()> ;
 
 
 /** A symbol printable in the SMT Lib 2 standard. */
-pub trait SymPrintSmt2 {
+pub trait Sym2Smt {
   fn sym_to_smt2(& self, writer: & mut io::Write) -> IoResUnit ;
 }
 /** An expression printable in the SMT Lib 2 standard. */
-pub trait ExprPrintSmt2 {
+pub trait Expr2Smt {
   fn expr_to_smt2(& self, writer: & mut io::Write) -> IoResUnit ;
 }
 /** A sort printable in the SMT Lib 2 standard. */
-pub trait SortPrintSmt2 {
+pub trait Sort2Smt {
   fn sort_to_smt2(& self, writer: & mut io::Write) -> IoResUnit ;
 }
 
-impl<'a> SymPrintSmt2  for & 'a str {
+impl<'a> Sym2Smt  for & 'a str {
   fn sym_to_smt2(& self, writer: & mut io::Write) -> IoResUnit {
     write!(writer, "{}", self)
   }
 }
-impl<'a> ExprPrintSmt2 for & 'a str {
+impl<'a> Expr2Smt for & 'a str {
   fn expr_to_smt2(& self, writer: & mut io::Write) -> IoResUnit {
     self.sym_to_smt2(writer)
   }
 }
-impl<'a> SortPrintSmt2 for & 'a str {
+impl<'a> Sort2Smt for & 'a str {
   fn sort_to_smt2(& self, writer: & mut io::Write) -> IoResUnit {
     self.sym_to_smt2(writer)
   }
