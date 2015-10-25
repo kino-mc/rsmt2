@@ -56,7 +56,7 @@ impl Var {
       SVar1(ref sym) => write!(writer, "|{}@{}|", sym, off.1),
     }
   }
-  /** Given an offset, a variable can become a Symbol as defined below. */
+  /** Given an offset, a variable can become a Symbol. */
   pub fn to_sym<'a, 'b>(& 'a self, off: & 'b Offset) -> Symbol<'a, 'b> {
     Symbol(self, off)
   }
@@ -126,7 +126,7 @@ impl SExpr {
       }
     }
   }
-  /** Given an offset, an S-expression can be unrolled as defined below. */
+  /** Given an offset, an S-expression can be unrolled. */
   pub fn unroll<'a, 'b>(& 'a self, off: & 'b Offset) -> Unrolled<'a,'b> {
     Unrolled(self, off)
   }
