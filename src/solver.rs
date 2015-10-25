@@ -362,9 +362,7 @@ impl<
 
   /** Pushes `n` layers on the assertion stack. */
   #[inline(always)]
-  pub fn push(
-    & mut self, n: & u8
-  ) -> UnitSmtRes {
+  pub fn push(& mut self, n: & u8) -> UnitSmtRes {
     parse_success!(
       self for {
         let mut writer = try_writer!( self.writer() ) ;
@@ -376,9 +374,7 @@ impl<
   }
   /** Pops `n` layers off the assertion stack. */
   #[inline(always)]
-  pub fn pop(
-    & mut self, n: & u8
-  ) -> UnitSmtRes {
+  pub fn pop(& mut self, n: & u8) -> UnitSmtRes {
     parse_success!(
       self for {
         let mut writer = try_writer!( self.writer() ) ;
@@ -390,9 +386,7 @@ impl<
   }
   /** Resets the assertions in the solver. */
   #[inline(always)]
-  pub fn reset_assertions(
-    & mut self
-  ) -> UnitSmtRes {
+  pub fn reset_assertions(& mut self) -> UnitSmtRes {
     parse_success!(
       self for {
         let mut writer = try_writer!( self.writer() ) ;
@@ -424,9 +418,7 @@ impl<
   }
   /** Defines a new sort. */
   #[inline]
-  pub fn define_sort<
-    Sort: Sort2Smt, Expr: Expr2Smt
-  >(
+  pub fn define_sort<Sort: Sort2Smt, Expr: Expr2Smt>(
     & mut self, sort: Sort, args: & [ Expr ], body: Expr
   ) -> UnitSmtRes {
     parse_success!(
@@ -501,8 +493,7 @@ impl<
   pub fn define_fun<
     Sort: Sort2Smt, Sym: Sym2Smt, Expr: Expr2Smt
   >(
-    & mut self,
-    symbol: Sym, args: & [ (Sym, Sort) ], out: Sort, body: Expr
+    & mut self, symbol: Sym, args: & [ (Sym, Sort) ], out: Sort, body: Expr
   ) -> UnitSmtRes {
     parse_success!(
       self for {
@@ -651,17 +642,13 @@ impl<
 
   /** Get info command. */
   #[inline(always)]
-  pub fn get_info(
-    & mut self, flag: & str
-  ) -> UnitSmtRes {
+  pub fn get_info(& mut self, flag: & str) -> UnitSmtRes {
     let mut writer = try_writer!( self.writer() ) ;
     smt_cast_io!( write!(writer, "(get-info {})\n", flag) )
   }
   /** Get option command. */
   #[inline(always)]
-  pub fn get_option(
-    & mut self, option: & str
-  ) -> UnitSmtRes {
+  pub fn get_option(& mut self, option: & str) -> UnitSmtRes {
     let mut writer = try_writer!( self.writer() ) ;
     smt_cast_io!( write!(writer, "(get-option {})\n", option) )
   }
@@ -670,17 +657,13 @@ impl<
 
   /** Set info command. */
   #[inline(always)]
-  pub fn set_info(
-    & mut self, attribute: & str
-  ) -> UnitSmtRes {
+  pub fn set_info(& mut self, attribute: & str) -> UnitSmtRes {
     let mut writer = try_writer!( self.writer() ) ;
     smt_cast_io!( write!(writer, "(set-info {})\n", attribute) )
   }
   /** Echo command. */
   #[inline(always)]
-  pub fn echo(
-    & mut self, text: & str
-  ) -> UnitSmtRes {
+  pub fn echo(& mut self, text: & str) -> UnitSmtRes {
     let mut writer = try_writer!( self.writer() ) ;
     smt_cast_io!( write!(writer, "(echo \"{}\")\n", text) )
   }
@@ -856,9 +839,7 @@ impl<Parser: ParseSmt2> async::Asynced<
 
   /** Parser the result of a get-values. */
   #[inline]
-  fn parse_values(& mut self) -> SmtRes<Vec<(
-    Parser::Expr, Parser::Value
-  )>> {
+  fn parse_values(& mut self) -> SmtRes<Vec<(Parser::Expr, Parser::Value)>> {
     use nom::StepperState::* ;
     use parse::{ open_paren, close_paren, unexpected } ;
     let parser = & self.parser ;
@@ -932,9 +913,7 @@ impl<Parser: ParseSmt2> async::Asynced<
 
   /** Get assertions command. */
   #[inline]
-  fn get_assertions(
-    & mut self
-  ) -> UnitSmtRes {
+  fn get_assertions(& mut self) -> UnitSmtRes {
     let mut writer = try_writer!( self.writer() ) ;
     smt_cast_io!( write!(writer, "(get-assertions)\n") )
   }
@@ -946,25 +925,19 @@ impl<Parser: ParseSmt2> async::Asynced<
   }
   /** Get unsat assumptions command. */
   #[inline(always)]
-  fn get_unsat_assumptions(
-    & mut self
-  ) -> UnitSmtRes {
+  fn get_unsat_assumptions(& mut self) -> UnitSmtRes {
     let mut writer = try_writer!( self.writer() ) ;
     smt_cast_io!( write!(writer, "(get-unsat-assumptions)\n") )
   }
   /** Get proof command. */
   #[inline(always)]
-  fn get_proof(
-    & mut self
-  ) -> UnitSmtRes {
+  fn get_proof(& mut self) -> UnitSmtRes {
     let mut writer = try_writer!( self.writer() ) ;
     smt_cast_io!( write!(writer, "(get-proof)\n") )
   }
   /** Get unsat core command. */
   #[inline(always)]
-  fn get_unsat_core(
-    & mut self
-  ) -> UnitSmtRes {
+  fn get_unsat_core(& mut self) -> UnitSmtRes {
     let mut writer = try_writer!( self.writer() ) ;
     smt_cast_io!( write!(writer, "(get-unsat-core)\n") )
   }
@@ -1002,9 +975,7 @@ impl<Parser: ParseSmt2, Expr: Expr2Smt> async::AsyncedExprPrint<
 
   /** Get value command. */
   #[inline]
-  fn get_values(
-    & mut self, exprs: & [ Expr ]
-  ) -> UnitSmtRes {
+  fn get_values(& mut self, exprs: & [ Expr ]) -> UnitSmtRes {
     let mut writer = try_writer!( self.writer() ) ;
     smtry_io!( write!(writer, "(get-value (") ) ;
     for e in exprs {
@@ -1168,11 +1139,10 @@ pub mod sync {
   /** Synchrous queries with no printing. */
   pub trait Synced<
     PIdent, PValue, PExpr, PProof
-  > : Asynced<PIdent, PValue, PExpr, PProof> {
+  > : Sized + Asynced<PIdent, PValue, PExpr, PProof> {
 
     /** Check-sat command. */
-    fn check_sat(& mut self) -> SmtRes<bool>
-    where Self : Sized {
+    fn check_sat(& mut self) -> SmtRes<bool> {
       try_cast!(
         (self as & mut Asynced<
           PIdent, PValue, PExpr, PProof
@@ -1182,8 +1152,7 @@ pub mod sync {
     }
 
     /** Get-model command. */
-    fn get_model(& mut self) -> SmtRes<Vec<(PIdent, PValue)>>
-    where Self : Sized {
+    fn get_model(& mut self) -> SmtRes<Vec<(PIdent, PValue)>> {
       try_cast!(
         (self as & mut Asynced<
           PIdent, PValue, PExpr, PProof
@@ -1197,13 +1166,10 @@ pub mod sync {
   /** Synchrous queries with ident printing. */
   pub trait SyncedIdentPrint<
     PIdent, PValue, PExpr, PProof, Ident: Sym2Smt
-  > : AsyncedIdentPrint<
-    PIdent, PValue, PExpr, PProof, Ident
-  > {
+  > : Sized + AsyncedIdentPrint<PIdent, PValue, PExpr, PProof, Ident> {
 
     /** Check-sat assuming command. */
-    fn check_sat_assuming(& mut self, idents: & [ Ident ]) -> SmtRes<bool>
-    where Self : Sized {
+    fn check_sat_assuming(& mut self, idents: & [ Ident ]) -> SmtRes<bool> {
       try_cast!(
         (self as & mut AsyncedIdentPrint<
           PIdent, PValue, PExpr, PProof, Ident
@@ -1217,15 +1183,12 @@ pub mod sync {
   /** Synchrous queries with expr printing. */
   pub trait SyncedExprPrint<
     PIdent, PValue, PExpr, PProof, Expr: Expr2Smt
-  > : AsyncedExprPrint<
-    PIdent, PValue, PExpr, PProof, Expr
-  > {
+  > : Sized + AsyncedExprPrint<PIdent, PValue, PExpr, PProof, Expr> {
 
     /** Get-values command. */
     fn get_values(
       & mut self, exprs: & [ Expr ]
-    ) -> SmtRes<Vec<(PExpr, PValue)>>
-    where Self : Sized {
+    ) -> SmtRes<Vec<(PExpr, PValue)>> {
       try_cast!(
         (self as & mut AsyncedExprPrint<
           PIdent, PValue, PExpr, PProof, Expr
