@@ -1066,7 +1066,8 @@ fn main() {
 
 This example is part of the tests of this library. It is presented
 incrementally for readability, but you can access the full code in the
-[`tests` directory of the repo][full example].
+[`tests` directory of the repo][full example]. It also showcases asynchronous
+queries.
 
 
 ## To do
