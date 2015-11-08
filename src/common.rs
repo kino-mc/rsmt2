@@ -12,6 +12,7 @@ Basic types used by the library.
 */
 
 use std::io ;
+use std::sync::Arc ;
 
 use nom::IResult ;
 
@@ -48,15 +49,30 @@ pub trait Sym2Smt {
   /** Prints a symbol to a writer. */
   fn sym_to_smt2(& self, writer: & mut io::Write) -> IoResUnit ;
 }
+impl<T: Sym2Smt> Sym2Smt for Arc<T> {
+  fn sym_to_smt2(& self, writer: & mut io::Write) -> IoResUnit {
+    (* * self).sym_to_smt2(writer)
+  }
+}
 /** An expression printable in the SMT Lib 2 standard. */
 pub trait Expr2Smt {
   /** Prints an expression to a writer. */
   fn expr_to_smt2(& self, writer: & mut io::Write) -> IoResUnit ;
 }
+impl<T: Expr2Smt> Expr2Smt for Arc<T> {
+  fn expr_to_smt2(& self, writer: & mut io::Write) -> IoResUnit {
+    (* * self).expr_to_smt2(writer)
+  }
+}
 /** A sort printable in the SMT Lib 2 standard. */
 pub trait Sort2Smt {
   /** Prints a sort to a writer. */
   fn sort_to_smt2(& self, writer: & mut io::Write) -> IoResUnit ;
+}
+impl<T: Sort2Smt> Sort2Smt for Arc<T> {
+  fn sort_to_smt2(& self, writer: & mut io::Write) -> IoResUnit {
+    (* * self).sort_to_smt2(writer)
+  }
 }
 
 impl<'a> Sym2Smt  for & 'a str {

@@ -11,5 +11,5 @@ keywords = ["SMT", "SAT", "satisfiability", "wrapper", "solver"]
 license = "MIT/Apache-2.0"
 
 [dependencies]
-regex = "0.1.41"
-nom = "~0.5.0"
+regex = "*"
+nom = "0.5.0"
