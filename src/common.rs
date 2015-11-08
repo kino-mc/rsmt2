@@ -54,6 +54,19 @@ impl<T: Sym2Smt> Sym2Smt for Arc<T> {
     (* * self).sym_to_smt2(writer)
   }
 }
+/** A symbol printable in the SMT Lib 2 standard given some info. */
+pub trait SymInfo2Smt<Info> {
+  /** Prints a symbol to a writer given some info. */
+  fn sym_info_to_smt2(
+    & self, info: & Info, writer: & mut io::Write
+  ) -> IoResUnit ;
+}
+impl<'a, 'b, Info, T: SymInfo2Smt<Info>> Sym2Smt for (& 'a T, & 'b Info) {
+  fn sym_to_smt2(& self, writer: & mut io::Write) -> IoResUnit {
+    self.0.sym_info_to_smt2(self.1, writer)
+  }
+}
+
 /** An expression printable in the SMT Lib 2 standard. */
 pub trait Expr2Smt {
   /** Prints an expression to a writer. */
@@ -64,6 +77,19 @@ impl<T: Expr2Smt> Expr2Smt for Arc<T> {
     (* * self).expr_to_smt2(writer)
   }
 }
+/** An expression printable in the SMT Lib 2 standard given some info. */
+pub trait ExprInfo2Smt<Info> {
+  /** Prints an expression to a writer given some info. */
+  fn expr_info_to_smt2(
+    & self, info: & Info, writer: & mut io::Write
+  ) -> IoResUnit ;
+}
+impl<'a, 'b, Info, T: ExprInfo2Smt<Info>> Expr2Smt for (& 'a T, & 'b Info) {
+  fn expr_to_smt2(& self, writer: & mut io::Write) -> IoResUnit {
+    self.0.expr_info_to_smt2(self.1, writer)
+  }
+}
+
 /** A sort printable in the SMT Lib 2 standard. */
 pub trait Sort2Smt {
   /** Prints a sort to a writer. */
@@ -72,6 +98,18 @@ pub trait Sort2Smt {
 impl<T: Sort2Smt> Sort2Smt for Arc<T> {
   fn sort_to_smt2(& self, writer: & mut io::Write) -> IoResUnit {
     (* * self).sort_to_smt2(writer)
+  }
+}
+/** A sort printable in the SMT Lib 2 standard given some info. */
+pub trait SortInfo2Smt<Info> {
+  /** Prints a sort to a writer given some info. */
+  fn sort_info_to_smt2(
+    & self, info: & Info, writer: & mut io::Write
+  ) -> IoResUnit ;
+}
+impl<'a, 'b, Info, T: SortInfo2Smt<Info>> Sort2Smt for (& 'a T, & 'b Info) {
+  fn sort_to_smt2(& self, writer: & mut io::Write) -> IoResUnit {
+    self.0.sort_info_to_smt2(self.1, writer)
   }
 }
 
