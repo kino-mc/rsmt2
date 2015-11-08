@@ -403,7 +403,7 @@ impl<
   /** Declares a new sort. */
   #[inline]
   pub fn declare_sort<Sort: Sort2Smt>(
-    & mut self, sort: Sort, arity: & u8
+    & mut self, sort: & Sort, arity: & u8
   ) -> UnitSmtRes {
     parse_success!(
       self for {
@@ -419,7 +419,7 @@ impl<
   /** Defines a new sort. */
   #[inline]
   pub fn define_sort<Sort: Sort2Smt, Expr: Expr2Smt>(
-    & mut self, sort: Sort, args: & [ Expr ], body: Expr
+    & mut self, sort: & Sort, args: & [ Expr ], body: & Expr
   ) -> UnitSmtRes {
     parse_success!(
       self for {
@@ -446,7 +446,7 @@ impl<
   /** Declares a new function symbol. */
   #[inline]
   pub fn declare_fun<Sort: Sort2Smt, Sym: Sym2Smt> (
-    & mut self, symbol: & Sym, args: & [ Sort ], out: Sort
+    & mut self, symbol: & Sym, args: & [ Sort ], out: & Sort
   ) -> UnitSmtRes {
     parse_success!(
       self for {
@@ -473,7 +473,7 @@ impl<
   /** Declares a new constant. */
   #[inline]
   pub fn declare_const<Sort: Sort2Smt, Sym: Sym2Smt> (
-    & mut self, symbol: Sym, out_sort: Sort
+    & mut self, symbol: & Sym, out_sort: & Sort
   ) -> UnitSmtRes {
     parse_success!(
       self for {
@@ -491,9 +491,10 @@ impl<
   /** Defines a new function symbol. */
   #[inline]
   pub fn define_fun<
-    Sort: Sort2Smt, Sym: Sym2Smt, Expr: Expr2Smt
+    Sort: Sort2Smt, Sym1: Sym2Smt, Sym2: Sym2Smt, Expr: Expr2Smt
   >(
-    & mut self, symbol: Sym, args: & [ (Sym, Sort) ], out: Sort, body: Expr
+    & mut self, symbol: & Sym1, args: & [ (Sym2, Sort) ],
+    out: & Sort, body: & Expr
   ) -> UnitSmtRes {
     parse_success!(
       self for {
@@ -579,7 +580,8 @@ impl<
   pub fn define_fun_rec<
     Sort: Sort2Smt, Sym: Sym2Smt, Expr: Expr2Smt
   >(
-    & mut self,  symbol: Sym, args: & [ (Sym, Sort) ], out: Sort, body: Expr
+    & mut self,  symbol: & Sym, args: & [ (Sym, Sort) ],
+    out: & Sort, body: & Expr
   ) -> UnitSmtRes {
     parse_success!(
       self for {

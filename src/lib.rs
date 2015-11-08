@@ -624,13 +624,13 @@ fn main() {
 
   let sym = nsv.to_sym(& offset1) ;
   smtry!(
-    solver.declare_fun(& sym, &[], "bool"),
+    solver.declare_fun(& sym, &[], & "bool"),
     failwith "declaration failed: {:?}"
   ) ;
 
   let sym = sv_0.to_sym(& offset1) ;
   smtry!(
-    solver.declare_fun(& sym, &[], "bool"),
+    solver.declare_fun(& sym, &[], & "bool"),
     failwith "declaration failed: {:?}"
   ) ;
 
@@ -996,13 +996,13 @@ fn main() {
 
   let sym = nsv.to_sym(& offset1) ;
   smtry!(
-    solver.declare_fun(& sym, &[], "bool"),
+    solver.declare_fun(& sym, &[], & "bool"),
     failwith "declaration failed: {:?}"
   ) ;
 
   let sym = sv_0.to_sym(& offset1) ;
   smtry!(
-    solver.declare_fun(& sym, &[], "bool"),
+    solver.declare_fun(& sym, &[], & "bool"),
     failwith "declaration failed: {:?}"
   ) ;
 
