@@ -418,8 +418,10 @@ impl<
   }
   /** Defines a new sort. */
   #[inline]
-  pub fn define_sort<Sort: Sort2Smt, Expr: Expr2Smt>(
-    & mut self, sort: & Sort, args: & [ Expr ], body: & Expr
+  pub fn define_sort<
+    Sort: Sort2Smt, I, Expr1: Expr2Smt<I>, Expr2: Expr2Smt<I>
+  >(
+    & mut self, sort: & Sort, args: & [ Expr1 ], body: & Expr2, info: & I
   ) -> UnitSmtRes {
     parse_success!(
       self for {
@@ -431,13 +433,13 @@ impl<
         ) ;
         for arg in args {
           smtry_io!(
-            arg.expr_to_smt2(writer) ;
+            arg.expr_to_smt2(writer, info) ;
             write!(writer, " ")
           ) ;
         } ;
         smt_cast_io!(
           write!(writer, ")\n   ") ;
-          body.expr_to_smt2(writer) ;
+          body.expr_to_smt2(writer, info) ;
           write!(writer, "\n)\n")
         )
       }
@@ -445,15 +447,15 @@ impl<
   }
   /** Declares a new function symbol. */
   #[inline]
-  pub fn declare_fun<Sort: Sort2Smt, Sym: Sym2Smt> (
-    & mut self, symbol: & Sym, args: & [ Sort ], out: & Sort
+  pub fn declare_fun<Sort: Sort2Smt, I, Sym: Sym2Smt<I>> (
+    & mut self, symbol: & Sym, args: & [ Sort ], out: & Sort, info: & I
   ) -> UnitSmtRes {
     parse_success!(
       self for {
         let mut writer = try_writer!( self.writer() ) ;
         smtry_io!(
           write!(writer, "(declare-fun ") ;
-          symbol.sym_to_smt2(writer) ;
+          symbol.sym_to_smt2(writer, info) ;
           write!(writer, " ( ")
         ) ;
         for arg in args {
@@ -472,15 +474,15 @@ impl<
   }
   /** Declares a new constant. */
   #[inline]
-  pub fn declare_const<Sort: Sort2Smt, Sym: Sym2Smt> (
-    & mut self, symbol: & Sym, out_sort: & Sort
+  pub fn declare_const<Sort: Sort2Smt, I, Sym: Sym2Smt<I>> (
+    & mut self, symbol: & Sym, out_sort: & Sort, info: & I
   ) -> UnitSmtRes {
     parse_success!(
       self for {
         let mut writer = try_writer!( self.writer() ) ;
         smt_cast_io!(
           write!(writer, "(declare-const ") ;
-          symbol.sym_to_smt2(writer) ;
+          symbol.sym_to_smt2(writer, info) ;
           write!(writer, " ") ;
           out_sort.sort_to_smt2(writer) ;
           write!(writer, ")\n")
@@ -491,24 +493,24 @@ impl<
   /** Defines a new function symbol. */
   #[inline]
   pub fn define_fun<
-    Sort: Sort2Smt, Sym1: Sym2Smt, Sym2: Sym2Smt, Expr: Expr2Smt
+    I, Sort: Sort2Smt, Sym1: Sym2Smt<I>, Sym2: Sym2Smt<I>, Expr: Expr2Smt<I>
   >(
     & mut self, symbol: & Sym1, args: & [ (Sym2, Sort) ],
-    out: & Sort, body: & Expr
+    out: & Sort, body: & Expr, info: & I
   ) -> UnitSmtRes {
     parse_success!(
       self for {
         let mut writer = try_writer!( self.writer() ) ;
         smtry_io!(
           write!(writer, "(define-fun ") ;
-          symbol.sym_to_smt2(writer) ;
+          symbol.sym_to_smt2(writer, info) ;
           write!(writer, " ( ")
         ) ;
         for arg in args {
           let (ref sym, ref sort) = * arg ;
           smtry_io!(
             write!(writer, "(") ;
-            sym.sym_to_smt2(writer) ;
+            sym.sym_to_smt2(writer, info) ;
             write!(writer, " ") ;
             sort.sort_to_smt2(writer) ;
             write!(writer, ") ")
@@ -518,7 +520,7 @@ impl<
           write!(writer, ") ") ;
           out.sort_to_smt2(writer) ;
           write!(writer, "\n   ") ;
-          body.expr_to_smt2(writer) ;
+          body.expr_to_smt2(writer, info) ;
           write!(writer, "\n)\n")
         )
       }
@@ -527,9 +529,9 @@ impl<
   /** Defines some new (possibily mutually) recursive functions. */
   #[inline]
   pub fn define_funs_rec<
-    Sort: Sort2Smt, Sym: Sym2Smt, Expr: Expr2Smt
+    I, Sort: Sort2Smt, Sym: Sym2Smt<I>, Expr: Expr2Smt<I>
   >(
-    & mut self, funs: & [ (Sym, & [ (Sym, Sort) ], Sort, Expr) ]
+    & mut self, funs: & [ (Sym, & [ (Sym, Sort) ], Sort, Expr) ], info: & I
   ) -> UnitSmtRes {
     parse_success!(
       self for {
@@ -542,14 +544,14 @@ impl<
           let (ref sym, ref args, ref out, _) = * fun ;
           smtry_io!(
             write!(writer, "   (");
-            sym.sym_to_smt2(writer) ;
+            sym.sym_to_smt2(writer, info) ;
             write!(writer, " ( ")
           ) ;
           for arg in * args {
             let (ref sym, ref sort) = * arg ;
             smtry_io!(
               write!(writer, "(") ;
-              sym.sym_to_smt2(writer) ;
+              sym.sym_to_smt2(writer, info) ;
               write!(writer, " ") ;
               sort.sort_to_smt2(writer) ;
               write!(writer, ") ")
@@ -568,7 +570,7 @@ impl<
           let (_, _, _, ref body) = * fun ;
           smtry_io!(
             write!(writer, "\n   ") ;
-            body.expr_to_smt2(writer)
+            body.expr_to_smt2(writer, info)
           )
         } ;
         smt_cast_io!( write!(writer, "\n )\n)\n") )
@@ -578,10 +580,10 @@ impl<
   /** Defines a new recursive function. */
   #[inline]
   pub fn define_fun_rec<
-    Sort: Sort2Smt, Sym: Sym2Smt, Expr: Expr2Smt
+    I, Sort: Sort2Smt, Sym: Sym2Smt<I>, Expr: Expr2Smt<I>
   >(
     & mut self,  symbol: & Sym, args: & [ (Sym, Sort) ],
-    out: & Sort, body: & Expr
+    out: & Sort, body: & Expr, info: & I
   ) -> UnitSmtRes {
     parse_success!(
       self for {
@@ -592,14 +594,14 @@ impl<
         // Signature.
         smtry_io!(
           write!(writer, "   (") ;
-          symbol.sym_to_smt2(writer) ;
+          symbol.sym_to_smt2(writer, info) ;
           write!(writer, " ( ")
         ) ;
         for arg in args {
           let (ref sym, ref sort) = * arg ;
           smtry_io!(
             write!(writer, "(") ;
-            sym.sym_to_smt2(writer) ;
+            sym.sym_to_smt2(writer, info) ;
             write!(writer, " ") ;
             sort.sort_to_smt2(writer) ;
             write!(writer, ") ")
@@ -615,7 +617,7 @@ impl<
         // Body.
         smt_cast_io!(
           write!(writer, "\n   ") ;
-          body.expr_to_smt2(writer) ;
+          body.expr_to_smt2(writer, info) ;
           write!(writer, "\n )\n)\n")
         )
       }
@@ -627,13 +629,15 @@ impl<
 
   /** Asserts an expression with some print information. */
   #[inline]
-  pub fn assert<Expr: Expr2Smt>(& mut self, expr: & Expr) -> UnitSmtRes {
+  pub fn assert<I, Expr: Expr2Smt<I>>(
+    & mut self, expr: & Expr, info: & I
+  ) -> UnitSmtRes {
     parse_success!(
       self for {
         let mut writer = try_writer!( self.writer() ) ;
         smt_cast_io!(
           write!(writer, "(assert\n  ") ;
-          expr.expr_to_smt2(writer) ;
+          expr.expr_to_smt2(writer, info) ;
           write!(writer, "\n)\n")
         )
       }
@@ -946,13 +950,15 @@ impl<Parser: ParseSmt2> async::Asynced<
 }
 
 
-impl<Parser: ParseSmt2, Ident: Sym2Smt> async::AsyncedIdentPrint<
-  Parser::Ident, Parser::Value, Parser::Expr, Parser::Proof, Ident
+impl<I, Parser: ParseSmt2, Ident: Sym2Smt<I>> async::AsyncedIdentPrint<
+  I, Parser::Ident, Parser::Value, Parser::Expr, Parser::Proof, Ident
 > for Solver<Parser> {
 
   /** Check-sat assuming command. */
   #[inline]
-  fn check_sat_assuming(& mut self, bool_vars: & [ Ident ]) -> UnitSmtRes {
+  fn check_sat_assuming(
+    & mut self, bool_vars: & [ Ident ], info: & I
+  ) -> UnitSmtRes {
     match self.conf.get_check_sat_assuming() {
       & Ok(cmd) => {
         let mut writer = try_writer!( self.writer() ) ;
@@ -960,7 +966,7 @@ impl<Parser: ParseSmt2, Ident: Sym2Smt> async::AsyncedIdentPrint<
         for sym in bool_vars {
           smtry_io!(
             write!(writer, " ") ;
-            sym.sym_to_smt2(writer)
+            sym.sym_to_smt2(writer, info)
           )
         } ;
         smt_cast_io!( write!(writer, "\n)\n") )
@@ -971,19 +977,19 @@ impl<Parser: ParseSmt2, Ident: Sym2Smt> async::AsyncedIdentPrint<
 }
 
 
-impl<Parser: ParseSmt2, Expr: Expr2Smt> async::AsyncedExprPrint<
-  Parser::Ident, Parser::Value, Parser::Expr, Parser::Proof, Expr
+impl<I, Parser: ParseSmt2, Expr: Expr2Smt<I>> async::AsyncedExprPrint<
+  I, Parser::Ident, Parser::Value, Parser::Expr, Parser::Proof, Expr
 > for Solver<Parser> {
 
   /** Get value command. */
   #[inline]
-  fn get_values(& mut self, exprs: & [ Expr ]) -> UnitSmtRes {
+  fn get_values(& mut self, exprs: & [ Expr ], info: & I) -> UnitSmtRes {
     let mut writer = try_writer!( self.writer() ) ;
     smtry_io!( write!(writer, "(get-value (") ) ;
     for e in exprs {
       smtry_io!(
         write!(writer, "\n  ") ;
-        e.expr_to_smt2(writer)
+        e.expr_to_smt2(writer, info)
       )
     } ;
     smt_cast_io!( write!(writer, "\n) )\n") )
@@ -995,12 +1001,12 @@ impl<Parser: ParseSmt2> sync::Synced<
   Parser::Ident, Parser::Value, Parser::Expr, Parser::Proof
 > for Solver<Parser> {}
 
-impl<Parser: ParseSmt2, Ident: Sym2Smt> sync::SyncedIdentPrint<
-  Parser::Ident, Parser::Value, Parser::Expr, Parser::Proof, Ident
+impl<I, Parser: ParseSmt2, Ident: Sym2Smt<I>> sync::SyncedIdentPrint<
+  I, Parser::Ident, Parser::Value, Parser::Expr, Parser::Proof, Ident
 > for Solver<Parser> {}
 
-impl<Parser: ParseSmt2, Expr: Expr2Smt> sync::SyncedExprPrint<
-  Parser::Ident, Parser::Value, Parser::Expr, Parser::Proof, Expr
+impl<I, Parser: ParseSmt2, Expr: Expr2Smt<I>> sync::SyncedExprPrint<
+  I, Parser::Ident, Parser::Value, Parser::Expr, Parser::Proof, Expr
 > for Solver<Parser> {}
 
 
@@ -1098,18 +1104,18 @@ pub mod async {
 
   /** Asynchronous queries with ident printing. */
   pub trait AsyncedIdentPrint<
-    PIdent, PValue, PExpr, PProof, Ident: Sym2Smt
+    I, PIdent, PValue, PExpr, PProof, Ident: Sym2Smt<I>
   > : Asynced<PIdent, PValue, PExpr, PProof> {
     /** Check-sat with assumptions command. */
-    fn check_sat_assuming(& mut self, & [ Ident ]) -> UnitSmtRes ;
+    fn check_sat_assuming(& mut self, & [ Ident ], & I) -> UnitSmtRes ;
   }
 
   /** Asynchronous queries with expr printing. */
   pub trait AsyncedExprPrint<
-    PIdent, PValue, PExpr, PProof, Expr: Expr2Smt
+    I, PIdent, PValue, PExpr, PProof, Expr: Expr2Smt<I>
   > : Asynced<PIdent, PValue, PExpr, PProof> {
     /** Get-values command. */
-    fn get_values(& mut self, & [ Expr ]) -> UnitSmtRes ;
+    fn get_values(& mut self, & [ Expr ], & I) -> UnitSmtRes ;
   }
 
   macro_rules! try_cast {
@@ -1167,15 +1173,17 @@ pub mod sync {
 
   /** Synchrous queries with ident printing. */
   pub trait SyncedIdentPrint<
-    PIdent, PValue, PExpr, PProof, Ident: Sym2Smt
-  > : Sized + AsyncedIdentPrint<PIdent, PValue, PExpr, PProof, Ident> {
+    I, PIdent, PValue, PExpr, PProof, Ident: Sym2Smt<I>
+  > : Sized + AsyncedIdentPrint<I, PIdent, PValue, PExpr, PProof, Ident> {
 
     /** Check-sat assuming command. */
-    fn check_sat_assuming(& mut self, idents: & [ Ident ]) -> SmtRes<bool> {
+    fn check_sat_assuming(
+      & mut self, idents: & [ Ident ], info: & I
+    ) -> SmtRes<bool> {
       try_cast!(
         (self as & mut AsyncedIdentPrint<
-          PIdent, PValue, PExpr, PProof, Ident
-        >).check_sat_assuming(idents)
+          I, PIdent, PValue, PExpr, PProof, Ident
+        >).check_sat_assuming(idents, info)
       ) ;
       self.parse_sat()
     }
@@ -1184,17 +1192,17 @@ pub mod sync {
 
   /** Synchrous queries with expr printing. */
   pub trait SyncedExprPrint<
-    PIdent, PValue, PExpr, PProof, Expr: Expr2Smt
-  > : Sized + AsyncedExprPrint<PIdent, PValue, PExpr, PProof, Expr> {
+    I, PIdent, PValue, PExpr, PProof, Expr: Expr2Smt<I>
+  > : Sized + AsyncedExprPrint<I, PIdent, PValue, PExpr, PProof, Expr> {
 
     /** Get-values command. */
     fn get_values(
-      & mut self, exprs: & [ Expr ]
+      & mut self, exprs: & [ Expr ], info: & I
     ) -> SmtRes<Vec<(PExpr, PValue)>> {
       try_cast!(
         (self as & mut AsyncedExprPrint<
-          PIdent, PValue, PExpr, PProof, Expr
-        >).get_values(exprs)
+          I, PIdent, PValue, PExpr, PProof, Expr
+        >).get_values(exprs, info)
       ) ;
       self.parse_values()
     }

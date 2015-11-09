@@ -148,6 +148,10 @@ printers over
 * symbols: `Sym2Smt` trait (*e.g.* for `declare-fun`),
 * expressions: `Expr2Smt` trait (*e.g.* for `assert`).
 
+The last two are parameterized by a Type for the information at print time.
+Commands using the user's structure for printing are enriched with a field
+to pass information down to the printer.
+
 For convenience, all these traits are implemented for `& str`. This is useful
 for testing and maybe *very* simple application.
 
@@ -396,15 +400,15 @@ It is now easy to implement `Sym2Smt` and `Expr2Smt`:
 #   }
 # }
 /** A symbol can be printed in SMT Lib 2. */
-impl<'a, 'b> Sym2Smt for Symbol<'a,'b> {
-  fn sym_to_smt2(& self, writer: & mut Write) -> IoResUnit {
+impl<'a, 'b> Sym2Smt<()> for Symbol<'a,'b> {
+  fn sym_to_smt2(& self, writer: & mut Write, _: & ()) -> IoResUnit {
     self.0.to_smt2(writer, self.1)
   }
 }
 
 /** An unrolled SExpr can be printed in SMT Lib 2. */
-impl<'a, 'b> Expr2Smt for Unrolled<'a,'b> {
-  fn expr_to_smt2(& self, writer: & mut Write) -> IoResUnit {
+impl<'a, 'b> Expr2Smt<()> for Unrolled<'a,'b> {
+  fn expr_to_smt2(& self, writer: & mut Write, _: & ()) -> IoResUnit {
     self.0.to_smt2(writer, self.1)
   }
 }
@@ -546,15 +550,15 @@ use nom::IResult ;
 #   }
 # }
 # /** A symbol can be printed in SMT Lib 2. */
-# impl<'a, 'b> Sym2Smt for Symbol<'a,'b> {
-#   fn sym_to_smt2(& self, writer: & mut Write) -> IoResUnit {
+# impl<'a, 'b> Sym2Smt<()> for Symbol<'a,'b> {
+#   fn sym_to_smt2(& self, writer: & mut Write, _: & ()) -> IoResUnit {
 #     self.0.to_smt2(writer, self.1)
 #   }
 # }
 # 
 # /** An unrolled SExpr can be printed in SMT Lib 2. */
-# impl<'a, 'b> Expr2Smt for Unrolled<'a,'b> {
-#   fn expr_to_smt2(& self, writer: & mut Write) -> IoResUnit {
+# impl<'a, 'b> Expr2Smt<()> for Unrolled<'a,'b> {
+#   fn expr_to_smt2(& self, writer: & mut Write, _: & ()) -> IoResUnit {
 #     self.0.to_smt2(writer, self.1)
 #   }
 # }
@@ -624,19 +628,19 @@ fn main() {
 
   let sym = nsv.to_sym(& offset1) ;
   smtry!(
-    solver.declare_fun(& sym, &[], & "bool"),
+    solver.declare_fun(& sym, &[], & "bool", & ()),
     failwith "declaration failed: {:?}"
   ) ;
 
   let sym = sv_0.to_sym(& offset1) ;
   smtry!(
-    solver.declare_fun(& sym, &[], & "bool"),
+    solver.declare_fun(& sym, &[], & "bool", & ()),
     failwith "declaration failed: {:?}"
   ) ;
 
   let expr = app1.unroll(& offset1) ;
   smtry!(
-    solver.assert(& expr),
+    solver.assert(& expr, & ()),
     failwith "assert failed: {:?}"
   ) ;
 
@@ -791,19 +795,18 @@ use rsmt2::* ;
 #   }
 # }
 # /** A symbol can be printed in SMT Lib 2. */
-# impl<'a, 'b> Sym2Smt for Symbol<'a,'b> {
-#   fn sym_to_smt2(& self, writer: & mut Write) -> IoResUnit {
+# impl<'a, 'b> Sym2Smt<()> for Symbol<'a,'b> {
+#   fn sym_to_smt2(& self, writer: & mut Write, _: & ()) -> IoResUnit {
 #     self.0.to_smt2(writer, self.1)
 #   }
 # }
 # 
 # /** An unrolled SExpr can be printed in SMT Lib 2. */
-# impl<'a, 'b> Expr2Smt for Unrolled<'a,'b> {
-#   fn expr_to_smt2(& self, writer: & mut Write) -> IoResUnit {
+# impl<'a, 'b> Expr2Smt<()> for Unrolled<'a,'b> {
+#   fn expr_to_smt2(& self, writer: & mut Write, _: & ()) -> IoResUnit {
 #     self.0.to_smt2(writer, self.1)
 #   }
 # }
-#
 /** Helper function, from `& [u8]` to `str`. */
 fn to_str(bytes: & [u8]) -> & str {
   match str::from_utf8(bytes) {
@@ -996,19 +999,19 @@ fn main() {
 
   let sym = nsv.to_sym(& offset1) ;
   smtry!(
-    solver.declare_fun(& sym, &[], & "bool"),
+    solver.declare_fun(& sym, &[], & "bool", & ()),
     failwith "declaration failed: {:?}"
   ) ;
 
   let sym = sv_0.to_sym(& offset1) ;
   smtry!(
-    solver.declare_fun(& sym, &[], & "bool"),
+    solver.declare_fun(& sym, &[], & "bool", & ()),
     failwith "declaration failed: {:?}"
   ) ;
 
   let expr = app1.unroll(& offset1) ;
   smtry!(
-    solver.assert(& expr),
+    solver.assert(& expr, & ()),
     failwith "assert failed: {:?}"
   ) ;
 
@@ -1039,7 +1042,7 @@ fn main() {
 
   let values = smtry!(
     solver.get_values(
-      & [ app1.unroll(& offset1), app2.unroll(& offset1)]
+      & [ app1.unroll(& offset1), app2.unroll(& offset1)], & ()
     ),
     failwith "error in get-values: {:?}"
   ) ;

@@ -76,8 +76,8 @@ impl Var {
 struct Symbol<'a, 'b>(& 'a Var, & 'b Offset) ;
 
 /** A symbol can be printed in SMT Lib 2. */
-impl<'a, 'b> Sym2Smt for Symbol<'a,'b> {
-  fn sym_to_smt2(& self, writer: & mut Write) -> IoResUnit {
+impl<'a, 'b> Sym2Smt<()> for Symbol<'a,'b> {
+  fn sym_to_smt2(& self, writer: & mut Write, _: & ()) -> IoResUnit {
     self.0.to_smt2(writer, self.1)
   }
 }
@@ -146,8 +146,8 @@ impl SExpr {
 struct Unrolled<'a, 'b>(& 'a SExpr, & 'b Offset) ;
 
 /** An unrolled SExpr can be printed in SMT Lib 2. */
-impl<'a, 'b> Expr2Smt for Unrolled<'a,'b> {
-  fn expr_to_smt2(& self, writer: & mut Write) -> IoResUnit {
+impl<'a, 'b> Expr2Smt<()> for Unrolled<'a,'b> {
+  fn expr_to_smt2(& self, writer: & mut Write, _: & ()) -> IoResUnit {
     self.0.to_smt2(writer, self.1)
   }
 }
@@ -348,14 +348,14 @@ fn sync() {
   let sym = nsv.to_sym(& offset1) ;
   println!("declaring {:?}", sym) ;
   smtry!(
-    solver.declare_fun(& sym, &[], & "bool"),
+    solver.declare_fun(& sym, &[], & "bool", & ()),
     failwith "declaration failed: {:?}"
   ) ;
 
   let sym = sv_0.to_sym(& offset1) ;
   println!("declaring {:?}",sym) ;
   smtry!(
-    solver.declare_fun(& sym, &[], & "bool"),
+    solver.declare_fun(& sym, &[], & "bool", & ()),
     failwith "declaration failed: {:?}"
   ) ;
 
@@ -364,7 +364,7 @@ fn sync() {
   let expr = app1.unroll(& offset1) ;
   println!("asserting {:?}", expr) ;
   smtry!(
-    solver.assert(& expr),
+    solver.assert(& expr, & ()),
     failwith "assert failed: {:?}"
   ) ;
   println!("") ;
@@ -401,7 +401,7 @@ fn sync() {
   println!("get-values") ;
   let values = smtry!(
     solver.get_values(
-      & [ app1.unroll(& offset1), app2.unroll(& offset1)]
+      & [ app1.unroll(& offset1), app2.unroll(& offset1)], & ()
     ),
     failwith "error in get-values: {:?}"
   ) ;
@@ -453,14 +453,14 @@ fn async() {
   let sym = nsv.to_sym(& offset1) ;
   println!("declaring {:?}", sym) ;
   smtry!(
-    solver.declare_fun(& sym, &[], & "bool"),
+    solver.declare_fun(& sym, &[], & "bool", & ()),
     failwith "declaration failed: {:?}"
   ) ;
 
   let sym = sv_0.to_sym(& offset1) ;
   println!("declaring {:?}",sym) ;
   smtry!(
-    solver.declare_fun(& sym, &[], & "bool"),
+    solver.declare_fun(& sym, &[], & "bool", & ()),
     failwith "declaration failed: {:?}"
   ) ;
 
@@ -469,7 +469,7 @@ fn async() {
   let expr = app1.unroll(& offset1) ;
   println!("asserting {:?}", expr) ;
   smtry!(
-    solver.assert(& expr),
+    solver.assert(& expr, & ()),
     failwith "assert failed: {:?}"
   ) ;
   println!("") ;
@@ -514,7 +514,7 @@ fn async() {
   println!("get-values") ;
   smtry!(
     solver.get_values(
-      & [ app1.unroll(& offset1), app2.unroll(& offset1)]
+      & [ app1.unroll(& offset1), app2.unroll(& offset1)], & ()
     ),
     failwith "error requesting values: {:?}"
   ) ;
