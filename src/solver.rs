@@ -954,14 +954,16 @@ impl<Parser: ParseSmt2> async::Asynced<
 }
 
 
-impl<Parser: ParseSmt2, Ident: Sym2Smt<Parser::I>> async::AsyncedIdentPrint<
-  Parser::I, Parser::Ident, Parser::Value, Parser::Expr, Parser::Proof, Ident
+impl<I, Parser: ParseSmt2, Ident: Sym2Smt<I>> async::AsyncedIdentPrint<
+  I,
+  Parser::I, Parser::Ident, Parser::Value, Parser::Expr, Parser::Proof,
+  Ident
 > for Solver<Parser> {
 
   /** Check-sat assuming command. */
   #[inline]
   fn check_sat_assuming(
-    & mut self, bool_vars: & [ Ident ], info: & Parser::I
+    & mut self, bool_vars: & [ Ident ], info: & I
   ) -> UnitSmtRes {
     match self.conf.get_check_sat_assuming() {
       & Ok(cmd) => {
@@ -982,7 +984,9 @@ impl<Parser: ParseSmt2, Ident: Sym2Smt<Parser::I>> async::AsyncedIdentPrint<
 
 
 impl<Parser: ParseSmt2, Expr: Expr2Smt<Parser::I>> async::AsyncedExprPrint<
-  Parser::I, Parser::Ident, Parser::Value, Parser::Expr, Parser::Proof, Expr
+  Parser::I,
+  Parser::I, Parser::Ident, Parser::Value, Parser::Expr, Parser::Proof,
+  Expr
 > for Solver<Parser> {
 
   /** Get value command. */
@@ -1007,8 +1011,10 @@ impl<Parser: ParseSmt2> sync::Synced<
   Parser::I, Parser::Ident, Parser::Value, Parser::Expr, Parser::Proof
 > for Solver<Parser> {}
 
-impl<Parser: ParseSmt2, Ident: Sym2Smt<Parser::I>> sync::SyncedIdentPrint<
-  Parser::I, Parser::Ident, Parser::Value, Parser::Expr, Parser::Proof, Ident
+impl<I, Parser: ParseSmt2, Ident: Sym2Smt<I>> sync::SyncedIdentPrint<
+  I,
+  Parser::I, Parser::Ident, Parser::Value, Parser::Expr, Parser::Proof,
+  Ident
 > for Solver<Parser> {}
 
 impl<Parser: ParseSmt2, Expr: Expr2Smt<Parser::I>> sync::SyncedExprPrint<
@@ -1110,16 +1116,16 @@ pub mod async {
 
   /** Asynchronous queries with ident printing. */
   pub trait AsyncedIdentPrint<
-    I, PIdent, PValue, PExpr, PProof, Ident: Sym2Smt<I>
-  > : Asynced<I, PIdent, PValue, PExpr, PProof> {
+    I, PInfo, PIdent, PValue, PExpr, PProof, Ident: Sym2Smt<I>
+  > : Asynced<PInfo, PIdent, PValue, PExpr, PProof> {
     /** Check-sat with assumptions command. */
     fn check_sat_assuming(& mut self, & [ Ident ], & I) -> UnitSmtRes ;
   }
 
   /** Asynchronous queries with expr printing. */
   pub trait AsyncedExprPrint<
-    I, PIdent, PValue, PExpr, PProof, Expr: Expr2Smt<I>
-  > : Asynced<I, PIdent, PValue, PExpr, PProof> {
+    I, PInfo, PIdent, PValue, PExpr, PProof, Expr: Expr2Smt<I>
+  > : Asynced<PInfo, PIdent, PValue, PExpr, PProof> {
     /** Get-values command. */
     fn get_values(& mut self, & [ Expr ], & I) -> UnitSmtRes ;
   }
@@ -1179,8 +1185,10 @@ pub mod sync {
 
   /** Synchrous queries with ident printing. */
   pub trait SyncedIdentPrint<
-    I, PIdent, PValue, PExpr, PProof, Ident: Sym2Smt<I>
-  > : Sized + AsyncedIdentPrint<I, PIdent, PValue, PExpr, PProof, Ident> {
+    I, PInfo, PIdent, PValue, PExpr, PProof, Ident: Sym2Smt<I>
+  > : Sized + AsyncedIdentPrint<
+    I, PInfo, PIdent, PValue, PExpr, PProof, Ident
+  > {
 
     /** Check-sat assuming command. */
     fn check_sat_assuming(
@@ -1188,7 +1196,7 @@ pub mod sync {
     ) -> SmtRes<bool> {
       try_cast!(
         (self as & mut AsyncedIdentPrint<
-          I, PIdent, PValue, PExpr, PProof, Ident
+          I, PInfo, PIdent, PValue, PExpr, PProof, Ident
         >).check_sat_assuming(idents, info)
       ) ;
       self.parse_sat()
@@ -1199,7 +1207,7 @@ pub mod sync {
   /** Synchrous queries with expr printing. */
   pub trait SyncedExprPrint<
     I, PIdent, PValue, PExpr, PProof, Expr: Expr2Smt<I>
-  > : Sized + AsyncedExprPrint<I, PIdent, PValue, PExpr, PProof, Expr> {
+  > : Sized + AsyncedExprPrint<I, I, PIdent, PValue, PExpr, PProof, Expr> {
 
     /** Get-values command. */
     fn get_values(
@@ -1207,7 +1215,7 @@ pub mod sync {
     ) -> SmtRes<Vec<(PExpr, PValue)>> {
       try_cast!(
         (self as & mut AsyncedExprPrint<
-          I, PIdent, PValue, PExpr, PProof, Expr
+          I, I, PIdent, PValue, PExpr, PProof, Expr
         >).get_values(exprs, info)
       ) ;
       self.parse_values(info)
