@@ -569,6 +569,7 @@ impl ParseSmt2 for Parser {
   type Value = Const ;
   type Expr = SExpr ;
   type Proof = () ;
+  type I = () ;
 
   fn parse_ident<'a>(
     & self, array: & 'a [u8]
@@ -581,7 +582,7 @@ impl ParseSmt2 for Parser {
     panic!("not implemented")
   }
   fn parse_expr<'a>(
-    & self, array: & 'a [u8]
+    & self, array: & 'a [u8], _: & ()
   ) -> IResult<'a, & 'a [u8], SExpr> {
     panic!("not implemented")
   }
@@ -939,6 +940,7 @@ impl ParseSmt2 for Parser {
   type Value = Const ;
   type Expr = SExpr ;
   type Proof = () ;
+  type I = () ;
 
   fn parse_ident<'a>(
     & self, array: & 'a [u8]
@@ -951,7 +953,7 @@ impl ParseSmt2 for Parser {
     cst(array)
   }
   fn parse_expr<'a>(
-    & self, array: & 'a [u8]
+    & self, array: & 'a [u8], _ : & ()
   ) -> IResult<'a, & 'a [u8], SExpr> {
     s_expr(array)
   }

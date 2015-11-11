@@ -697,7 +697,7 @@ impl<
 
 
 impl<Parser: ParseSmt2> async::Asynced<
-  Parser::Ident, Parser::Value, Parser::Expr, Parser::Proof
+  Parser::I, Parser::Ident, Parser::Value, Parser::Expr, Parser::Proof
 > for Solver<Parser> {
 
   /** Check-sat command. */
@@ -845,7 +845,9 @@ impl<Parser: ParseSmt2> async::Asynced<
 
   /** Parser the result of a get-values. */
   #[inline]
-  fn parse_values(& mut self) -> SmtRes<Vec<(Parser::Expr, Parser::Value)>> {
+  fn parse_values(& mut self, info: & Parser::I) -> SmtRes<
+    Vec<(Parser::Expr, Parser::Value)>
+  > {
     use nom::StepperState::* ;
     use parse::{ open_paren, close_paren, unexpected } ;
     let parser = & self.parser ;
@@ -889,7 +891,9 @@ impl<Parser: ParseSmt2> async::Asynced<
         step => panic!("{:?}", step),
       } ;
       /* We're parsing an expression/value pair. Parsing expr. */
-      let expr = match stepper.current_step(|array| parser.parse_expr(array)) {
+      let expr = match stepper.current_step(
+        |array| parser.parse_expr(array, info)
+      ) {
         Value(expr) => expr,
         ParserError(::nom::Err::Position(p,txt)) => {
           panic!("at {}: \"{}\"", p, ::std::str::from_utf8(txt).unwrap())
@@ -950,14 +954,14 @@ impl<Parser: ParseSmt2> async::Asynced<
 }
 
 
-impl<I, Parser: ParseSmt2, Ident: Sym2Smt<I>> async::AsyncedIdentPrint<
-  I, Parser::Ident, Parser::Value, Parser::Expr, Parser::Proof, Ident
+impl<Parser: ParseSmt2, Ident: Sym2Smt<Parser::I>> async::AsyncedIdentPrint<
+  Parser::I, Parser::Ident, Parser::Value, Parser::Expr, Parser::Proof, Ident
 > for Solver<Parser> {
 
   /** Check-sat assuming command. */
   #[inline]
   fn check_sat_assuming(
-    & mut self, bool_vars: & [ Ident ], info: & I
+    & mut self, bool_vars: & [ Ident ], info: & Parser::I
   ) -> UnitSmtRes {
     match self.conf.get_check_sat_assuming() {
       & Ok(cmd) => {
@@ -977,13 +981,15 @@ impl<I, Parser: ParseSmt2, Ident: Sym2Smt<I>> async::AsyncedIdentPrint<
 }
 
 
-impl<I, Parser: ParseSmt2, Expr: Expr2Smt<I>> async::AsyncedExprPrint<
-  I, Parser::Ident, Parser::Value, Parser::Expr, Parser::Proof, Expr
+impl<Parser: ParseSmt2, Expr: Expr2Smt<Parser::I>> async::AsyncedExprPrint<
+  Parser::I, Parser::Ident, Parser::Value, Parser::Expr, Parser::Proof, Expr
 > for Solver<Parser> {
 
   /** Get value command. */
   #[inline]
-  fn get_values(& mut self, exprs: & [ Expr ], info: & I) -> UnitSmtRes {
+  fn get_values(
+    & mut self, exprs: & [ Expr ], info: & Parser::I
+  ) -> UnitSmtRes {
     let mut writer = try_writer!( self.writer() ) ;
     smtry_io!( write!(writer, "(get-value (") ) ;
     for e in exprs {
@@ -998,15 +1004,15 @@ impl<I, Parser: ParseSmt2, Expr: Expr2Smt<I>> async::AsyncedExprPrint<
 
 
 impl<Parser: ParseSmt2> sync::Synced<
-  Parser::Ident, Parser::Value, Parser::Expr, Parser::Proof
+  Parser::I, Parser::Ident, Parser::Value, Parser::Expr, Parser::Proof
 > for Solver<Parser> {}
 
-impl<I, Parser: ParseSmt2, Ident: Sym2Smt<I>> sync::SyncedIdentPrint<
-  I, Parser::Ident, Parser::Value, Parser::Expr, Parser::Proof, Ident
+impl<Parser: ParseSmt2, Ident: Sym2Smt<Parser::I>> sync::SyncedIdentPrint<
+  Parser::I, Parser::Ident, Parser::Value, Parser::Expr, Parser::Proof, Ident
 > for Solver<Parser> {}
 
-impl<I, Parser: ParseSmt2, Expr: Expr2Smt<I>> sync::SyncedExprPrint<
-  I, Parser::Ident, Parser::Value, Parser::Expr, Parser::Proof, Expr
+impl<Parser: ParseSmt2, Expr: Expr2Smt<Parser::I>> sync::SyncedExprPrint<
+  Parser::I, Parser::Ident, Parser::Value, Parser::Expr, Parser::Proof, Expr
 > for Solver<Parser> {}
 
 
@@ -1077,7 +1083,7 @@ pub mod async {
   use common::* ;
 
   /** Asynchronous queries with no printing. */
-  pub trait Asynced<PIdent, PValue, PExpr, PProof> {
+  pub trait Asynced<PInfo, PIdent, PValue, PExpr, PProof> {
     /** Check-sat command. */
     fn check_sat(& mut self) -> UnitSmtRes ;
     /** Parse the result of a check-sat. */
@@ -1088,7 +1094,7 @@ pub mod async {
     /** Parse the result of a get-model. */
     fn parse_model(& mut self) -> SmtRes<Vec<(PIdent, PValue)>> ;
     /** Parse the result of a get-values. */
-    fn parse_values(& mut self) -> SmtRes<Vec<(PExpr, PValue)>> ;
+    fn parse_values(& mut self, & PInfo) -> SmtRes<Vec<(PExpr, PValue)>> ;
 
     /** Get-assertions command. */
     fn get_assertions(& mut self) -> UnitSmtRes ;
@@ -1105,7 +1111,7 @@ pub mod async {
   /** Asynchronous queries with ident printing. */
   pub trait AsyncedIdentPrint<
     I, PIdent, PValue, PExpr, PProof, Ident: Sym2Smt<I>
-  > : Asynced<PIdent, PValue, PExpr, PProof> {
+  > : Asynced<I, PIdent, PValue, PExpr, PProof> {
     /** Check-sat with assumptions command. */
     fn check_sat_assuming(& mut self, & [ Ident ], & I) -> UnitSmtRes ;
   }
@@ -1113,7 +1119,7 @@ pub mod async {
   /** Asynchronous queries with expr printing. */
   pub trait AsyncedExprPrint<
     I, PIdent, PValue, PExpr, PProof, Expr: Expr2Smt<I>
-  > : Asynced<PIdent, PValue, PExpr, PProof> {
+  > : Asynced<I, PIdent, PValue, PExpr, PProof> {
     /** Get-values command. */
     fn get_values(& mut self, & [ Expr ], & I) -> UnitSmtRes ;
   }
@@ -1146,14 +1152,14 @@ pub mod sync {
 
   /** Synchrous queries with no printing. */
   pub trait Synced<
-    PIdent, PValue, PExpr, PProof
-  > : Sized + Asynced<PIdent, PValue, PExpr, PProof> {
+    I, PIdent, PValue, PExpr, PProof
+  > : Sized + Asynced<I, PIdent, PValue, PExpr, PProof> {
 
     /** Check-sat command. */
     fn check_sat(& mut self) -> SmtRes<bool> {
       try_cast!(
         (self as & mut Asynced<
-          PIdent, PValue, PExpr, PProof
+          I, PIdent, PValue, PExpr, PProof
         >).check_sat()
       ) ;
       self.parse_sat()
@@ -1163,7 +1169,7 @@ pub mod sync {
     fn get_model(& mut self) -> SmtRes<Vec<(PIdent, PValue)>> {
       try_cast!(
         (self as & mut Asynced<
-          PIdent, PValue, PExpr, PProof
+          I, PIdent, PValue, PExpr, PProof
         >).get_model()
       ) ;
       self.parse_model()
@@ -1204,7 +1210,7 @@ pub mod sync {
           I, PIdent, PValue, PExpr, PProof, Expr
         >).get_values(exprs, info)
       ) ;
-      self.parse_values()
+      self.parse_values(info)
     }
   }
 

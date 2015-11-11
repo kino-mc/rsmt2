@@ -287,6 +287,7 @@ impl ParseSmt2 for Parser {
   type Value = Const ;
   type Expr = SExpr ;
   type Proof = () ;
+  type I = () ;
 
   fn parse_ident<'a>(
     & self, array: & 'a [u8]
@@ -299,7 +300,7 @@ impl ParseSmt2 for Parser {
     cst(array)
   }
   fn parse_expr<'a>(
-    & self, array: & 'a [u8]
+    & self, array: & 'a [u8], _: & ()
   ) -> IResult<'a, & 'a [u8], SExpr> {
     s_expr(array)
   }
@@ -519,7 +520,7 @@ fn async() {
     failwith "error requesting values: {:?}"
   ) ;
   let values = smtry!(
-    solver.parse_values(),
+    solver.parse_values(& ()),
     failwith "error in get-values: {:?}"
   ) ;
   for (e,v) in values.into_iter() {

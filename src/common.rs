@@ -99,6 +99,8 @@ pub trait ParseSmt2 {
   type Expr :  ::std::fmt::Debug ;
   /** Type of proofs in the user's structure. */
   type Proof : ::std::fmt::Debug ;
+  /** Type of the info passed when parsing expressions. */
+  type I ;
 
   /** Parses an ident from self, viewed as a reader.
   
@@ -132,7 +134,7 @@ pub trait ParseSmt2 {
   * `get_assertions` */
   #[inline(always)]
   fn parse_expr<'a>(
-    & self, & 'a [u8]
+    & self, & 'a [u8], & Self::I
   ) -> IResult<'a, & 'a [u8], Self::Expr> ;
 
   /** Parses a proof from self, viewed as a reader.
@@ -151,6 +153,7 @@ impl ParseSmt2 for () {
   type Value = () ;
   type Expr = () ;
   type Proof = () ;
+  type I = () ;
   fn parse_ident<'a>(
     & self, _: & 'a [u8]
   ) -> IResult<'a, & 'a [u8], Self::Ident> {
@@ -162,7 +165,7 @@ impl ParseSmt2 for () {
     panic!("parser on () called")
   }
   fn parse_expr<'a>(
-    & self, _: & 'a [u8]
+    & self, _: & 'a [u8], _: & ()
   ) -> IResult<'a, & 'a [u8], Self::Expr> {
     panic!("parser on () called")
   }
