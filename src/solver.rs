@@ -741,104 +741,56 @@ impl<Parser: ParseSmt2> async::Asynced<
     let parser = & self.parser ;
     let mut stepper = stepper_of!(self.kid) ;
 
-    /* Parse an error (done) or an opening parenthesis (values). */
     loop {
       match stepper.step (
         closure!(
           alt!(
-            map!( unexpected, |e| Some(e) ) |
+            map!( unexpected, |e| Err(e) ) |
             chain!(
               open_paren ~
               opt!(multispace) ~
-              tag!("model"),
-              || None
+              tag!("model") ~
+              vec: many0!(
+                chain!(
+                  open_paren ~
+                  opt!(multispace) ~
+                  tag!("define-fun") ~
+                  multispace ~
+                  id: call!(|bytes| parser.parse_ident(bytes)) ~
+                  open_paren ~
+                  close_paren ~
+                  opt!(multispace) ~
+                  alt!( tag!("bool") | tag!("int") | tag!("real") ) ~
+                  opt!(multispace) ~
+                  val: call!(|bytes| parser.parse_value(bytes)) ~
+                  close_paren,
+                  || (id, val)
+                )
+              ) ~
+              close_paren,
+              || Ok(vec)
             )
           )
         )
       ) {
-        Value( Some(err) ) => return Err(err),
-        Value( None ) => break,
-        Continue => continue,
-        ParserError(::nom::Err::Position(p,txt)) => {
-          panic!("at {}: \"{}\"", p, ::std::str::from_utf8(txt).unwrap())
-        },
-        step => panic!("{:?}", step),
-      }
-    }
-
-    let mut vec = vec![] ;
-
-    loop {
-      /* Parse an opening (value definition) or a closing (done) parenthesis.
-      */
-      match stepper.current_step(
-        closure!(
-          alt!(
-            chain!(
-              open_paren ~
-              opt!(multispace) ~
-              tag!("define-fun"),
-              || false
-            ) |
-            map!(close_paren, |_| true)
+        Value( Ok(vec) ) => return Ok(vec),
+        Value( Err(unex) ) => return Err(unex),
+        ParserError(::nom::Err::Position(p,txt)) => return Err(
+          Error(
+            format!(
+              "parser error at {}: \"{}\"",
+              p, ::std::str::from_utf8(txt).unwrap()
+            )
           )
-        )
-      ) {
-        Value(closed) => if closed { return Ok(vec) },
-        ParserError(::nom::Err::Position(p,txt)) => {
-          panic!("at {}: \"{}\"", p, ::std::str::from_utf8(txt).unwrap())
-        },
-        step => panic!("{:?}", step),
-      } ;
-      /* We're parsing an ident/value pair. Parsing ident. */
-      let ident = match stepper.current_step(
-        |array| parser.parse_ident(array)
-      ) {
-        Value(ident) => ident,
-        ParserError(::nom::Err::Position(p,txt)) => {
-          panic!("at {}: \"{}\"", p, ::std::str::from_utf8(txt).unwrap())
-        },
-        step => panic!("{:?}", step),
-      } ;
-      /* Throwing away type info. */
-      match stepper.current_step(
-        closure!(
-          chain!(
-            opt!(multispace) ~
-            char!('(') ~
-            opt!(is_not!("()")) ~
-            char!(')') ~
-            opt!(multispace) ~
-            is_not!(" \t\n") ~
-            opt!(multispace),
-            || ()
-          )
-        )
-      ) {
-        Value(_) => (),
-        ParserError(::nom::Err::Position(p,txt)) => {
-          panic!("at {}: \"{}\"", p, ::std::str::from_utf8(txt).unwrap())
-        },
-        step => panic!("{:?}", step),
+        ),
+        ParserError(e) => return Err(
+          Error( format!("parser error: \"{:?}\"", e) )
+        ),
+        ProducerError(i) => return Err(
+          Error( format!("producer error ({})",i ) )
+        ),
+        _ => continue,
       }
-      /* Parsing value. */
-      let val = match stepper.current_step(|array| parser.parse_value(array)) {
-        Value(value) => value,
-        ParserError(::nom::Err::Position(p,txt)) => {
-          panic!("at {}: \"{}\"", p, ::std::str::from_utf8(txt).unwrap())
-        },
-        step => panic!("{:?}", step),
-      } ;
-      /* End of expression/value pair. */
-      match stepper.current_step(close_paren) {
-        Value(_) => (),
-        ParserError(::nom::Err::Position(p,txt)) => {
-          panic!("at {}: \"{}\"", p, ::std::str::from_utf8(txt).unwrap())
-        },
-        step => panic!("{:?}", step),
-      } ;
-      /* Push on vector and loop. */
-      vec.push((ident,val)) ;
     }
   }
 
@@ -853,71 +805,48 @@ impl<Parser: ParseSmt2> async::Asynced<
     let parser = & self.parser ;
     let mut stepper = stepper_of!(self.kid) ;
 
-    /* Parse an error (done) or an opening parenthesis (values). */
     loop {
       match stepper.step (
         closure!(
           alt!(
-            map!( unexpected, |e| Some(e) ) |
-            map!( open_paren, |_| None )
+            map!( unexpected, |e| Err(e) ) |
+            chain!(
+              open_paren ~
+              vec: many0!(
+                chain!(
+                  open_paren ~
+                  opt!(multispace) ~
+                  expr: call!(|bytes| parser.parse_expr(bytes, info)) ~
+                  multispace ~
+                  val: call!(|bytes| parser.parse_value(bytes)) ~
+                  close_paren,
+                  || (expr, val)
+                )
+              ) ~
+              close_paren,
+              || Ok(vec)
+            )
           )
         )
       ) {
-        Value( Some(err) ) => return Err(err),
-        Value( None ) => break,
-        ParserError(::nom::Err::Position(p,txt)) => {
-          panic!("at {}: \"{}\"", p, ::std::str::from_utf8(txt).unwrap())
-        },
-        step => panic!("{:?}", step),
+        Value( Ok(vec) ) => return Ok(vec),
+        Value( Err(unex) ) => return Err(unex),
+        ParserError(::nom::Err::Position(p,txt)) => return Err(
+          Error(
+            format!(
+              "parser error at {}: \"{}\"",
+              p, ::std::str::from_utf8(txt).unwrap()
+            )
+          )
+        ),
+        ParserError(e) => return Err(
+          Error( format!("parser error: \"{:?}\"", e) )
+        ),
+        ProducerError(i) => return Err(
+          Error( format!("producer error ({})",i ) )
+        ),
+        _ => continue,
       }
-    }
-
-    let mut vec = vec![] ;
-
-    loop {
-      /* Parse an opening (value definition) or a closing (done) parenthesis.
-      */
-      match stepper.current_step(
-        closure!(
-          alt!(
-            map!(open_paren, |_| false) | map!(close_paren, |_| true)
-          )
-        )
-      ) {
-        Value(closed) => if closed { return Ok(vec) },
-        ParserError(::nom::Err::Position(p,txt)) => {
-          panic!("at {}: \"{}\"", p, ::std::str::from_utf8(txt).unwrap())
-        },
-        step => panic!("{:?}", step),
-      } ;
-      /* We're parsing an expression/value pair. Parsing expr. */
-      let expr = match stepper.current_step(
-        |array| parser.parse_expr(array, info)
-      ) {
-        Value(expr) => expr,
-        ParserError(::nom::Err::Position(p,txt)) => {
-          panic!("at {}: \"{}\"", p, ::std::str::from_utf8(txt).unwrap())
-        },
-        step => panic!("{:?}", step),
-      } ;
-      /* Parsing value. */
-      let val = match stepper.current_step(|array| parser.parse_value(array)) {
-        Value(value) => value,
-        ParserError(::nom::Err::Position(p,txt)) => {
-          panic!("at {}: \"{}\"", p, ::std::str::from_utf8(txt).unwrap())
-        },
-        step => panic!("{:?}", step),
-      } ;
-      /* End of expression/value pair. */
-      match stepper.current_step(close_paren) {
-        Value(_) => (),
-        ParserError(::nom::Err::Position(p,txt)) => {
-          panic!("at {}: \"{}\"", p, ::std::str::from_utf8(txt).unwrap())
-        },
-        step => panic!("{:?}", step),
-      } ;
-      /* Push on vector and loop. */
-      vec.push((expr,val)) ;
     }
   }
 
@@ -1316,30 +1245,6 @@ mod stepper {
     /** Creates a new stepper. */
     pub fn new(producer: T) -> Stepper<T> {
       Stepper { acc: Vec::new(), remaining: Vec::new(), producer: producer }
-    }
-
-    /** Attempts to parse the output that was previously retrieved. Does **not** read on the producer.*/
-    pub fn current_step<'a, F, O>(
-      & 'a mut self, parser: F
-    ) -> StepperState<'a, O>
-    where F: Fn(&'a [u8]) -> IResult<&'a [u8],O> {
-      self.acc.clear() ;
-      self.acc.extend(self.remaining.iter().cloned()) ;
-
-      match parser(&(self.acc)[..]) {
-        IResult::Done(i, o) => {
-          self.remaining.clear() ;
-          self.remaining.extend(i.iter().cloned()) ;
-          StepperState::Value(o)
-        },
-        IResult::Error(e) => {
-          self.remaining.clear() ;
-          self.remaining.extend(self.acc.iter().cloned()) ;
-          StepperState::ParserError(e)
-        },
-        IResult::Incomplete(_) =>
-          StepperState::Continue,
-      }
     }
 
     /** Reads on the producer and attemps to parse something. */
