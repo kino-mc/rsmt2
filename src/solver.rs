@@ -21,10 +21,9 @@ use std::io ;
 use std::io::{ Write, Read } ;
 use std::process ;
 
-use nom::multispace ;
+use nom::{ Stepper, multispace } ;
 
 use common::* ;
-use self::stepper::* ;
 use common::UnexSmtRes::* ;
 use conf::SolverConf ;
 use parse::* ;
@@ -686,9 +685,11 @@ impl<
       match stepper.step( success ) {
         Value( e ) => return e,
         Continue => continue,
-        ParserError(::nom::Err::Position(p,txt)) => {
-          panic!("at {}: \"{}\"", p, ::std::str::from_utf8(txt).unwrap())
-        },
+        ParserError(::nom::Err::Position(p,txt)) => return Err(
+          Error(
+            format!("at {}: \"{}\"", p, ::std::str::from_utf8(txt).unwrap())
+          )
+        ),
         step => { panic!("step = {:?}", step) },
       }
     }
@@ -760,7 +761,10 @@ impl<Parser: ParseSmt2> async::Asynced<
                   open_paren ~
                   close_paren ~
                   opt!(multispace) ~
-                  alt!( tag!("bool") | tag!("int") | tag!("real") ) ~
+                  alt!(
+                    tag!("Bool") | tag!("Int") | tag!("Real") |
+                    tag!("bool") | tag!("int") | tag!("real")
+                  ) ~
                   opt!(multispace) ~
                   val: call!(|bytes| parser.parse_value(bytes)) ~
                   close_paren,
@@ -775,14 +779,15 @@ impl<Parser: ParseSmt2> async::Asynced<
       ) {
         Value( Ok(vec) ) => return Ok(vec),
         Value( Err(unex) ) => return Err(unex),
-        ParserError(::nom::Err::Position(p,txt)) => return Err(
-          Error(
-            format!(
-              "parser error at {}: \"{}\"",
-              p, ::std::str::from_utf8(txt).unwrap()
-            )
-          )
-        ),
+        ParserError(::nom::Err::Position(_,_)) => continue,
+        // ParserError(::nom::Err::Position(p,txt)) => return Err(
+        //   Error(
+        //     format!(
+        //       "parser error at {}: \"{}\"",
+        //       p, ::std::str::from_utf8(txt).unwrap()
+        //     )
+        //   )
+        // ),
         ParserError(e) => return Err(
           Error( format!("parser error: \"{:?}\"", e) )
         ),
@@ -831,14 +836,15 @@ impl<Parser: ParseSmt2> async::Asynced<
       ) {
         Value( Ok(vec) ) => return Ok(vec),
         Value( Err(unex) ) => return Err(unex),
-        ParserError(::nom::Err::Position(p,txt)) => return Err(
-          Error(
-            format!(
-              "parser error at {}: \"{}\"",
-              p, ::std::str::from_utf8(txt).unwrap()
-            )
-          )
-        ),
+        ParserError(::nom::Err::Position(_,_)) => continue,
+        // ParserError(::nom::Err::Position(p,txt)) => return Err(
+        //   Error(
+        //     format!(
+        //       "parser error at {}: \"{}\"",
+        //       p, ::std::str::from_utf8(txt).unwrap()
+        //     )
+        //   )
+        // ),
         ParserError(e) => return Err(
           Error( format!("parser error: \"{:?}\"", e) )
         ),
@@ -1225,71 +1231,3 @@ impl<'a> io::Read for & 'a mut Kid {
   }
 }
 
-
-/** Hack around the `Stepper` from `nom` to handle parsing of a child
-process. */
-mod stepper {
-  use nom::{
-    StepperState, Producer, IResult, ProducerState
-  } ;
-  use nom::StepperState::* ;
-
-  /** Stepper designed for child processes. */
-  pub struct Stepper<T: Producer> {
-    acc: Vec<u8>,
-    remaining: Vec<u8>,
-    producer: T,
-  }
-
-  impl<T: Producer> Stepper<T> {
-    /** Creates a new stepper. */
-    pub fn new(producer: T) -> Stepper<T> {
-      Stepper { acc: Vec::new(), remaining: Vec::new(), producer: producer }
-    }
-
-    /** Reads on the producer and attemps to parse something. */
-    pub fn step<'a, F, O>(
-      & 'a mut self, parser: F
-    ) -> StepperState<'a, O>
-    where F: Fn(&'a [u8]) -> IResult<&'a [u8],O> {
-      self.acc.clear() ;
-      self.acc.extend(self.remaining.iter().cloned()) ;
-
-      /* Incomplete, need more data. */
-      let state = self.producer.produce() ;
-
-      match state {
-        ProducerState::Data(v) => {
-          self.acc.extend(v.iter().cloned())
-        },
-        ProducerState::Eof(v) => {
-          self.acc.extend(v.iter().cloned())
-        },
-        ProducerState::Continue =>
-          return StepperState::Continue,
-        ProducerState::ProducerError(u) =>
-          return StepperState::ProducerError(u),
-      }
-
-      if self.acc.is_empty() { return StepperState::Eof }
-
-      match parser(&(self.acc)[..]) {
-        IResult::Done(i, o) => {
-          self.remaining.clear() ;
-          self.remaining.extend(i.iter().cloned()) ;
-          return StepperState::Value(o)
-        },
-        IResult::Error(e) => {
-          self.remaining.clear() ;
-          self.remaining.extend(self.acc.iter().cloned()) ;
-          return StepperState::ParserError(e)
-        },
-        IResult::Incomplete(_) => {
-          self.remaining.clear() ;
-          self.remaining.extend(self.acc.iter().cloned()) ;
-          return StepperState::Continue
-        },
-      }
-    }
-  }
-}
