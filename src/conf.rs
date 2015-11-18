@@ -9,6 +9,8 @@
 
 /*! Solver configuration, contains backend solver specific info. */
 
+use std::fmt ;
+
 use common::UnexSmtRes ;
 
 use self::SolverStyle::* ;
@@ -55,6 +57,15 @@ impl SolverStyle {
         unsat_cores: false,
         check_sat_assuming: unsupported(),
       },
+    }
+  }
+}
+
+impl fmt::Display for SolverStyle {
+  fn fmt(& self, fmt: & mut fmt::Formatter) -> fmt::Result {
+    match * self {
+      Z3 => write!(fmt, "z3"),
+      CVC4 => write!(fmt, "cvc4"),
     }
   }
 }
