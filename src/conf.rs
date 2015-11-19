@@ -27,7 +27,7 @@ fn supported(keyword: & 'static str) -> ConfItem { Ok(keyword) }
 
 
 /** Solver styles. */
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum SolverStyle {
   /** Z3-style smt solver. */
   Z3,
