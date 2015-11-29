@@ -113,7 +113,7 @@ pub trait ParseSmt2 {
   #[inline(always)]
   fn parse_ident<'a>(
     & self, & 'a [u8]
-  ) -> IResult<'a, & 'a [u8], Self::Ident> ;
+  ) -> IResult<& 'a [u8], Self::Ident> ;
 
   /** Parses a value from self, viewed as a reader.
 
@@ -125,7 +125,7 @@ pub trait ParseSmt2 {
   #[inline(always)]
   fn parse_value<'a>(
     & self, & 'a [u8]
-  ) -> IResult<'a, & 'a [u8], Self::Value> ;
+  ) -> IResult<& 'a [u8], Self::Value> ;
 
   /** Parses an expression from self, viewed as a reader.
 
@@ -135,7 +135,7 @@ pub trait ParseSmt2 {
   #[inline(always)]
   fn parse_expr<'a>(
     & self, & 'a [u8], & Self::I
-  ) -> IResult<'a, & 'a [u8], Self::Expr> ;
+  ) -> IResult<& 'a [u8], Self::Expr> ;
 
   /** Parses a proof from self, viewed as a reader.
 
@@ -145,7 +145,7 @@ pub trait ParseSmt2 {
   #[inline(always)]
   fn parse_proof<'a>(
     & self, & 'a [u8]
-  ) -> IResult<'a, & 'a [u8], Self::Proof> ;
+  ) -> IResult<& 'a [u8], Self::Proof> ;
 }
 
 impl ParseSmt2 for () {
@@ -156,22 +156,22 @@ impl ParseSmt2 for () {
   type I = () ;
   fn parse_ident<'a>(
     & self, _: & 'a [u8]
-  ) -> IResult<'a, & 'a [u8], Self::Ident> {
+  ) -> IResult<& 'a [u8], Self::Ident> {
     panic!("parser on () called")
   }
   fn parse_value<'a>(
     & self, _: & 'a [u8]
-  ) -> IResult<'a, & 'a [u8], Self::Value> {
+  ) -> IResult<& 'a [u8], Self::Value> {
     panic!("parser on () called")
   }
   fn parse_expr<'a>(
     & self, _: & 'a [u8], _: & ()
-  ) -> IResult<'a, & 'a [u8], Self::Expr> {
+  ) -> IResult<& 'a [u8], Self::Expr> {
     panic!("parser on () called")
   }
   fn parse_proof<'a>(
     & self, _: & 'a [u8]
-  ) -> IResult<'a, & 'a [u8], Self::Proof> {
+  ) -> IResult<& 'a [u8], Self::Proof> {
     panic!("parser on () called")
   }
 }

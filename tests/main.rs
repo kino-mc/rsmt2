@@ -291,22 +291,22 @@ impl ParseSmt2 for Parser {
 
   fn parse_ident<'a>(
     & self, array: & 'a [u8]
-  ) -> IResult<'a, & 'a [u8], Var> {
+  ) -> IResult<& 'a [u8], Var> {
     var(array)
   }
   fn parse_value<'a>(
     & self, array: & 'a [u8]
-  ) -> IResult<'a, & 'a [u8], Const> {
+  ) -> IResult<& 'a [u8], Const> {
     cst(array)
   }
   fn parse_expr<'a>(
     & self, array: & 'a [u8], _: & ()
-  ) -> IResult<'a, & 'a [u8], SExpr> {
+  ) -> IResult<& 'a [u8], SExpr> {
     s_expr(array)
   }
   fn parse_proof<'a>(
     & self, _: & 'a [u8]
-  ) -> IResult<'a, & 'a [u8], ()> {
+  ) -> IResult<& 'a [u8], ()> {
     panic!("proof parsing is not supported")
   }
 }

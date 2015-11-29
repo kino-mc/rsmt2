@@ -21,7 +21,7 @@ use std::io ;
 use std::io::{ Write, Read } ;
 use std::process ;
 
-use nom::{ Stepper, multispace } ;
+use nom::{ multispace, IResult } ;
 
 use common::* ;
 use common::UnexSmtRes::* ;
@@ -33,6 +33,21 @@ macro_rules! try_writer {
   ($e:expr) => (
     match $e {
       Some(writer) => writer,
+      None => return Err(
+        IOError(
+          io::Error::new(
+            io::ErrorKind::Other, "cannot access writer of child process"
+          )
+        )
+      ),
+    }
+  )
+}
+
+macro_rules! try_reader {
+  ($e:expr) => (
+    match $e {
+      Some(reader) => reader,
       None => return Err(
         IOError(
           io::Error::new(
@@ -95,25 +110,6 @@ macro_rules! smt_cast_io {
   ) ;
 }
 
-macro_rules! stepper_of {
-  ($e:expr) => (
-    {
-      use nom::ReadProducer ;
-      let producer = ReadProducer::new(& mut $e, 1000) ;
-      Stepper::new(producer)
-    }
-  ) ;
-}
-
-macro_rules! take_step {
-  ($stepper:expr, $parser:expr) => (
-    match $stepper.current_step($parser) {
-      nome::StepperState::Continue => $stepper.step($parser),
-      res => res,
-    }
-  )
-}
-
 /** Contains an actual solver process. */
 pub struct Solver<
   Parser: ParseSmt2
@@ -122,6 +118,10 @@ pub struct Solver<
   cmd: Command,
   /** The actual solver child process. */
   kid: Kid,
+  /** Line buffer. */
+  buff: String,
+  /** Line swapper. */
+  swap: String,
   /** The solver specific information. */
   conf: SolverConf,
   /** The parser. */
@@ -149,7 +149,12 @@ impl<
       Ok(kid) => {
         /* Successful, creating solver. */
         let mut solver = Solver {
-          cmd: cmd, kid: Kid::mk(kid), conf: conf, parser: parser
+          cmd: cmd,
+          kid: Kid::mk(kid),
+          buff: String::with_capacity(1000),
+          swap: String::with_capacity(1000),
+          conf: conf,
+          parser: parser,
         } ;
         /* Activate parse success if asked. */
         if solver.conf.get_parse_success() {
@@ -188,7 +193,7 @@ impl<
 
   // /** Returns a pointer to the reader on the stdout of the process. */
   // #[inline(always)]
-  // fn out_reader(& mut self) -> Option<& mut process::ChildStdout> {
+  // fn reader(& mut self) -> Option<& mut process::ChildStdout> {
   //   self.kid.stdout()
   // }
 
@@ -676,23 +681,82 @@ impl<
 
   // |===| Parsing simple stuff.
 
+  /** Fetches data if necessary. */
+  fn fetch(& mut self) -> UnitSmtRes {
+    ::std::mem::swap(& mut self.buff, & mut self.swap) ;
+    let mut buff = ::std::io::BufReader::new(
+      try_reader!(self.kid.stdout())
+    ) ;
+    let mut cnt = 0 ;
+    let mut qid = false ;
+    let mut str = false ;
+    loop {
+      use std::io::BufRead ;
+      let len = self.buff.len() ;
+      match buff.read_line(& mut self.buff) {
+        Ok(_) => (),
+        Err(e) => return Err( UnexSmtRes::IOError(e) ),
+      } ;
+      if len < self.buff.len() {
+        self.buff.trim_right() ;
+        for c in self.buff.chars().skip(len) {
+          let normal = ! (qid || str) ;
+          match c {
+            '(' if normal => cnt += 1,
+            ')' if normal => cnt -= 1,
+            '|' if !str => qid = ! qid,
+            '"' if !qid => str = ! str,
+            _ => (),
+          }
+        } ;
+        if cnt == 0 { break }
+      }
+    }
+    Ok(())
+  }
+
+  /** Applies a parser and returns its result. Fetches more data if necessary.
+  */
+  fn parse<'a, T, F: Fn(& 'a [u8]) -> IResult<& 'a [u8], SmtRes<T>>>(
+    & 'a mut self, parser: F
+  ) -> SmtRes<T> {
+    use nom::IResult::* ;
+    try!( self.fetch() ) ;
+    let res = match parser( self.buff.as_ref() ) {
+      Done(rest, res) => {
+        self.swap.clear() ;
+        self.swap.extend( ::std::str::from_utf8(rest).unwrap().chars() ) ;
+        res
+      },
+      Error(e) => return Err( UnexSmtRes::Error(format!("{:?}", e)) ),
+      Incomplete(n) => panic!("incomplete {:?}", n),
+    } ;
+    res
+  }
+
+  /** Applies a parser and returns its result. Fetches more data if necessary.
+  Gives the internal parser as parameter to the parser. */
+  fn cstm_parse<
+    'a, T, F: Fn(& 'a [u8], & Parser) -> IResult<& 'a [u8], SmtRes<T>>
+  >(& 'a mut self, parser: F) -> SmtRes<T> {
+    use nom::IResult::* ;
+    try!( self.fetch() ) ;
+    let res = match parser( self.buff.as_ref(), & self.parser ) {
+      Done(rest, res) => {
+        self.swap.clear() ;
+        self.swap.extend( ::std::str::from_utf8(rest).unwrap().chars() ) ;
+        res
+      },
+      Error(e) => return Err( UnexSmtRes::Error(format!("{:?}", e)) ),
+      Incomplete(n) => panic!("incomplete {:?}", n),
+    } ;
+    res
+  }
+
   /** Parse success. */
   #[inline]
   fn parse_success(& mut self) -> SuccessRes {
-    use nom::StepperState::* ;
-    let mut stepper = stepper_of!(self.kid) ;
-    loop {
-      match stepper.step( success ) {
-        Value( e ) => return e,
-        Continue => continue,
-        ParserError(::nom::Err::Position(p,txt)) => return Err(
-          Error(
-            format!("at {}: \"{}\"", p, ::std::str::from_utf8(txt).unwrap())
-          )
-        ),
-        step => { panic!("step = {:?}", step) },
-      }
-    }
+    self.parse(success)
   }
 }
 
@@ -711,18 +775,7 @@ impl<Parser: ParseSmt2> async::Asynced<
   /** Parse the result of a check-sat. */
   #[inline]
   fn parse_sat(& mut self) -> SmtRes<bool> {
-    use nom::StepperState::* ;
-    let mut stepper = stepper_of!(self.kid) ;
-    loop {
-      match stepper.step( check_sat ) {
-        Value( res ) => return res,
-        Continue => { println!("continue") },
-        ParserError(::nom::Err::Position(p,txt)) => {
-          panic!("at {}: \"{}\"", p, ::std::str::from_utf8(txt).unwrap())
-        },
-        step => panic!("{:?}", step),
-      }
-    }
+    self.parse(check_sat)
   }
 
   /** Get model command. */
@@ -737,13 +790,10 @@ impl<Parser: ParseSmt2> async::Asynced<
   fn parse_model(& mut self) -> SmtRes<Vec<(
     Parser::Ident, Parser::Value
   )>> where Parser::Value: Debug, Parser::Ident: Debug {
-    use nom::StepperState::* ;
     use parse::{ open_paren, close_paren, unexpected } ;
-    let parser = & self.parser ;
-    let mut stepper = stepper_of!(self.kid) ;
 
-    loop {
-      match stepper.step (
+    self.cstm_parse(|bytes, parser|
+      call!(bytes,
         closure!(
           alt!(
             map!( unexpected, |e| Err(e) ) |
@@ -776,27 +826,8 @@ impl<Parser: ParseSmt2> async::Asynced<
             )
           )
         )
-      ) {
-        Value( Ok(vec) ) => return Ok(vec),
-        Value( Err(unex) ) => return Err(unex),
-        ParserError(::nom::Err::Position(_,_)) => continue,
-        // ParserError(::nom::Err::Position(p,txt)) => return Err(
-        //   Error(
-        //     format!(
-        //       "parser error at {}: \"{}\"",
-        //       p, ::std::str::from_utf8(txt).unwrap()
-        //     )
-        //   )
-        // ),
-        ParserError(e) => return Err(
-          Error( format!("parser error: \"{:?}\"", e) )
-        ),
-        ProducerError(i) => return Err(
-          Error( format!("producer error ({})",i ) )
-        ),
-        _ => continue,
-      }
-    }
+      )
+    )
   }
 
 
@@ -805,13 +836,10 @@ impl<Parser: ParseSmt2> async::Asynced<
   fn parse_values(& mut self, info: & Parser::I) -> SmtRes<
     Vec<(Parser::Expr, Parser::Value)>
   > {
-    use nom::StepperState::* ;
     use parse::{ open_paren, close_paren, unexpected } ;
-    let parser = & self.parser ;
-    let mut stepper = stepper_of!(self.kid) ;
 
-    loop {
-      match stepper.step (
+    self.cstm_parse(
+      |bytes, parser| call!(bytes,
         closure!(
           alt!(
             map!( unexpected, |e| Err(e) ) |
@@ -833,27 +861,8 @@ impl<Parser: ParseSmt2> async::Asynced<
             )
           )
         )
-      ) {
-        Value( Ok(vec) ) => return Ok(vec),
-        Value( Err(unex) ) => return Err(unex),
-        ParserError(::nom::Err::Position(_,_)) => continue,
-        // ParserError(::nom::Err::Position(p,txt)) => return Err(
-        //   Error(
-        //     format!(
-        //       "parser error at {}: \"{}\"",
-        //       p, ::std::str::from_utf8(txt).unwrap()
-        //     )
-        //   )
-        // ),
-        ParserError(e) => return Err(
-          Error( format!("parser error: \"{:?}\"", e) )
-        ),
-        ProducerError(i) => return Err(
-          Error( format!("producer error ({})",i ) )
-        ),
-        _ => continue,
-      }
-    }
+      )
+    )
   }
 
   /** Get assertions command. */
@@ -1203,13 +1212,13 @@ impl Kid {
     }
   }
 
-  // /** A reference on the child's stdout. */
-  // #[inline(always)]
-  // pub fn stdout(& mut self) -> Option<& mut process::ChildStdout> {
-  //   match self.kid.stdout {
-  //     None => None, Some(ref mut stdout) => Some(stdout)
-  //   }
-  // }
+  /** A reference on the child's stdout. */
+  #[inline(always)]
+  pub fn stdout(& mut self) -> Option<& mut process::ChildStdout> {
+    match self.kid.stdout {
+      None => None, Some(ref mut stdout) => Some(stdout)
+    }
+  }
 
 }
 
