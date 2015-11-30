@@ -15,10 +15,11 @@ pipes.
 */
 
 
-use std::process::{ Command, Stdio } ;
+use std::process::{ ChildStdin, Command, Stdio } ;
 use std::fmt::Debug ;
 use std::io ;
-use std::io::{ Write, Read } ;
+use std::io::{ Write, Read, BufWriter } ;
+use std::fs::File ;
 use std::process ;
 
 use nom::{ multispace, IResult } ;
@@ -81,6 +82,28 @@ macro_rules! parse_success {
   ) ;
 }
 
+#[cfg(not(no_parse_success))]
+macro_rules! new_parse_success {
+  ($slf:ident for $b:block) => (
+    {
+      let res = $b ;
+      if $slf.conf().get_parse_success() {
+        match $slf.parse_success() {
+          Ok(()) => res,
+          e => e
+        }
+      } else { res }
+    }
+  ) ;
+}
+
+#[cfg(no_parse_success)]
+macro_rules! new_parse_success {
+  ($slf:ident for $b:block) => (
+    $b
+  ) ;
+}
+
 macro_rules! smtry_io {
   ($e:expr) => (
     match $e {
@@ -108,6 +131,68 @@ macro_rules! smt_cast_io {
       Err(e) => Err(IOError(e)),
     }
   ) ;
+}
+
+
+macro_rules! fetch {
+  ($slf:expr, $start:expr, $c:ident => $action:expr) => ( {
+    ::std::mem::swap(& mut $slf.buff, & mut $slf.swap) ;
+    let mut buff = ::std::io::BufReader::new(
+      try_reader!( $slf.kid.stdout() )
+    ) ;
+    let mut cnt = 0 ;
+    let mut qid = false ;
+    let mut str = false ;
+    loop {
+      use std::io::BufRead ;
+      let len = $slf.buff.len() ;
+      match buff.read_line(& mut $slf.buff) {
+        Ok(_) => (),
+        Err(e) => return Err( IOError(e) ),
+      } ;
+      let mut cmt = false ;
+      if len < $slf.buff.len() {
+        $start ;
+        $slf.buff.trim_right() ;
+        for $c in $slf.buff.chars().skip(len) {
+          $action ;
+          let normal = ! (qid || str || cmt) ;
+          match $c {
+            ';' if normal => cmt = true,
+            '(' if normal => cnt += 1,
+            ')' if normal => cnt -= 1,
+            '|' if ! (str || cmt) => qid = ! qid,
+            '"' if ! (qid || cmt) => str = ! str,
+            _ => (),
+          }
+        }
+      } ;
+      if cnt == 0 { break }
+    } ;
+    Ok(())
+  } ) ;
+  ($slf:ident) => ( fetch!( $slf, (), c => () ) ) ;
+}
+
+macro_rules! parse {
+  ($slf:expr, $fetch:expr, $parse:expr) => ( {
+    use nom::IResult::* ;
+    $fetch ;
+    let res = match $parse {
+      Done(rest, res) => {
+        $slf.swap.clear() ;
+        $slf.swap.extend(
+          ::std::str::from_utf8(rest).unwrap().chars()
+        ) ;
+        res
+      },
+      Error(e) => return Err(
+        UnexSmtRes::Error(format!("{:?}", e))
+      ),
+      Incomplete(n) => panic!("incomplete {:?}", n),
+    } ;
+    res
+  } )
 }
 
 /** Contains an actual solver process. */
@@ -1240,3 +1325,740 @@ impl<'a> io::Read for & 'a mut Kid {
   }
 }
 
+
+
+
+
+/** Contains an actual solver process. */
+pub struct NormalSolver<
+  Parser: ParseSmt2
+> {
+  /** The command used to run the solver. */
+  cmd: Command,
+  /** The actual solver child process. */
+  kid: Kid,
+  /** Line buffer. */
+  buff: String,
+  /** Line swapper. */
+  swap: String,
+  /** The solver specific information. */
+  conf: SolverConf,
+  /** The parser. */
+  parser: Parser,
+}
+
+impl<Parser: ParseSmt2> NormalSolver<Parser> {
+  /** Creates a solver logging commands and results in a file. */
+  pub fn tee(
+    self, log: & ::std::path::Path
+  ) -> SmtRes<TeeSolver<Parser>> {
+    use std::fs::OpenOptions ;
+    match OpenOptions::new().write(true).open(log) {
+      Ok(file) => Ok(
+        TeeSolver { solver: self, file: file }
+      ),
+      Err(e) => Err(
+        Error(
+          format!("could not open log file \"{:?}\": {}", log, e)
+        )
+      ),
+    }
+  }
+
+  /** Fetches data if necessary. */
+  fn fetch(& mut self) -> UnitSmtRes {
+    fetch!(self)
+  }
+}
+
+
+
+
+impl<Parser: ParseSmt2>
+SolverPrimitives<Parser> for
+NormalSolver<Parser> {
+  fn conf(& self) -> & SolverConf { & self.conf }
+  fn stop(self) -> IoRes<(Command, SolverConf)> {
+    let (cmd,conf,kid) = (self.cmd, self.conf, self.kid) ;
+    match kid.kill() {
+      Ok(()) => Ok((cmd, conf)),
+      Err(e) => Err(e)
+    }
+  }
+  fn write<
+    T, F: Fn(& mut Write) -> SmtRes<T>
+  >(& mut self, f: F) -> SmtRes<T> {
+    match self.kid.stdin() {
+      Some(stdin) => f(
+        & mut BufWriter::with_capacity(1000, stdin)
+      ),
+      None => Err(
+        Error("could not access stdin of solver".to_string())
+      ),
+    }
+  }
+  fn parse<'a, T, F: Fn(& 'a [u8]) -> IResult<& 'a [u8], SmtRes<T>>>(
+    & 'a mut self, parser: F
+  ) -> SmtRes<T> {
+    parse!(
+      self, try!( self.fetch() ), parser( self.buff.as_ref() )
+    )
+  }
+  fn cstm_parse<
+    'a, T, F: Fn(& 'a [u8], & Parser) -> IResult<& 'a [u8], SmtRes<T>>
+  >(& 'a mut self, parser: F) -> SmtRes<T> {
+    parse!(
+      self, try!( self.fetch() ),
+      parser( self.buff.as_ref(), & self.parser )
+    )
+  }
+}
+
+impl<Parser: ParseSmt2> SolverCmd<Parser> for NormalSolver<Parser> {}
+
+
+
+
+/** Contains an actual solver process. */
+pub struct TeeSolver<
+  Parser: ParseSmt2
+> {
+  /** The actual solver. */
+  solver: NormalSolver<Parser>,
+  /** The file we're logging to. */
+  file: File,
+}
+
+impl<Parser: ParseSmt2> TeeSolver<Parser> {
+  /** Fetches data if necessary. */
+  fn fetch(& mut self) -> UnitSmtRes {
+    fetch!(
+      self.solver,
+      smtry_io!( write!(self.file, ";; ") ),
+      c => smtry_io!( write!(self.file, "{}", c) )
+    )
+  }
+}
+
+
+
+
+/** Tee writer. */
+struct TeeWriter<W1: Write, W2: Write> {
+  w1: W1, w2: W2
+}
+impl<W1: Write, W2: Write> TeeWriter<W1, W2> {
+  fn mk(w1: W1, w2: W2) -> BufWriter<Self> {
+    BufWriter::with_capacity(
+      1000, TeeWriter { w1: w1, w2: w2 }
+    )
+  }
+}
+impl<W1: Write, W2: Write> Write for TeeWriter<W1, W2> {
+  fn write(& mut self, buf: & [u8]) -> IoRes<usize> {
+    try!( self.w1.write(buf) ) ;
+    self.w2.write(buf)
+  }
+  fn flush(& mut self) -> IoRes<()> {
+    try!( self.w1.flush() ) ;
+    self.w2.flush()
+  }
+}
+
+
+impl<Parser: ParseSmt2>
+SolverPrimitives<Parser> for
+TeeSolver<Parser> {
+  fn conf(& self) -> & SolverConf { self.solver.conf() }
+  fn stop(self) -> IoRes<(Command, SolverConf)> { self.solver.stop() }
+  fn write<
+    T, F: Fn(& mut Write) -> SmtRes<T>
+  >(& mut self, f: F) -> SmtRes<T> {
+    match self.solver.kid.stdin() {
+      Some(stdin) => f(
+        & mut TeeWriter::mk(stdin, & mut self.file)
+      ),
+      None => Err(
+        Error("could not access stdin of solver".to_string())
+      ),
+    }
+  }
+  fn parse<'a, T, F: Fn(& 'a [u8]) -> IResult<& 'a [u8], SmtRes<T>>>(
+    & 'a mut self, parser: F
+  ) -> SmtRes<T> {
+    parse!(
+      self.solver, try!( self.fetch() ), parser( self.solver.buff.as_ref() )
+    )
+  }
+  fn cstm_parse<
+    'a, T, F: Fn(& 'a [u8], & Parser) -> IResult<& 'a [u8], SmtRes<T>>
+  >(& 'a mut self, parser: F) -> SmtRes<T> {
+    parse!(
+      self.solver, try!( self.fetch() ),
+      parser( self.solver.buff.as_ref(), & self.solver.parser )
+    )
+  }
+}
+
+impl<Parser: ParseSmt2> SolverCmd<Parser> for TeeSolver<Parser> {}
+
+
+/** Primitive functions provided by a solver wrapper. */
+trait SolverPrimitives<Parser: ParseSmt2> {
+  /** The configuration of the solver. */
+  #[inline(always)]
+  fn conf(& self) -> & SolverConf ;
+
+  /** Kills the underlying solver. */
+  #[inline(always)]
+  fn stop(self) -> IoRes<(Command, SolverConf)> ;
+
+  /** Writes something on solver's stdin. */
+  #[inline(always)]
+  fn write<
+    T, F: Fn(& mut Write) -> SmtRes<T>
+  >(& mut self, f: F) -> SmtRes<T> ;
+
+  /** Applies a parser and returns its result. Fetches more data if necessary.
+  */
+  fn parse<'a, T, F: Fn(& 'a [u8]) -> IResult<& 'a [u8], SmtRes<T>>>(
+    & 'a mut self, parser: F
+  ) -> SmtRes<T> ;
+
+  /** Applies a parser and returns its result. Fetches more data if necessary.
+  Gives the internal parser as parameter to the parser. */
+  fn cstm_parse<
+    'a, T, F: Fn(& 'a [u8], & Parser) -> IResult<& 'a [u8], SmtRes<T>>
+  >(& 'a mut self, parser: F) -> SmtRes<T> ;
+}
+
+
+
+pub trait SolverCmd<Parser: ParseSmt2> : Sized + SolverPrimitives<Parser> {
+
+  /** Creates a solver. */
+  fn mk(
+    cmd: Command, conf: SolverConf, parser: Parser
+  ) -> SmtRes<NormalSolver<Parser>> {
+    let mut cmd = cmd ;
+    /* Adding configuration options to the command. */
+    cmd.args(conf.get_options()) ;
+    /* Setting up pipes for child process. */
+    cmd.stdin(Stdio::piped()) ;
+    cmd.stdout(Stdio::piped()) ;
+    cmd.stderr(Stdio::piped()) ;
+    /* Spawning child process. */
+    match cmd.spawn() {
+      Ok(kid) => {
+        /* Successful, creating solver. */
+        let mut solver = NormalSolver {
+          cmd: cmd,
+          kid: Kid::mk(kid),
+          buff: String::with_capacity(1000),
+          swap: String::with_capacity(1000),
+          conf: conf,
+          parser: parser,
+        } ;
+        /* Activate parse success if asked. */
+        if solver.conf.get_parse_success() {
+          match solver.print_success() {
+            Ok(()) => (),
+            Err(e) => {
+              solver.kill().unwrap() ;
+              return Err(e)
+            }
+          }
+        } ;
+        /* Activating interactive mode. */
+        try!( solver.interactive_mode() ) ;
+        /* Done. */
+        Ok(solver)
+      },
+      Err(e) => Err(IOError(e)),
+    }
+  }
+
+  /** Kills the underlying solver. */
+  #[inline(always)]
+  fn kill(self) -> IoRes<(Command, SolverConf)> { self.stop() }
+
+
+  // Comment things.
+
+  /** Prints some text as comments. Input is sanitized in case it contains
+  newlines. */
+  #[inline(always)]
+  fn comment(& mut self, txt: & str) -> UnitSmtRes {
+    self.write(
+      |w| {
+        for line in txt.lines() {
+          smtry_io!( write!(w, ";; {}\n", line) )
+        } ;
+        smt_cast_io!( write!(w, "\n") )
+      }
+    )
+  }
+
+
+  // |===| (Re)starting and terminating.
+
+  /** Resets the underlying solver. Restarts the kid process if no reset
+  command is supported. */
+  #[inline(always)]
+  fn reset(
+    & mut self
+  ) -> UnitSmtRes {
+    self.write(
+      |w| smt_cast_io!( write!(w, "(reset)\n") )
+    )
+  }
+  #[inline]
+  /** Sets the logic. */
+  fn set_logic(
+    & mut self, logic: & Logic
+  ) -> UnitSmtRes {
+    new_parse_success!(
+      self for {
+        self.write(
+          |w| smt_cast_io!(
+            write!(w, "(set-logic ") ;
+            logic.to_smt2(w, ()) ;
+            write!(w, ")\n")
+          )
+        )
+      }
+    )
+  }
+  /** Set option command. */
+  #[inline]
+  fn set_option<Value: ::std::fmt::Display>(
+    & mut self, option: & str, value: Value
+  ) -> UnitSmtRes {
+    match option {
+      ":interactive_mode" => return Err(
+        Error(
+          "illegal set-option on interactive mode".to_string()
+        )
+      ),
+      ":print_success" => return Err(
+        Error(
+          "illegal set-option on print success, \
+          use `SmtConf` to activate it".to_string()
+        )
+      ),
+      _ => (),
+    } ;
+    new_parse_success!(
+      self for {
+        self.write(
+          |w| smt_cast_io!(
+            write!(w, "(set-option {} {})\n", option, value)
+          )
+        )
+      }
+    )
+  }
+  /** Activates interactive mode. */
+  #[inline(always)]
+  fn interactive_mode(& mut self) -> UnitSmtRes {
+    new_parse_success!(
+      self for {
+        self.write(
+          |w| smt_cast_io!(
+            write!(w, "(set-option :interactive-mode true)\n")
+          )
+        )
+      }
+    )
+  }
+  /** Activates print success. */
+  #[inline(always)]
+  fn print_success(& mut self) -> UnitSmtRes {
+    new_parse_success!(
+      self for {
+        self.write(
+          |w| smt_cast_io!(
+            write!(w, "(set-option :print-success true)\n")
+          )
+        )
+      }
+    )
+  }
+  /** Activates unsat core production. */
+  #[inline(always)]
+  fn produce_unsat_core(& mut self) -> UnitSmtRes {
+    new_parse_success!(
+      self for {
+        self.write(
+          |w| smt_cast_io!(
+            write!(w, "(set-option :produce-unsat-cores true)\n")
+          )
+        )
+      }
+    )
+  }
+  /** Shuts the solver down. */
+  #[inline(always)]
+  fn exit(& mut self) -> UnitSmtRes {
+    new_parse_success!(
+      self for {
+        self.write(
+          |w| smt_cast_io!(
+            write!(w, "(exit)\n")
+          )
+        )
+      }
+    )
+  }
+
+
+  // |===| Modifying the assertion stack.
+
+  /** Pushes `n` layers on the assertion stack. */
+  #[inline(always)]
+  fn push(& mut self, n: & u8) -> UnitSmtRes {
+    new_parse_success!(
+      self for {
+        self.write(
+          |w| smt_cast_io!(
+            write!(w, "(push {})\n", n)
+          )
+        )
+      }
+    )
+  }
+  /** Pops `n` layers off the assertion stack. */
+  #[inline(always)]
+  fn pop(& mut self, n: & u8) -> UnitSmtRes {
+    new_parse_success!(
+      self for {
+        self.write(
+          |w| smt_cast_io!(
+            write!(w, "(pop {})\n", n)
+          )
+        )
+      }
+    )
+  }
+  /** Resets the assertions in the solver. */
+  #[inline(always)]
+  fn reset_assertions(& mut self) -> UnitSmtRes {
+    new_parse_success!(
+      self for {
+        self.write(
+          |w| smt_cast_io!(
+            write!(w, "(reset-assertions)\n")
+          )
+        )
+      }
+    )
+  }
+
+
+  // |===| Introducing new symbols.
+
+  /** Declares a new sort. */
+  #[inline]
+  fn declare_sort<Sort: Sort2Smt>(
+    & mut self, sort: & Sort, arity: & u8
+  ) -> UnitSmtRes {
+    new_parse_success!(
+      self for {
+        self.write(
+          |w| smt_cast_io!(
+            write!(w, "(declare-sort ") ;
+            sort.sort_to_smt2(w) ;
+            write!(w, " {})\n", arity)
+          )
+        )
+      }
+    )
+  }
+  /** Defines a new sort. */
+  #[inline]
+  fn define_sort<
+    Sort: Sort2Smt, I, Expr1: Expr2Smt<I>, Expr2: Expr2Smt<I>
+  >(
+    & mut self, sort: & Sort, args: & [ Expr1 ], body: & Expr2, info: & I
+  ) -> UnitSmtRes {
+    new_parse_success!(
+      self for {
+        self.write(
+          |w| {
+            smtry_io!(
+              write!(w, "( define-sort ") ;
+              sort.sort_to_smt2(w) ;
+              write!(w, "\n   ( ")
+            ) ;
+            for arg in args {
+              smtry_io!(
+                arg.expr_to_smt2(w, info) ;
+                write!(w, " ")
+              ) ;
+            } ;
+            smt_cast_io!(
+              write!(w, ")\n   ") ;
+              body.expr_to_smt2(w, info) ;
+              write!(w, "\n)\n")
+            )
+          }
+        )
+      }
+    )
+  }
+  /** Declares a new function symbol. */
+  #[inline]
+  fn declare_fun<Sort: Sort2Smt, I, Sym: Sym2Smt<I>> (
+    & mut self, symbol: & Sym, args: & [ Sort ], out: & Sort, info: & I
+  ) -> UnitSmtRes {
+    new_parse_success!(
+      self for {
+        self.write(
+          |w| {
+            smtry_io!(
+              write!(w, "(declare-fun ") ;
+              symbol.sym_to_smt2(w, info) ;
+              write!(w, " ( ")
+            ) ;
+            for arg in args {
+              smtry_io!(
+                arg.sort_to_smt2(w) ;
+                write!(w, " ")
+              ) ;
+            } ;
+            smt_cast_io!(
+              write!(w, ") ") ;
+              out.sort_to_smt2(w) ;
+              write!(w, ")\n")
+            )
+          }
+        )
+      }
+    )
+  }
+  /** Declares a new constant. */
+  #[inline]
+  fn declare_const<Sort: Sort2Smt, I, Sym: Sym2Smt<I>> (
+    & mut self, symbol: & Sym, out_sort: & Sort, info: & I
+  ) -> UnitSmtRes {
+    new_parse_success!(
+      self for {
+        self.write(
+          |w| smt_cast_io!(
+            write!(w, "(declare-const ") ;
+            symbol.sym_to_smt2(w, info) ;
+            write!(w, " ") ;
+            out_sort.sort_to_smt2(w) ;
+            write!(w, ")\n")
+          )
+        )
+      }
+    )
+  }
+  /** Defines a new function symbol. */
+  #[inline]
+  fn define_fun<
+    I, Sort: Sort2Smt, Sym1: Sym2Smt<I>, Sym2: Sym2Smt<I>, Expr: Expr2Smt<I>
+  >(
+    & mut self, symbol: & Sym1, args: & [ (Sym2, Sort) ],
+    out: & Sort, body: & Expr, info: & I
+  ) -> UnitSmtRes {
+    new_parse_success!(
+      self for {
+        self.write(
+          |w| {
+            smtry_io!(
+              write!(w, "(define-fun ") ;
+              symbol.sym_to_smt2(w, info) ;
+              write!(w, " ( ")
+            ) ;
+            for arg in args {
+              let (ref sym, ref sort) = * arg ;
+              smtry_io!(
+                write!(w, "(") ;
+                sym.sym_to_smt2(w, info) ;
+                write!(w, " ") ;
+                sort.sort_to_smt2(w) ;
+                write!(w, ") ")
+              )
+            } ;
+            smt_cast_io!(
+              write!(w, ") ") ;
+              out.sort_to_smt2(w) ;
+              write!(w, "\n   ") ;
+              body.expr_to_smt2(w, info) ;
+              write!(w, "\n)\n")
+            )
+          }
+        )
+      }
+    )
+  }
+  /** Defines some new (possibily mutually) recursive functions. */
+  #[inline]
+  fn define_funs_rec<
+    I, Sort: Sort2Smt, Sym: Sym2Smt<I>, Expr: Expr2Smt<I>
+  >(
+    & mut self, funs: & [ (Sym, & [ (Sym, Sort) ], Sort, Expr) ], info: & I
+  ) -> UnitSmtRes {
+    new_parse_success!(
+      self for {
+        self.write(
+          |w| {
+            // Header.
+            smtry_io!( write!(w, "(define-funs-rec (\n") ) ;
+
+            // Signatures.
+            for fun in funs {
+              let (ref sym, ref args, ref out, _) = * fun ;
+              smtry_io!(
+                write!(w, "   (");
+                sym.sym_to_smt2(w, info) ;
+                write!(w, " ( ")
+              ) ;
+              for arg in * args {
+                let (ref sym, ref sort) = * arg ;
+                smtry_io!(
+                  write!(w, "(") ;
+                  sym.sym_to_smt2(w, info) ;
+                  write!(w, " ") ;
+                  sort.sort_to_smt2(w) ;
+                  write!(w, ") ")
+                )
+              } ;
+              smtry_io!(
+                write!(w, ") ") ;
+                out.sort_to_smt2(w) ;
+                write!(w, ")\n")
+              )
+            } ;
+            smtry_io!( write!(w, " ) (") ) ;
+
+            // Bodies
+            for fun in funs {
+              let (_, _, _, ref body) = * fun ;
+              smtry_io!(
+                write!(w, "\n   ") ;
+                body.expr_to_smt2(w, info)
+              )
+            } ;
+            smt_cast_io!( write!(w, "\n )\n)\n") )
+          }
+        )
+      }
+    )
+  }
+  /** Defines a new recursive function. */
+  #[inline]
+  fn define_fun_rec<
+    I, Sort: Sort2Smt, Sym: Sym2Smt<I>, Expr: Expr2Smt<I>
+  >(
+    & mut self,  symbol: & Sym, args: & [ (Sym, Sort) ],
+    out: & Sort, body: & Expr, info: & I
+  ) -> UnitSmtRes {
+    new_parse_success!(
+      self for {
+        self.write(
+          |w| {
+            // Header.
+            smtry_io!( write!(w, "(define-fun-rec (\n") ) ;
+
+            // Signature.
+            smtry_io!(
+              write!(w, "   (") ;
+              symbol.sym_to_smt2(w, info) ;
+              write!(w, " ( ")
+            ) ;
+            for arg in args {
+              let (ref sym, ref sort) = * arg ;
+              smtry_io!(
+                write!(w, "(") ;
+                sym.sym_to_smt2(w, info) ;
+                write!(w, " ") ;
+                sort.sort_to_smt2(w) ;
+                write!(w, ") ")
+              )
+            } ;
+            smtry_io!(
+              write!(w, ") ") ;
+              out.sort_to_smt2(w) ;
+              write!(w, ")\n") ;
+              write!(w, " ) (")
+            ) ;
+
+            // Body.
+            smt_cast_io!(
+              write!(w, "\n   ") ;
+              body.expr_to_smt2(w, info) ;
+              write!(w, "\n )\n)\n")
+            )
+          }
+        )
+      }
+    )
+  }
+
+
+  // |===| Asserting and inspecting formulas.
+
+  /** Asserts an expression with some print information. */
+  #[inline]
+  fn assert<I, Expr: Expr2Smt<I>>(
+    & mut self, expr: & Expr, info: & I
+  ) -> UnitSmtRes {
+    new_parse_success!(
+      self for {
+        self.write(
+          |w| smt_cast_io!(
+            write!(w, "(assert\n  ") ;
+            expr.expr_to_smt2(w, info) ;
+            write!(w, "\n)\n")
+          )
+        )
+      }
+    )
+  }
+
+  // |===| Inspecting settings.
+
+  /** Get info command. */
+  #[inline(always)]
+  fn get_info(& mut self, flag: & str) -> UnitSmtRes {
+    self.write(
+      |w| smt_cast_io!( write!(w, "(get-info {})\n", flag) )
+    )
+  }
+  /** Get option command. */
+  #[inline(always)]
+  fn get_option(& mut self, option: & str) -> UnitSmtRes {
+    self.write(
+      |w| smt_cast_io!( write!(w, "(get-option {})\n", option) )
+    )
+  }
+
+  // |===| Script information.
+
+  /** Set info command. */
+  #[inline(always)]
+  fn set_info(& mut self, attribute: & str) -> UnitSmtRes {
+    self.write(
+      |w| smt_cast_io!( write!(w, "(set-info {})\n", attribute) )
+    )
+  }
+  /** Echo command. */
+  #[inline(always)]
+  fn echo(& mut self, text: & str) -> UnitSmtRes {
+    self.write(
+      |w| smt_cast_io!( write!(w, "(echo \"{}\")\n", text) )
+    )
+  }
+
+
+  // |===| Parsing simple stuff.
+
+  /** Parse success. */
+  #[inline]
+  fn parse_success(& mut self) -> SuccessRes {
+    self.parse(success)
+  }
+}
