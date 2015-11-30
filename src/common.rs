@@ -33,7 +33,7 @@ pub enum UnexSmtRes {
   /** A command produced an error. */
   Error(String),
   /** An input/output error occured. */
-  IOError(io::Error),
+  IoError(io::Error),
 }
 
 /** Result of an SMT query. */

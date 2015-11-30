@@ -606,52 +606,61 @@ macro_rules! smtry {
 
 fn main() {
   use rsmt2::sync::* ;
-  use std::process::Command ;
 
-  // This doc test will not pass if z3 is not available...
   let conf = SolverConf::z3() ;
-  // ...with this command:
-  let cmd_str = "z3" ;
-  let cmd = Command::new(cmd_str) ;
 
-  let mut solver = smtry!(
-    Solver::mk(cmd, conf, Parser),
-    failwith "could not create solver using command {}: {:?}", cmd_str
-  ) ;
+  let mut kid = match Kid::mk(conf) {
+    Ok(kid) => kid,
+    Err(e) => panic!("Could not spawn solver kid: {:?}", e)
+  } ;
 
-  let nsv = Var::nsvar("non stateful var") ;
-  let s_nsv = Id(nsv.clone()) ;
-  let sv_0 = Var::svar0("stateful var") ;
-  let s_sv_0 = Id(sv_0.clone()) ;
-  let app2 = SExpr::app("not", vec![ s_sv_0.clone() ]) ;
-  let app1 = SExpr::app("and", vec![ s_nsv.clone(), app2.clone() ]) ;
-  let offset1 = Offset(0,1) ;
+  {
 
-  let sym = nsv.to_sym(& offset1) ;
-  smtry!(
-    solver.declare_fun(& sym, &[], & "bool", & ()),
-    failwith "declaration failed: {:?}"
-  ) ;
+    let mut solver = smtry!(
+      solver(& mut kid, Parser),
+      failwith "could not create solver: {:?}"
+    ) ;
 
-  let sym = sv_0.to_sym(& offset1) ;
-  smtry!(
-    solver.declare_fun(& sym, &[], & "bool", & ()),
-    failwith "declaration failed: {:?}"
-  ) ;
+    let nsv = Var::nsvar("non stateful var") ;
+    let s_nsv = Id(nsv.clone()) ;
+    let sv_0 = Var::svar0("stateful var") ;
+    let s_sv_0 = Id(sv_0.clone()) ;
+    let app2 = SExpr::app("not", vec![ s_sv_0.clone() ]) ;
+    let app1 = SExpr::app("and", vec![ s_nsv.clone(), app2.clone() ]) ;
+    let offset1 = Offset(0,1) ;
 
-  let expr = app1.unroll(& offset1) ;
-  smtry!(
-    solver.assert(& expr, & ()),
-    failwith "assert failed: {:?}"
-  ) ;
+    let sym = nsv.to_sym(& offset1) ;
+    smtry!(
+      solver.declare_fun(& sym, &[], & "bool", & ()),
+      failwith "declaration failed: {:?}"
+    ) ;
 
-  match smtry!(
-    solver.check_sat(),
-    failwith "error in checksat: {:?}"
-  ) {
-    true => (),
-    false => panic!("expected sat, got unsat"),
+    let sym = sv_0.to_sym(& offset1) ;
+    smtry!(
+      solver.declare_fun(& sym, &[], & "bool", & ()),
+      failwith "declaration failed: {:?}"
+    ) ;
+
+    let expr = app1.unroll(& offset1) ;
+    smtry!(
+      solver.assert(& expr, & ()),
+      failwith "assert failed: {:?}"
+    ) ;
+
+    match smtry!(
+      solver.check_sat(),
+      failwith "error in checksat: {:?}"
+    ) {
+      true => (),
+      false => panic!("expected sat, got unsat"),
+    }
+
   }
+
+  smtry!(
+    kid.kill(),
+    failwith "error while killing solver: {:?}"
+  ) ;
 }
 ```
 
@@ -977,88 +986,91 @@ macro_rules! smtry {
 
 fn main() {
   use rsmt2::sync::* ;
-  use std::process::Command ;
 
-  // This doc test will not pass if z3 is not available...
   let conf = SolverConf::z3() ;
-  // ...with this command:
-  let cmd_str = "z3" ;
-  let cmd = Command::new(cmd_str) ;
 
-  println!("Launching solver.") ;
-  let mut solver = smtry!(
-    Solver::mk(cmd, conf, Parser),
-    failwith "could not create solver using command {}: {:?}", cmd_str
-  ) ;
-
-  let nsv = Var::nsvar("non stateful var") ;
-  let s_nsv = Id(nsv.clone()) ;
-  let sv_0 = Var::svar0("stateful var") ;
-  let s_sv_0 = Id(sv_0.clone()) ;
-  let app2 = SExpr::app("not", vec![ s_sv_0.clone() ]) ;
-  let app1 = SExpr::app("and", vec![ s_nsv.clone(), app2.clone() ]) ;
-  let offset1 = Offset(0,1) ;
-
-  let sym = nsv.to_sym(& offset1) ;
-  smtry!(
-    solver.declare_fun(& sym, &[], & "bool", & ()),
-    failwith "declaration failed: {:?}"
-  ) ;
-
-  let sym = sv_0.to_sym(& offset1) ;
-  smtry!(
-    solver.declare_fun(& sym, &[], & "bool", & ()),
-    failwith "declaration failed: {:?}"
-  ) ;
-
-  let expr = app1.unroll(& offset1) ;
-  smtry!(
-    solver.assert(& expr, & ()),
-    failwith "assert failed: {:?}"
-  ) ;
-
-  match smtry!(
-    solver.check_sat(),
-    failwith "error in checksat: {:?}"
-  ) {
-    true => println!("> sat"),
-    false => panic!("expected sat, got unsat"),
+  let mut kid = match Kid::mk(conf) {
+    Ok(kid) => kid,
+    Err(e) => panic!("Could not spawn solver kid: {:?}", e)
   } ;
 
-  let model = smtry!(
-    solver.get_model(),
-    failwith "could not retrieve model: {:?}"
-  ) ;
-  for (id,v) in model.into_iter() {
-    let res = if id == sv_0 {
-      BConst(false)
-    } else {
-      if id == nsv { BConst(true) } else {
-        panic!("expected {:?} or {:?}, got {:?}", sv_0, nsv, id)
+  {
+
+    let mut solver = smtry!(
+      solver(& mut kid, Parser),
+      failwith "could not create solver: {:?}"
+    ) ;
+
+    let nsv = Var::nsvar("non stateful var") ;
+    let s_nsv = Id(nsv.clone()) ;
+    let sv_0 = Var::svar0("stateful var") ;
+    let s_sv_0 = Id(sv_0.clone()) ;
+    let app2 = SExpr::app("not", vec![ s_sv_0.clone() ]) ;
+    let app1 = SExpr::app("and", vec![ s_nsv.clone(), app2.clone() ]) ;
+    let offset1 = Offset(0,1) ;
+
+    let sym = nsv.to_sym(& offset1) ;
+    smtry!(
+      solver.declare_fun(& sym, &[], & "bool", & ()),
+      failwith "declaration failed: {:?}"
+    ) ;
+
+    let sym = sv_0.to_sym(& offset1) ;
+    smtry!(
+      solver.declare_fun(& sym, &[], & "bool", & ()),
+      failwith "declaration failed: {:?}"
+    ) ;
+
+    let expr = app1.unroll(& offset1) ;
+    smtry!(
+      solver.assert(& expr, & ()),
+      failwith "assert failed: {:?}"
+    ) ;
+
+    match smtry!(
+      solver.check_sat(),
+      failwith "error in checksat: {:?}"
+    ) {
+      true => println!("> sat"),
+      false => panic!("expected sat, got unsat"),
+    } ;
+
+    let model = smtry!(
+      solver.get_model(),
+      failwith "could not retrieve model: {:?}"
+    ) ;
+    for (id,v) in model.into_iter() {
+      let res = if id == sv_0 {
+        BConst(false)
+      } else {
+        if id == nsv { BConst(true) } else {
+          panic!("expected {:?} or {:?}, got {:?}", sv_0, nsv, id)
+        }
+      } ;
+      if v != res {
+        panic!("expected {:?} for {:?}, got {:?}", res, id, v)
       }
     } ;
-    if v != res {
-      panic!("expected {:?} for {:?}, got {:?}", res, id, v)
-    }
-  } ;
 
-  let values = smtry!(
-    solver.get_values(
-      & [ app1.unroll(& offset1), app2.unroll(& offset1)], & ()
-    ),
-    failwith "error in get-values: {:?}"
-  ) ;
-  for (e,v) in values.into_iter() {
-    let res = if e == app1 || e == app2 { BConst(true) } else {
-      panic!("expected {:?} or {:?}, got {:?}", app1, app2, e)
-    } ;
-    if v != res {
-      panic!("expected {:?} for {:?}, got {:?}", res, e, v)
+    let values = smtry!(
+      solver.get_values(
+        & [ app1.unroll(& offset1), app2.unroll(& offset1)], & ()
+      ),
+      failwith "error in get-values: {:?}"
+    ) ;
+    for (e,v) in values.into_iter() {
+      let res = if e == app1 || e == app2 { BConst(true) } else {
+        panic!("expected {:?} or {:?}, got {:?}", app1, app2, e)
+      } ;
+      if v != res {
+        panic!("expected {:?} for {:?}, got {:?}", res, e, v)
+      }
     }
-  } ;
+
+  }
 
   smtry!(
-    solver.kill(),
+    kid.kill(),
     failwith "error while killing solver: {:?}"
   ) ;
 
@@ -1073,11 +1085,6 @@ This example is part of the tests of this library. It is presented
 incrementally for readability, but you can access the full code in the
 [`tests` directory of the repo][full example]. It also showcases asynchronous
 queries.
-
-
-## To do
-
-* update `nom` to remove the hack on `Stepper` for child processes
 
 [nom page]: https://crates.io/crates/nom (crates.io pafe of the nom library)
 [full example]: https://bitbucket.org/AdrienChampion/rsmt2/src/6d2bafb28c1dc8380695c99f9ba8a0890f643ffc/tests/main.rs?at=dev&fileviewer=file-view-default (Full example)

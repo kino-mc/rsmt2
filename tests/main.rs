@@ -323,102 +323,109 @@ macro_rules! smtry {
 #[test]
 fn sync() {
   use rsmt2::sync::* ;
-  use std::process::Command ;
 
   let conf = SolverConf::z3() ;
-  let cmd_str = "z3" ;
-  let cmd = Command::new(cmd_str) ;
 
   println!("") ;
 
-  println!("Launching solver.") ;
-  let mut solver = smtry!(
-    Solver::mk(cmd, conf, Parser),
-    failwith "could not create solver using command {}: {:?}", cmd_str
-  ) ;
-  println!("") ;
-
-  let nsv = Var::nsvar("non stateful var") ;
-  let s_nsv = Id(nsv.clone()) ;
-  let sv_0 = Var::svar0("stateful var") ;
-  let s_sv_0 = Id(sv_0.clone()) ;
-  let app2 = SExpr::app("not", vec![ s_sv_0.clone() ]) ;
-  let app1 = SExpr::app("and", vec![ s_nsv.clone(), app2.clone() ]) ;
-  let offset1 = Offset(0,1) ;
-
-  let sym = nsv.to_sym(& offset1) ;
-  println!("declaring {:?}", sym) ;
-  smtry!(
-    solver.declare_fun(& sym, &[], & "bool", & ()),
-    failwith "declaration failed: {:?}"
-  ) ;
-
-  let sym = sv_0.to_sym(& offset1) ;
-  println!("declaring {:?}",sym) ;
-  smtry!(
-    solver.declare_fun(& sym, &[], & "bool", & ()),
-    failwith "declaration failed: {:?}"
-  ) ;
-
-  println!("") ;
-
-  let expr = app1.unroll(& offset1) ;
-  println!("asserting {:?}", expr) ;
-  smtry!(
-    solver.assert(& expr, & ()),
-    failwith "assert failed: {:?}"
-  ) ;
-  println!("") ;
-
-  println!("check-sat") ;
-  match smtry!(
-    solver.check_sat(),
-    failwith "error in checksat: {:?}"
-  ) {
-    true => println!("> sat"),
-    false => panic!("expected sat, got unsat"),
+  println!("Creating kid.") ;
+  let mut kid = match Kid::mk(conf) {
+    Ok(kid) => kid,
+    Err(e) => panic!("Could not spawn solver kid: {:?}", e)
   } ;
-  println!("") ;
 
-  println!("get-model") ;
-  let model = smtry!(
-    solver.get_model(),
-    failwith "could not retrieve model: {:?}"
-  ) ;
-  for (id,v) in model.into_iter() {
-    let res = if id == sv_0 {
-      BConst(false)
-    } else {
-      if id == nsv { BConst(true) } else {
-        panic!("expected {:?} or {:?}, got {:?}", sv_0, nsv, id)
+  {
+
+    println!("Launching solver.") ;
+    let mut solver = smtry!(
+      solver(& mut kid, Parser),
+      failwith "could not create solver: {:?}"
+    ) ;
+    println!("") ;
+
+    let nsv = Var::nsvar("non stateful var") ;
+    let s_nsv = Id(nsv.clone()) ;
+    let sv_0 = Var::svar0("stateful var") ;
+    let s_sv_0 = Id(sv_0.clone()) ;
+    let app2 = SExpr::app("not", vec![ s_sv_0.clone() ]) ;
+    let app1 = SExpr::app("and", vec![ s_nsv.clone(), app2.clone() ]) ;
+    let offset1 = Offset(0,1) ;
+
+    let sym = nsv.to_sym(& offset1) ;
+    println!("declaring {:?}", sym) ;
+    smtry!(
+      solver.declare_fun(& sym, &[], & "bool", & ()),
+      failwith "declaration failed: {:?}"
+    ) ;
+
+    let sym = sv_0.to_sym(& offset1) ;
+    println!("declaring {:?}",sym) ;
+    smtry!(
+      solver.declare_fun(& sym, &[], & "bool", & ()),
+      failwith "declaration failed: {:?}"
+    ) ;
+
+    println!("") ;
+
+    let expr = app1.unroll(& offset1) ;
+    println!("asserting {:?}", expr) ;
+    smtry!(
+      solver.assert(& expr, & ()),
+      failwith "assert failed: {:?}"
+    ) ;
+    println!("") ;
+
+    println!("check-sat") ;
+    match smtry!(
+      solver.check_sat(),
+      failwith "error in checksat: {:?}"
+    ) {
+      true => println!("> sat"),
+      false => panic!("expected sat, got unsat"),
+    } ;
+    println!("") ;
+
+    println!("get-model") ;
+    let model = smtry!(
+      solver.get_model(),
+      failwith "could not retrieve model: {:?}"
+    ) ;
+    for (id,v) in model.into_iter() {
+      let res = if id == sv_0 {
+        BConst(false)
+      } else {
+        if id == nsv { BConst(true) } else {
+          panic!("expected {:?} or {:?}, got {:?}", sv_0, nsv, id)
+        }
+      } ;
+      if v != res {
+        panic!("expected {:?} for {:?}, got {:?}", res, id, v)
       }
     } ;
-    if v != res {
-      panic!("expected {:?} for {:?}, got {:?}", res, id, v)
-    }
-  } ;
-  println!("") ;
+    println!("") ;
 
-  println!("get-values") ;
-  let values = smtry!(
-    solver.get_values(
-      & [ app1.unroll(& offset1), app2.unroll(& offset1)], & ()
-    ),
-    failwith "error in get-values: {:?}"
-  ) ;
-  for (e,v) in values.into_iter() {
-    let res = if e == app1 || e == app2 { BConst(true) } else {
-      panic!("expected {:?} or {:?}, got {:?}", app1, app2, e)
+    println!("get-values") ;
+    let values = smtry!(
+      solver.get_values(
+        & [ app1.unroll(& offset1), app2.unroll(& offset1)], & ()
+      ),
+      failwith "error in get-values: {:?}"
+    ) ;
+    for (e,v) in values.into_iter() {
+      let res = if e == app1 || e == app2 { BConst(true) } else {
+        panic!("expected {:?} or {:?}, got {:?}", app1, app2, e)
+      } ;
+      if v != res {
+        panic!("expected {:?} for {:?}, got {:?}", res, e, v)
+      }
     } ;
-    if v != res {
-      panic!("expected {:?} for {:?}, got {:?}", res, e, v)
-    }
-  } ;
-  println!("") ;
+    println!("") ;
+
+  }
 
   println!("Killing solver.") ;
   smtry!(
-    solver.kill(),
+    kid.kill(),
     failwith "error while killing solver: {:?}"
   ) ;
 
@@ -428,114 +435,121 @@ fn sync() {
 #[test]
 fn async() {
   use rsmt2::async::* ;
-  use std::process::Command ;
 
   let conf = SolverConf::z3() ;
-  let cmd_str = "z3" ;
-  let cmd = Command::new(cmd_str) ;
 
   println!("") ;
 
-  println!("Launching solver.") ;
-  let mut solver = smtry!(
-    Solver::mk(cmd, conf, Parser),
-    failwith "could not create solver using command {}: {:?}", cmd_str
-  ) ;
-  println!("") ;
-
-  let nsv = Var::nsvar("non stateful var") ;
-  let s_nsv = Id(nsv.clone()) ;
-  let sv_0 = Var::svar0("stateful var") ;
-  let s_sv_0 = Id(sv_0.clone()) ;
-  let app2 = SExpr::app("not", vec![ s_sv_0.clone() ]) ;
-  let app1 = SExpr::app("and", vec![ s_nsv.clone(), app2.clone() ]) ;
-  let offset1 = Offset(0,1) ;
-
-  let sym = nsv.to_sym(& offset1) ;
-  println!("declaring {:?}", sym) ;
-  smtry!(
-    solver.declare_fun(& sym, &[], & "bool", & ()),
-    failwith "declaration failed: {:?}"
-  ) ;
-
-  let sym = sv_0.to_sym(& offset1) ;
-  println!("declaring {:?}",sym) ;
-  smtry!(
-    solver.declare_fun(& sym, &[], & "bool", & ()),
-    failwith "declaration failed: {:?}"
-  ) ;
-
-  println!("") ;
-
-  let expr = app1.unroll(& offset1) ;
-  println!("asserting {:?}", expr) ;
-  smtry!(
-    solver.assert(& expr, & ()),
-    failwith "assert failed: {:?}"
-  ) ;
-  println!("") ;
-
-  println!("check-sat") ;
-  smtry!(
-    solver.check_sat(),
-    failwith "error requesting checksat: {:?}"
-  ) ;
-  match smtry!(
-    solver.parse_sat(),
-    failwith "error in checksat: {:?}"
-  ) {
-    true => println!("> sat"),
-    false => panic!("expected sat, got unsat"),
+  println!("Creating kid.") ;
+  let mut kid = match Kid::mk(conf) {
+    Ok(kid) => kid,
+    Err(e) => panic!("Could not spawn solver kid: {:?}", e)
   } ;
-  println!("") ;
 
-  println!("get-model") ;
-  smtry!(
-    solver.get_model(),
-    failwith "error requesting model: {:?}"
-  ) ;
-  let model = smtry!(
-    solver.parse_model(),
-    failwith "could not retrieve model: {:?}"
-  ) ;
-  for (id,v) in model.into_iter() {
-    let res = if id == sv_0 {
-      BConst(false)
-    } else {
-      if id == nsv { BConst(true) } else {
-        panic!("expected {:?} or {:?}, got {:?}", sv_0, nsv, id)
+  {
+
+    println!("Launching solver.") ;
+    let mut solver = smtry!(
+      solver(& mut kid, Parser),
+      failwith "could not create solver {:?}"
+    ) ;
+    println!("") ;
+
+    let nsv = Var::nsvar("non stateful var") ;
+    let s_nsv = Id(nsv.clone()) ;
+    let sv_0 = Var::svar0("stateful var") ;
+    let s_sv_0 = Id(sv_0.clone()) ;
+    let app2 = SExpr::app("not", vec![ s_sv_0.clone() ]) ;
+    let app1 = SExpr::app("and", vec![ s_nsv.clone(), app2.clone() ]) ;
+    let offset1 = Offset(0,1) ;
+
+    let sym = nsv.to_sym(& offset1) ;
+    println!("declaring {:?}", sym) ;
+    smtry!(
+      solver.declare_fun(& sym, &[], & "bool", & ()),
+      failwith "declaration failed: {:?}"
+    ) ;
+
+    let sym = sv_0.to_sym(& offset1) ;
+    println!("declaring {:?}",sym) ;
+    smtry!(
+      solver.declare_fun(& sym, &[], & "bool", & ()),
+      failwith "declaration failed: {:?}"
+    ) ;
+
+    println!("") ;
+
+    let expr = app1.unroll(& offset1) ;
+    println!("asserting {:?}", expr) ;
+    smtry!(
+      solver.assert(& expr, & ()),
+      failwith "assert failed: {:?}"
+    ) ;
+    println!("") ;
+
+    println!("check-sat") ;
+    smtry!(
+      solver.check_sat(),
+      failwith "error requesting checksat: {:?}"
+    ) ;
+    match smtry!(
+      solver.parse_sat(),
+      failwith "error in checksat: {:?}"
+    ) {
+      true => println!("> sat"),
+      false => panic!("expected sat, got unsat"),
+    } ;
+    println!("") ;
+
+    println!("get-model") ;
+    smtry!(
+      solver.get_model(),
+      failwith "error requesting model: {:?}"
+    ) ;
+    let model = smtry!(
+      solver.parse_model(),
+      failwith "could not retrieve model: {:?}"
+    ) ;
+    for (id,v) in model.into_iter() {
+      let res = if id == sv_0 {
+        BConst(false)
+      } else {
+        if id == nsv { BConst(true) } else {
+          panic!("expected {:?} or {:?}, got {:?}", sv_0, nsv, id)
+        }
+      } ;
+      if v != res {
+        panic!("expected {:?} for {:?}, got {:?}", res, id, v)
       }
     } ;
-    if v != res {
-      panic!("expected {:?} for {:?}, got {:?}", res, id, v)
-    }
-  } ;
-  println!("") ;
+    println!("") ;
 
-  println!("get-values") ;
-  smtry!(
-    solver.get_values(
-      & [ app1.unroll(& offset1), app2.unroll(& offset1)], & ()
-    ),
-    failwith "error requesting values: {:?}"
-  ) ;
-  let values = smtry!(
-    solver.parse_values(& ()),
-    failwith "error in get-values: {:?}"
-  ) ;
-  for (e,v) in values.into_iter() {
-    let res = if e == app1 || e == app2 { BConst(true) } else {
-      panic!("expected {:?} or {:?}, got {:?}", app1, app2, e)
+    println!("get-values") ;
+    smtry!(
+      solver.get_values(
+        & [ app1.unroll(& offset1), app2.unroll(& offset1)], & ()
+      ),
+      failwith "error requesting values: {:?}"
+    ) ;
+    let values = smtry!(
+      solver.parse_values(& ()),
+      failwith "error in get-values: {:?}"
+    ) ;
+    for (e,v) in values.into_iter() {
+      let res = if e == app1 || e == app2 { BConst(true) } else {
+        panic!("expected {:?} or {:?}, got {:?}", app1, app2, e)
+      } ;
+      if v != res {
+        panic!("expected {:?} for {:?}, got {:?}", res, e, v)
+      }
     } ;
-    if v != res {
-      panic!("expected {:?} for {:?}, got {:?}", res, e, v)
-    }
-  } ;
-  println!("") ;
+    println!("") ;
+
+  }
 
   println!("Killing solver.") ;
   smtry!(
-    solver.kill(),
+    kid.kill(),
     failwith "error while killing solver: {:?}"
   ) ;
 

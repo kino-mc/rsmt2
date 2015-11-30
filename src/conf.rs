@@ -38,9 +38,11 @@ pub enum SolverStyle {
 impl SolverStyle {
   /** Default configuration for a solver style. */
   pub fn default(self) -> SolverConf {
+    let cmd = self.cmd() ;
     match self {
       Z3 => SolverConf {
         style: self,
+        cmd: cmd,
         options: vec![
           "-in", "-smt2"
         ],
@@ -50,6 +52,7 @@ impl SolverStyle {
       },
       CVC4 => SolverConf {
         style: self,
+        cmd: cmd,
         options: vec![
           "--smtlib-strict", "-qqqqq", "--interactive"
         ],
@@ -57,6 +60,12 @@ impl SolverStyle {
         unsat_cores: false,
         check_sat_assuming: unsupported(),
       },
+    }
+  }
+  /** Default command for a solver style. */
+  pub fn cmd(& self) -> String {
+    match * self {
+      Z3 => "z3".to_string(), CVC4 => "cvc4".to_string(),
     }
   }
 }
@@ -75,6 +84,8 @@ impl fmt::Display for SolverStyle {
 pub struct SolverConf {
   /** Solver style. */
   style: SolverStyle,
+  /** Solver command. */
+  cmd: String,
   /** Options to call the solver with. */
   options: Vec<& 'static str>,
   /** Parse success. */
@@ -99,6 +110,10 @@ impl SolverConf {
   #[inline(always)]
   pub fn style(& self) -> & SolverStyle { & self.style }
 
+  /** Solver command. */
+  #[inline(always)]
+  pub fn get_cmd(& self) -> & str { & self.cmd }
+
   /** Options of the configuration. */
   #[inline(always)]
   pub fn get_options(& self) -> & [& 'static str] { & self.options }
@@ -117,6 +132,13 @@ impl SolverConf {
   #[inline(always)]
   pub fn option(mut self, o: & 'static str) -> Self {
     self.options.push(o) ;
+    self
+  }
+
+  /** Sets the command for the solver. */
+  #[inline(always)]
+  pub fn cmd(mut self, cmd: String) -> Self {
+    self.cmd = cmd ;
     self
   }
 
