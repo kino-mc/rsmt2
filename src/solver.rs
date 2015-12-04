@@ -21,12 +21,14 @@ use std::process::{
 } ;
 use std::io::{ Write, Read, BufWriter, BufReader } ;
 
-use nom::IResult ;
+use nom::{ IResult, multispace } ;
 
 use common::* ;
 use common::UnexSmtRes::* ;
 use conf::SolverConf ;
-use parse::{ SuccessRes, success } ;
+use parse::{
+  SuccessRes, success, check_sat, unexpected, open_paren, close_paren
+} ;
 
 #[cfg(not(no_parse_success))]
 macro_rules! parse_success {
@@ -274,51 +276,23 @@ impl<
 
 impl<
   'kid, Parser: ParseSmt2
-> QueryPrint<'kid, Parser> for PlainSolver<'kid, Parser> {}
-
-impl<
-  'kid, Parser: ParseSmt2
-> async::Asynced<'kid, Parser> for PlainSolver<'kid, Parser> {}
-
-impl<
-  'kid, Parser: ParseSmt2
-> sync::Synced<'kid, Parser> for PlainSolver<'kid, Parser> {}
-
+> Query<'kid, Parser> for PlainSolver<'kid, Parser> {}
 
 impl<
   'kid, Parser: ParseSmt2, Info, Ident: Sym2Smt<Info>
-> QueryIdentPrint<
+> QueryIdent<
   'kid, Parser, Info, Ident
-> for PlainSolver<'kid, Parser> {}
-
-impl<
-  'kid, Parser: ParseSmt2, Info, Ident: Sym2Smt<Info>
-> async::AsyncedIdent<
-  'kid, Parser, Info, Ident
-> for PlainSolver<'kid, Parser> {}
-
-impl<
-  'kid, Parser: ParseSmt2, Info, Ident: Sym2Smt<Info>
-> sync::SyncedIdent<
-  'kid, Parser, Info, Ident
-> for PlainSolver<'kid, Parser> {}
-
-
-impl<
-  'kid, Parser: ParseSmt2, Info, Expr: Expr2Smt<Info>
-> QueryExprPrint<
-  'kid, Parser, Info, Expr
 > for PlainSolver<'kid, Parser> {}
 
 impl<
   'kid, Parser: ParseSmt2, Info, Expr: Expr2Smt<Info>
-> async::AsyncedExpr<
+> QueryExpr<
   'kid, Parser, Info, Expr
 > for PlainSolver<'kid, Parser> {}
 
 impl<
   'kid, Parser: ParseSmt2, Expr: Expr2Smt<Parser::I>
-> sync::SyncedExpr<
+> QueryExprInfo<
   'kid, Parser, Expr
 > for PlainSolver<'kid, Parser> {}
 
@@ -388,51 +362,23 @@ impl<
 
 impl<
   'kid, Parser: ParseSmt2
-> QueryPrint<'kid, Parser> for TeeSolver<'kid, Parser> {}
-
-impl<
-  'kid, Parser: ParseSmt2
-> async::Asynced<'kid, Parser> for TeeSolver<'kid, Parser> {}
-
-impl<
-  'kid, Parser: ParseSmt2
-> sync::Synced<'kid, Parser> for TeeSolver<'kid, Parser> {}
-
+> Query<'kid, Parser> for TeeSolver<'kid, Parser> {}
 
 impl<
   'kid, Parser: ParseSmt2, Info, Ident: Sym2Smt<Info>
-> QueryIdentPrint<
+> QueryIdent<
   'kid, Parser, Info, Ident
-> for TeeSolver<'kid, Parser> {}
-
-impl<
-  'kid, Parser: ParseSmt2, Info, Ident: Sym2Smt<Info>
-> async::AsyncedIdent<
-  'kid, Parser, Info, Ident
-> for TeeSolver<'kid, Parser> {}
-
-impl<
-  'kid, Parser: ParseSmt2, Info, Ident: Sym2Smt<Info>
-> sync::SyncedIdent<
-  'kid, Parser, Info, Ident
-> for TeeSolver<'kid, Parser> {}
-
-
-impl<
-  'kid, Parser: ParseSmt2, Info, Expr: Expr2Smt<Info>
-> QueryExprPrint<
-  'kid, Parser, Info, Expr
 > for TeeSolver<'kid, Parser> {}
 
 impl<
   'kid, Parser: ParseSmt2, Info, Expr: Expr2Smt<Info>
-> async::AsyncedExpr<
+> QueryExpr<
   'kid, Parser, Info, Expr
 > for TeeSolver<'kid, Parser> {}
 
 impl<
   'kid, Parser: ParseSmt2, Expr: Expr2Smt<Parser::I>
-> sync::SyncedExpr<
+> QueryExprInfo<
   'kid, Parser, Expr
 > for TeeSolver<'kid, Parser> {}
 
@@ -1000,14 +946,24 @@ pub trait Solver<'kid, Parser: ParseSmt2> : SolverPrims<'kid, Parser> {
 
 
 
+macro_rules! try_cast {
+  ($e:expr) => (
+    match $e {
+      Ok(something) => something,
+      Err(e) => return Err(e),
+    }
+  ) ;
+}
+
 
 
 
 
 /** Prints queries. */
-trait QueryPrint<
+pub trait Query<
   'kid, Parser: ParseSmt2
 > : Solver<'kid, Parser> {
+
   /** Check-sat command. */
   #[inline(always)]
   fn print_check_sat(& mut self) -> UnitSmtRes {
@@ -1016,12 +972,108 @@ trait QueryPrint<
     )
   }
 
+  /** Parse the result of a check-sat. */
+  #[inline(always)]
+  fn parse_check_sat(& mut self) -> SmtRes<bool> {
+    self.parse( |bytes, _| check_sat(bytes) )
+  }
+
+  /** Check-sat command. */
+  fn check_sat(& mut self) -> SmtRes<bool> {
+    try_cast!(
+      self.print_check_sat()
+    ) ;
+    self.parse_check_sat()
+  }
 
   /** Get-model command. */
   #[inline(always)]
   fn print_get_model(& mut self) -> UnitSmtRes {
     self.write(
       |w| smt_cast_io!( write!(w, "(get-model)\n") )
+    )
+  }
+
+  /** Parse the result of a get-model. */
+  fn parse_get_model(
+    & mut self
+  ) -> SmtRes<Vec<(Parser::Ident, Parser::Value)>> {
+    self.parse(
+      |bytes, parser| call!(
+        bytes,
+        closure!(
+          alt!(
+            map!( unexpected, |e| Err(e) ) |
+            chain!(
+              open_paren ~
+              opt!(multispace) ~
+              tag!("model") ~
+              vec: many0!(
+                chain!(
+                  open_paren ~
+                  opt!(multispace) ~
+                  tag!("define-fun") ~
+                  multispace ~
+                  id: call!(|bytes| parser.parse_ident(bytes)) ~
+                  open_paren ~
+                  close_paren ~
+                  opt!(multispace) ~
+                  alt!(
+                    tag!("Bool") | tag!("Int") | tag!("Real") |
+                    tag!("bool") | tag!("int") | tag!("real")
+                  ) ~
+                  opt!(multispace) ~
+                  val: call!(|bytes| parser.parse_value(bytes)) ~
+                  close_paren,
+                  || (id, val)
+                )
+              ) ~
+              close_paren,
+              || Ok(vec)
+            )
+          )
+        )
+      )
+    )
+  }
+
+  /** Get-model command. */
+  fn get_model(& mut self) -> SmtRes<Vec<(Parser::Ident, Parser::Value)>> {
+    try_cast!(
+      self.print_get_model()
+    ) ;
+    self.parse_get_model()
+  }
+
+  /** Parse the result of a get-values. */
+  fn parse_get_values(
+    & mut self, info: & Parser::I
+  ) -> SmtRes<Vec<(Parser::Expr, Parser::Value)>> {
+    self.parse(
+      |bytes, parser| call!(
+        bytes,
+        closure!(
+          alt!(
+            map!( unexpected, |e| Err(e) ) |
+            chain!(
+              open_paren ~
+              vec: many0!(
+                chain!(
+                  open_paren ~
+                  opt!(multispace) ~
+                  expr: call!(|bytes| parser.parse_expr(bytes, info)) ~
+                  multispace ~
+                  val: call!(|bytes| parser.parse_value(bytes)) ~
+                  close_paren,
+                  || (expr, val)
+                )
+              ) ~
+              close_paren,
+              || Ok(vec)
+            )
+          )
+        )
+      )
     )
   }
 
@@ -1058,9 +1110,9 @@ trait QueryPrint<
 }
 
 /** Queries with ident printing. */
-trait QueryIdentPrint<
+pub trait QueryIdent<
   'kid, Parser: ParseSmt2, Info, Ident: Sym2Smt<Info>
-> : Solver<'kid, Parser> {
+> : Solver<'kid, Parser> + Query<'kid, Parser> {
   /** Check-sat with assumptions command. */
   fn print_check_sat_assuming(
     & mut self, bool_vars: & [ Ident ], info: & Info
@@ -1090,12 +1142,22 @@ trait QueryIdentPrint<
       ),
     }
   }
+
+  /** Check-sat assuming command. */
+  fn check_sat_assuming(
+    & mut self, idents: & [ Ident ], info: & Info
+  ) -> SmtRes<bool> {
+    try_cast!(
+      self.print_check_sat_assuming(idents, info)
+    ) ;
+    self.parse_check_sat()
+  }
 }
 
 /** Queries with expr printing. */
-trait QueryExprPrint<
+pub trait QueryExpr<
   'kid, Parser: ParseSmt2, Info, Expr: Expr2Smt<Info>
-> : Solver<'kid, Parser> {
+> : Solver<'kid, Parser> + Query<'kid, Parser> {
   /** Get-values command. */
   fn print_get_values(
     & mut self, exprs: & [ Expr ], info: & Info
@@ -1115,246 +1177,17 @@ trait QueryExprPrint<
   }
 }
 
-
-
-
-
-
-
-
-/** Asynchronous solver queries.
-
-Queries are printed on the solver's standard input but the result is not
-parsed. It must be retrieved separately. */
-pub mod async {
-  use nom::multispace ;
-
-  use common::* ;
-  use parse::* ;
-  use super::{ QueryPrint, QueryIdentPrint, QueryExprPrint } ;
-
-  /** Asynchronous queries with no printing. */
-  pub trait Asynced<
-    'kid, Parser: ParseSmt2
-  > : QueryPrint<'kid, Parser> {
-    /** Check-sat command. */
-    #[inline(always)]
-    fn check_sat(& mut self) -> UnitSmtRes {
-      self.print_check_sat()
-    }
-
-    /** Parse the result of a check-sat. */
-    #[inline(always)]
-    fn parse_sat(& mut self) -> SmtRes<bool> {
-      self.parse( |bytes, _| check_sat(bytes) )
-    }
-
-
-    /** Get-model command. */
-    #[inline(always)]
-    fn get_model(& mut self) -> UnitSmtRes {
-      self.print_get_model()
-    }
-
-    /** Parse the result of a get-model. */
-    fn parse_model(
-      & mut self
-    ) -> SmtRes<Vec<(Parser::Ident, Parser::Value)>> {
-      self.parse(
-        |bytes, parser| call!(
-          bytes,
-          closure!(
-            alt!(
-              map!( unexpected, |e| Err(e) ) |
-              chain!(
-                open_paren ~
-                opt!(multispace) ~
-                tag!("model") ~
-                vec: many0!(
-                  chain!(
-                    open_paren ~
-                    opt!(multispace) ~
-                    tag!("define-fun") ~
-                    multispace ~
-                    id: call!(|bytes| parser.parse_ident(bytes)) ~
-                    open_paren ~
-                    close_paren ~
-                    opt!(multispace) ~
-                    alt!(
-                      tag!("Bool") | tag!("Int") | tag!("Real") |
-                      tag!("bool") | tag!("int") | tag!("real")
-                    ) ~
-                    opt!(multispace) ~
-                    val: call!(|bytes| parser.parse_value(bytes)) ~
-                    close_paren,
-                    || (id, val)
-                  )
-                ) ~
-                close_paren,
-                || Ok(vec)
-              )
-            )
-          )
-        )
-      )
-    }
-
-
-    /** Parse the result of a get-values. */
-    fn parse_values(
-      & mut self, info: & Parser::I
-    ) -> SmtRes<Vec<(Parser::Expr, Parser::Value)>> {
-      self.parse(
-        |bytes, parser| call!(
-          bytes,
-          closure!(
-            alt!(
-              map!( unexpected, |e| Err(e) ) |
-              chain!(
-                open_paren ~
-                vec: many0!(
-                  chain!(
-                    open_paren ~
-                    opt!(multispace) ~
-                    expr: call!(|bytes| parser.parse_expr(bytes, info)) ~
-                    multispace ~
-                    val: call!(|bytes| parser.parse_value(bytes)) ~
-                    close_paren,
-                    || (expr, val)
-                  )
-                ) ~
-                close_paren,
-                || Ok(vec)
-              )
-            )
-          )
-        )
-      )
-    }
-
-    /** Get-assertions command. */
-    #[inline(always)]
-    fn get_assertions(& mut self) -> UnitSmtRes {
-      self.print_get_assertions()
-    }
-    /** Get-assignment command. */
-    #[inline(always)]
-    fn get_assignment(& mut self) -> UnitSmtRes {
-      self.print_get_assignment()
-    }
-    /** Get-unsat-assumptions command. */
-    #[inline(always)]
-    fn get_unsat_assumptions(& mut self) -> UnitSmtRes {
-      self.print_get_unsat_assumptions()
-    }
-    /** Get-proof command. */
-    #[inline(always)]
-    fn get_proof(& mut self) -> UnitSmtRes {
-      self.print_get_proof()
-    }
-    /** Get-unsat-core command. */
-    #[inline(always)]
-    fn get_unsat_core(& mut self) -> UnitSmtRes {
-      self.print_get_unsat_core()
-    }
-  }
-
-  /** Asynchronous queries with ident printing. */
-  pub trait AsyncedIdent<
-    'kid, Parser: ParseSmt2, Info, Ident: Sym2Smt<Info>
-  > : Asynced<'kid, Parser> + QueryIdentPrint<'kid, Parser, Info, Ident> {
-    /** Check-sat with assumptions command. */
-    #[inline(always)]
-    fn check_sat_assuming(
-      & mut self, bool_vars: & [ Ident ], info: & Info
-    ) -> UnitSmtRes {
-      self.print_check_sat_assuming(bool_vars, info)
-    }
-  }
-
-  /** Asynchronous queries with expr printing. */
-  pub trait AsyncedExpr<
-    'kid, Parser: ParseSmt2, Info, Expr: Expr2Smt<Info>
-  > : Asynced<'kid, Parser> + QueryExprPrint<'kid, Parser, Info, Expr> {
-    /** Get-values command. */
-    #[inline(always)]
-    fn get_values(
-      & mut self, exprs: & [ Expr ], info: & Info
-    ) -> UnitSmtRes {
-      self.print_get_values(exprs, info)
-    }
-  }
-}
-
-/** Synchronous solver queries.
-
-Queries are issued to the solver and the result is immediately printed. */
-pub mod sync {
-  use super::async::{ Asynced, AsyncedIdent, AsyncedExpr } ;
-  use common::* ;
-
-  macro_rules! try_cast {
-    ($e:expr) => (
-      match $e {
-        Ok(something) => something,
-        Err(e) => return Err(e),
-      }
-    ) ;
-  }
-
-  /** Synchrous queries with no printing. */
-  pub trait Synced<
-    'kid, Parser: ParseSmt2
-  > : Asynced<'kid, Parser> {
-    /** Check-sat command. */
-    fn check_sat(& mut self) -> SmtRes<bool> {
-      try_cast!(
-        self.print_check_sat()
-      ) ;
-      self.parse_sat()
-    }
-
-    /** Get-model command. */
-    fn get_model(& mut self) -> SmtRes<Vec<(Parser::Ident, Parser::Value)>> {
-      try_cast!(
-        self.print_get_model()
-      ) ;
-      self.parse_model()
-    }
-    
-  }
-
-  /** Synchrous queries with ident printing. */
-  pub trait SyncedIdent<
-    'kid, Parser: ParseSmt2, Info, Ident: Sym2Smt<Info>
-  > : AsyncedIdent<'kid, Parser, Info, Ident> {
-
-    /** Check-sat assuming command. */
-    fn check_sat_assuming(
-      & mut self, idents: & [ Ident ], info: & Info
-    ) -> SmtRes<bool> {
-      try_cast!(
-        self.print_check_sat_assuming(idents, info)
-      ) ;
-      self.parse_sat()
-    }
-    
-  }
-
-  /** Synchrous queries with expr printing. */
-  pub trait SyncedExpr<
+/** Queries with expr printing and related print/parse information. */
+pub trait QueryExprInfo<
   'kid, Parser: ParseSmt2, Expr: Expr2Smt<Parser::I>
-  > : AsyncedExpr<'kid, Parser, Parser::I, Expr> {
-
-    /** Get-values command. */
-    fn get_values(
-      & mut self, exprs: & [ Expr ], info: & Parser::I
-    ) -> SmtRes<Vec<(Parser::Expr, Parser::Value)>> {
-      try_cast!(
-        self.print_get_values(exprs, info)
-      ) ;
-      self.parse_values(info)
-    }
+> : Solver<'kid, Parser> + QueryExpr<'kid, Parser, Parser::I, Expr> {
+  /** Get-values command. */
+  fn get_values(
+    & mut self, exprs: & [ Expr ], info: & Parser::I
+  ) -> SmtRes<Vec<(Parser::Expr, Parser::Value)>> {
+    try_cast!(
+      self.print_get_values(exprs, info)
+    ) ;
+    self.parse_get_values(info)
   }
-
 }

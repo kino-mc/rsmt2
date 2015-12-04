@@ -322,8 +322,6 @@ macro_rules! smtry {
 
 #[test]
 fn sync() {
-  use rsmt2::sync::* ;
-
   let conf = SolverConf::z3() ;
 
   println!("") ;
@@ -434,8 +432,6 @@ fn sync() {
 
 #[test]
 fn async() {
-  use rsmt2::async::* ;
-
   let conf = SolverConf::z3() ;
 
   println!("") ;
@@ -489,11 +485,11 @@ fn async() {
 
     println!("check-sat") ;
     smtry!(
-      solver.check_sat(),
+      solver.print_check_sat(),
       failwith "error requesting checksat: {:?}"
     ) ;
     match smtry!(
-      solver.parse_sat(),
+      solver.parse_check_sat(),
       failwith "error in checksat: {:?}"
     ) {
       true => println!("> sat"),
@@ -503,11 +499,11 @@ fn async() {
 
     println!("get-model") ;
     smtry!(
-      solver.get_model(),
+      solver.print_get_model(),
       failwith "error requesting model: {:?}"
     ) ;
     let model = smtry!(
-      solver.parse_model(),
+      solver.parse_get_model(),
       failwith "could not retrieve model: {:?}"
     ) ;
     for (id,v) in model.into_iter() {
@@ -526,13 +522,13 @@ fn async() {
 
     println!("get-values") ;
     smtry!(
-      solver.get_values(
+      solver.print_get_values(
         & [ app1.unroll(& offset1), app2.unroll(& offset1)], & ()
       ),
       failwith "error requesting values: {:?}"
     ) ;
     let values = smtry!(
-      solver.parse_values(& ()),
+      solver.parse_get_values(& ()),
       failwith "error in get-values: {:?}"
     ) ;
     for (e,v) in values.into_iter() {

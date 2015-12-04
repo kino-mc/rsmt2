@@ -605,7 +605,7 @@ macro_rules! smtry {
 
 
 fn main() {
-  use rsmt2::sync::* ;
+  use rsmt2::* ;
 
   let conf = SolverConf::z3() ;
 
@@ -985,7 +985,7 @@ macro_rules! smtry {
 
 
 fn main() {
-  use rsmt2::sync::* ;
+  use rsmt2::* ;
 
   let conf = SolverConf::z3() ;
 
