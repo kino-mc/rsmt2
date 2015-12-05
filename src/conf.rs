@@ -62,6 +62,18 @@ impl SolverStyle {
       },
     }
   }
+  /** A solver style from a string. */
+  pub fn of_str(s: & str) -> Option<SolverStyle> {
+    match s {
+      "z3" | "Z3" => Some(Z3),
+      "cvc4" | "CVC4" => Some(CVC4),
+      _ => None,
+    }
+  }
+  /** Legal string representations of solver styles. */
+  pub fn str_keys() -> Vec<& 'static str> {
+    vec![ "z3", "Z3", "cvc4", "CVC4" ]
+  }
   /** Default command for a solver style. */
   pub fn cmd(& self) -> String {
     match * self {
