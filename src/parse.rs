@@ -42,9 +42,12 @@ named!{ pub unexpected<UnexSmtRes>, alt!( unsupported | error ) }
 pub type SuccessRes = SmtRes<()> ;
 
 named!{ pub success<SuccessRes>,
-  alt!(
-    map!( tag!("success"), |_| Ok(()) ) |
-    map!( unexpected, |e| Err(e) )
+  preceded!(
+    opt!(multispace),
+    alt!(
+      map!( tag!("success"), |_| Ok(()) ) |
+      map!( unexpected, |e| Err(e) )
+    )
   )
 }
 
@@ -52,10 +55,13 @@ named!{ pub success<SuccessRes>,
 pub type CheckSatRes = SmtRes<bool> ;
 
 named!{ pub check_sat<CheckSatRes>,
-  alt!(
-    map!( tag!("sat"), |_| Ok(true) ) |
-    map!( tag!("unsat"), |_| Ok(false) ) |
-    map!( unexpected, |e| Err(e) )
+  preceded!(
+    opt!(multispace),
+    alt!(
+      map!( tag!("sat"), |_| Ok(true) ) |
+      map!( tag!("unsat"), |_| Ok(false) ) |
+      map!( unexpected, |e| Err(e) )
+    )
   )
 }
 

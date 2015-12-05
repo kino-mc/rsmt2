@@ -97,7 +97,7 @@ macro_rules! fetch {
         Err(e) => return Err( IoError(e) ),
       } ;
       let mut cmt = false ;
-      if len < $slf.buff.len() {
+      if len + 1 < $slf.buff.len() {
         $start ;
         $slf.buff.trim_right() ;
         for $c in $slf.buff.chars().skip(len) {
@@ -112,8 +112,8 @@ macro_rules! fetch {
             _ => (),
           }
         } ;
+        if cnt == 0 { break }
       } ;
-      if cnt == 0 { break }
     } ;
     Ok(())
   } ) ;
@@ -471,7 +471,8 @@ pub fn solver<'kid, Parser: ParseSmt2>(
 
 
 /// Provides SMT-LIB commands that are not queries.
-pub trait Solver<'kid, Parser: ParseSmt2> : SolverPrims<'kid, Parser> {
+pub trait Solver<'kid, Parser: ParseSmt2> :
+SolverPrims<'kid, Parser> {
 
 
   // |===| (Re)starting and terminating.
