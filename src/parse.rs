@@ -51,6 +51,10 @@ named!{ pub success<SuccessRes>,
   )
 }
 
+// pub fn success(bytes: & [u8]) -> (String, SuccessRes) {
+//   wrap!( parse_success(bytes) )
+// }
+
 
 pub type CheckSatRes = SmtRes<bool> ;
 
@@ -64,6 +68,10 @@ named!{ pub check_sat<CheckSatRes>,
     )
   )
 }
+
+// pub fn check_sat(bytes: & [u8]) -> (String, CheckSatRes) {
+//   wrap!( parse_check_sat(bytes) )
+// }
 
 named!{ pub open_paren<()>,
   map!( preceded!( opt!(multispace), char!('(')), |_| () )

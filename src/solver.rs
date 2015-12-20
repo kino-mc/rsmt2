@@ -21,7 +21,7 @@ use std::process::{
 } ;
 use std::io::{ Write, Read, BufWriter, BufReader } ;
 
-use nom::{ IResult, multispace } ;
+use nom::multispace ;
 
 use common::* ;
 use common::UnexSmtRes::* ;
@@ -29,6 +29,35 @@ use conf::SolverConf ;
 use parse::{
   SuccessRes, success, check_sat, unexpected, open_paren, close_paren
 } ;
+
+
+macro_rules! wrap {
+  ($e:expr) => (
+    {
+      use nom::IResult::* ;
+      use std::str::from_utf8 ;
+      match $e {
+        Done(rest, res) => (
+          from_utf8(rest).unwrap().to_string(), res
+        ),
+        Error(e) => (
+          String::new(), Err(
+            UnexSmtRes::Error(
+              format!("{:?}", e)
+            )
+          )
+        ),
+        Incomplete(e) => (
+          String::new(), Err(
+            UnexSmtRes::Error(
+              format!("{:?}", e)
+            )
+          )
+        ),
+      }
+    }
+  )
+}
 
 #[cfg(not(no_parse_success))]
 macro_rules! parse_success {
@@ -172,7 +201,7 @@ impl Kid {
 
 
 /// Plain solver, as opposed to `TeeSolver` which logs IOs.
-pub struct PlainSolver<'kid, Parser: ParseSmt2> {
+pub struct PlainSolver<'kid, Parser: ParseSmt2 + 'static> {
   /// Solver configuration.
   conf: & 'kid SolverConf,
   /// Kid's stdin.
@@ -188,7 +217,7 @@ pub struct PlainSolver<'kid, Parser: ParseSmt2> {
   /// User-provided parser.
   parser: Parser,
 }
-impl<'kid, Parser: ParseSmt2> PlainSolver<'kid, Parser> {
+impl<'kid, Parser: ParseSmt2 + 'static> PlainSolver<'kid, Parser> {
   /// Creates a plain solver.
   pub fn mk(kid: & 'kid mut Kid, parser: Parser) -> SmtRes<Self> {
     let stdin = match kid.kid.stdin.as_mut() {
@@ -242,7 +271,7 @@ impl<'kid, Parser: ParseSmt2> PlainSolver<'kid, Parser> {
 }
 
 impl<
-  'kid, Parser: ParseSmt2
+  'kid, Parser: ParseSmt2 + 'static
 > SolverBasic<'kid, Parser> for PlainSolver<'kid, Parser> {
   fn fetch(& mut self) -> UnitSmtRes {
     fetch!(self)
@@ -260,38 +289,41 @@ impl<
   fn parser(& self) -> & Parser {
     & self.parser
   }
+  fn as_ref(& self) -> & [u8] {
+    self.buff.as_ref()
+  }
   fn solver(& mut self) -> & mut PlainSolver<'kid, Parser> {
     self
   }
 }
 
 impl<
-  'kid, Parser: ParseSmt2
+  'kid, Parser: ParseSmt2 + 'static
 > SolverPrims<'kid, Parser> for PlainSolver<'kid, Parser> {}
 
 impl<
-  'kid, Parser: ParseSmt2
+  'kid, Parser: ParseSmt2 + 'static
 > Solver<'kid, Parser> for PlainSolver<'kid, Parser> {}
 
 
 impl<
-  'kid, Parser: ParseSmt2
+  'kid, Parser: ParseSmt2 + 'static
 > Query<'kid, Parser> for PlainSolver<'kid, Parser> {}
 
 impl<
-  'kid, Parser: ParseSmt2, Info, Ident: Sym2Smt<Info>
+  'kid, Parser: ParseSmt2 + 'static, Info, Ident: Sym2Smt<Info>
 > QueryIdent<
   'kid, Parser, Info, Ident
 > for PlainSolver<'kid, Parser> {}
 
 impl<
-  'kid, Parser: ParseSmt2, Info, Expr: Expr2Smt<Info>
+  'kid, Parser: ParseSmt2 + 'static, Info, Expr: Expr2Smt<Info>
 > QueryExpr<
   'kid, Parser, Info, Expr
 > for PlainSolver<'kid, Parser> {}
 
 impl<
-  'kid, Parser: ParseSmt2, Expr: Expr2Smt<Parser::I>
+  'kid, Parser: ParseSmt2 + 'static, Expr: Expr2Smt<Parser::I>
 > QueryExprInfo<
   'kid, Parser, Expr
 > for PlainSolver<'kid, Parser> {}
@@ -307,17 +339,17 @@ impl<
 
 
 /// Wrapper around a `PlainSolver` logging IOs to a file.
-pub struct TeeSolver<'kid, Parser: ParseSmt2> {
+pub struct TeeSolver<'kid, Parser: ParseSmt2 + 'static> {
   solver: PlainSolver<'kid, Parser>,
   file: BufWriter<File>,
 }
-impl<'kid, Parser: ParseSmt2> TeeSolver<'kid, Parser> {
+impl<'kid, Parser: ParseSmt2 + 'static> TeeSolver<'kid, Parser> {
   /// Configuration of the solver.
   pub fn conf(& self) -> & SolverConf { self.solver.conf }
 }
 
 impl<
-  'kid, Parser: ParseSmt2
+  'kid, Parser: ParseSmt2 + 'static
 > SolverBasic<'kid, Parser> for TeeSolver<'kid, Parser> {
   fn fetch(& mut self) -> UnitSmtRes {
     fetch!(
@@ -346,38 +378,41 @@ impl<
   fn parser(& self) -> & Parser {
     & self.solver.parser
   }
+  fn as_ref(& self) -> & [u8] {
+    & self.solver.buff.as_ref()
+  }
   fn solver(& mut self) -> & mut PlainSolver<'kid, Parser> {
     & mut self.solver
   }
 }
 
 impl<
-  'kid, Parser: ParseSmt2
+  'kid, Parser: ParseSmt2 + 'static
 > SolverPrims<'kid, Parser> for TeeSolver<'kid, Parser> {}
 
 impl<
-  'kid, Parser: ParseSmt2
+  'kid, Parser: ParseSmt2 + 'static
 > Solver<'kid, Parser> for TeeSolver<'kid, Parser> {}
 
 
 impl<
-  'kid, Parser: ParseSmt2
+  'kid, Parser: ParseSmt2 + 'static
 > Query<'kid, Parser> for TeeSolver<'kid, Parser> {}
 
 impl<
-  'kid, Parser: ParseSmt2, Info, Ident: Sym2Smt<Info>
+  'kid, Parser: ParseSmt2 + 'static, Info, Ident: Sym2Smt<Info>
 > QueryIdent<
   'kid, Parser, Info, Ident
 > for TeeSolver<'kid, Parser> {}
 
 impl<
-  'kid, Parser: ParseSmt2, Info, Expr: Expr2Smt<Info>
+  'kid, Parser: ParseSmt2 + 'static, Info, Expr: Expr2Smt<Info>
 > QueryExpr<
   'kid, Parser, Info, Expr
 > for TeeSolver<'kid, Parser> {}
 
 impl<
-  'kid, Parser: ParseSmt2, Expr: Expr2Smt<Parser::I>
+  'kid, Parser: ParseSmt2 + 'static, Expr: Expr2Smt<Parser::I>
 > QueryExprInfo<
   'kid, Parser, Expr
 > for TeeSolver<'kid, Parser> {}
@@ -395,7 +430,7 @@ impl<
 
 
 /// Most basic function needed to provide SMT-LIB commands.
-trait SolverBasic<'kid, Parser: ParseSmt2> {
+trait SolverBasic<'kid, Parser: ParseSmt2 + 'static> {
   /// Fetches data.
   fn fetch(& mut self) -> UnitSmtRes ;
   /// Applies a function to the writer on the solver's stdin.
@@ -404,6 +439,8 @@ trait SolverBasic<'kid, Parser: ParseSmt2> {
   >(& mut self, f: F) -> UnitSmtRes ;
   /// Writes comments. Ignored for `PlainSolver`.
   fn comment(& mut self, txt: & str) -> UnitSmtRes ;
+  /// The bytes of the buffer.
+  fn as_ref(& self) -> & [u8] ;
   /// The parser.
   fn parser(& self) -> & Parser ;
   /// The plain solver.
@@ -423,31 +460,20 @@ trait SolverBasic<'kid, Parser: ParseSmt2> {
 
 
 /// Primitive functions provided by a solver wrapper.
-trait SolverPrims<'kid, Parser: ParseSmt2> : SolverBasic<'kid, Parser> {
+trait SolverPrims<
+  'kid, Parser: ParseSmt2 + 'static
+> : SolverBasic<'kid, Parser> {
   /// Fetchs data, applies a parser (passes the internal parser) and returns
   /// its result.
   fn parse<
-    'a, Out, F: Fn(& 'a [u8], & Parser) -> IResult<& 'a [u8], SmtRes<Out>>
-  >(& 'a mut self, parser: F) -> SmtRes<Out> {
-    use nom::IResult::* ;
-    use std::str::from_utf8 ;
+    Out, F: Fn(& [u8], & Parser) -> (String, SmtRes<Out>)
+  >(& mut self, parser: F) -> SmtRes<Out> {
     try!( self.fetch() ) ;
+    let (rest, res) = parser( self.as_ref(), self.parser() ) ;
     let solver = self.solver() ;
-    match parser(
-      solver.buff.as_ref(), & solver.parser
-    ) {
-      Done(rest, res) => {
-        solver.swap.clear() ;
-        solver.swap.extend(
-          from_utf8(rest).unwrap().chars()
-        ) ;
-        res
-      },
-      Error(e) => return Err(
-        UnexSmtRes::Error( format!("{:?}", e) )
-      ),
-      Incomplete(n) => panic!("incomplete {:?}", n),
-    }
+    solver.swap.clear() ;
+    solver.swap.extend( rest.chars() ) ;
+    res
   }
 }
 
@@ -458,7 +484,7 @@ trait SolverPrims<'kid, Parser: ParseSmt2> : SolverBasic<'kid, Parser> {
 
 
 /// Creates a solver from a kid.
-pub fn solver<'kid, Parser: ParseSmt2>(
+pub fn solver<'kid, Parser: ParseSmt2 + 'static>(
   kid: & 'kid mut Kid, parser: Parser
 ) -> SmtRes< PlainSolver<'kid, Parser> > {
   PlainSolver::mk(kid, parser)
@@ -471,7 +497,7 @@ pub fn solver<'kid, Parser: ParseSmt2>(
 
 
 /// Provides SMT-LIB commands that are not queries.
-pub trait Solver<'kid, Parser: ParseSmt2> :
+pub trait Solver<'kid, Parser: ParseSmt2 + 'static> :
 SolverPrims<'kid, Parser> {
 
 
@@ -937,7 +963,7 @@ SolverPrims<'kid, Parser> {
   /** Parse success. */
   #[inline]
   fn parse_success(& mut self) -> SuccessRes {
-    self.parse( |bytes, _| success(bytes) )
+    self.parse( |bytes, _| wrap!( success(bytes) ) )
   }
 }
 
@@ -962,7 +988,7 @@ macro_rules! try_cast {
 
 /** Prints queries. */
 pub trait Query<
-  'kid, Parser: ParseSmt2
+  'kid, Parser: ParseSmt2 + 'static
 > : Solver<'kid, Parser> {
 
   /** Check-sat command. */
@@ -976,7 +1002,7 @@ pub trait Query<
   /** Parse the result of a check-sat. */
   #[inline(always)]
   fn parse_check_sat(& mut self) -> SmtRes<bool> {
-    self.parse( |bytes, _| check_sat(bytes) )
+    self.parse( |bytes, _| wrap!( check_sat(bytes) ) )
   }
 
   /** Check-sat command. */
@@ -996,42 +1022,41 @@ pub trait Query<
   }
 
   /** Parse the result of a get-model. */
-  fn parse_get_model(
-    & mut self
-  ) -> SmtRes<Vec<(Parser::Ident, Parser::Value)>> {
+  fn parse_get_model<'a>(
+    & 'a mut self
+  ) -> SmtRes<Vec<(Parser::Ident, Parser::Value)>>
+  where Parser: 'a {
     self.parse(
-      |bytes, parser| call!(
-        bytes,
-        closure!(
-          alt!(
-            map!( unexpected, |e| Err(e) ) |
-            chain!(
-              open_paren ~
-              opt!(multispace) ~
-              tag!("model") ~
-              vec: many0!(
-                chain!(
-                  open_paren ~
-                  opt!(multispace) ~
-                  tag!("define-fun") ~
-                  multispace ~
-                  id: call!(|bytes| parser.parse_ident(bytes)) ~
-                  open_paren ~
-                  close_paren ~
-                  opt!(multispace) ~
-                  alt!(
-                    tag!("Bool") | tag!("Int") | tag!("Real") |
-                    tag!("bool") | tag!("int") | tag!("real")
-                  ) ~
-                  opt!(multispace) ~
-                  val: call!(|bytes| parser.parse_value(bytes)) ~
-                  close_paren,
-                  || (id, val)
-                )
-              ) ~
-              close_paren,
-              || Ok(vec)
-            )
+      |bytes, parser| wrap!(
+        alt!(
+          bytes,
+          map!( unexpected, |e| Err(e) ) |
+          chain!(
+            open_paren ~
+            opt!(multispace) ~
+            tag!("model") ~
+            vec: many0!(
+              chain!(
+                open_paren ~
+                opt!(multispace) ~
+                tag!("define-fun") ~
+                multispace ~
+                id: call!(|bytes| parser.parse_ident(bytes)) ~
+                open_paren ~
+                close_paren ~
+                opt!(multispace) ~
+                alt!(
+                  tag!("Bool") | tag!("Int") | tag!("Real") |
+                  tag!("bool") | tag!("int") | tag!("real")
+                ) ~
+                opt!(multispace) ~
+                val: call!(|bytes| parser.parse_value(bytes)) ~
+                close_paren,
+                || (id, val)
+              )
+            ) ~
+            close_paren,
+            || Ok(vec)
           )
         )
       )
@@ -1051,26 +1076,28 @@ pub trait Query<
     & mut self, info: & Parser::I
   ) -> SmtRes<Vec<(Parser::Expr, Parser::Value)>> {
     self.parse(
-      |bytes, parser| call!(
-        bytes,
-        closure!(
-          alt!(
-            map!( unexpected, |e| Err(e) ) |
-            chain!(
-              open_paren ~
-              vec: many0!(
-                chain!(
-                  open_paren ~
-                  opt!(multispace) ~
-                  expr: call!(|bytes| parser.parse_expr(bytes, info)) ~
-                  multispace ~
-                  val: call!(|bytes| parser.parse_value(bytes)) ~
-                  close_paren,
-                  || (expr, val)
-                )
-              ) ~
-              close_paren,
-              || Ok(vec)
+      |bytes, parser| wrap!(
+        call!(
+          bytes,
+          closure!(
+            alt!(
+              map!( unexpected, |e| Err(e) ) |
+              chain!(
+                open_paren ~
+                vec: many0!(
+                  chain!(
+                    open_paren ~
+                    opt!(multispace) ~
+                    expr: call!(|bytes| parser.parse_expr(bytes, info)) ~
+                    multispace ~
+                    val: call!(|bytes| parser.parse_value(bytes)) ~
+                    close_paren,
+                    || (expr, val)
+                  )
+                ) ~
+                close_paren,
+                || Ok(vec)
+              )
             )
           )
         )
@@ -1112,7 +1139,7 @@ pub trait Query<
 
 /** Queries with ident printing. */
 pub trait QueryIdent<
-  'kid, Parser: ParseSmt2, Info, Ident: Sym2Smt<Info>
+  'kid, Parser: ParseSmt2 + 'static, Info, Ident: Sym2Smt<Info>
 > : Solver<'kid, Parser> + Query<'kid, Parser> {
   /** Check-sat with assumptions command. */
   fn print_check_sat_assuming(
@@ -1157,7 +1184,7 @@ pub trait QueryIdent<
 
 /** Queries with expr printing. */
 pub trait QueryExpr<
-  'kid, Parser: ParseSmt2, Info, Expr: Expr2Smt<Info>
+  'kid, Parser: ParseSmt2 + 'static, Info, Expr: Expr2Smt<Info>
 > : Solver<'kid, Parser> + Query<'kid, Parser> {
   /** Get-values command. */
   fn print_get_values(
@@ -1180,7 +1207,7 @@ pub trait QueryExpr<
 
 /** Queries with expr printing and related print/parse information. */
 pub trait QueryExprInfo<
-  'kid, Parser: ParseSmt2, Expr: Expr2Smt<Parser::I>
+  'kid, Parser: ParseSmt2 + 'static, Expr: Expr2Smt<Parser::I>
 > : Solver<'kid, Parser> + QueryExpr<'kid, Parser, Parser::I, Expr> {
   /** Get-values command. */
   fn get_values(
