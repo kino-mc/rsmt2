@@ -12,6 +12,7 @@ Basic types used by the library.
 */
 
 use std::io ;
+use std::fmt ;
 
 use nom::IResult ;
 
@@ -34,6 +35,15 @@ pub enum UnexSmtRes {
   Error(String),
   /** An input/output error occured. */
   IoError(io::Error),
+}
+impl fmt::Display for UnexSmtRes {
+  fn fmt(& self, fmt: & mut fmt::Formatter) -> fmt::Result {
+    match * self {
+      UnexSmtRes::Unsupported => write!(fmt, "unsupported"),
+      UnexSmtRes::Error(ref s) => write!(fmt, "{}", s),
+      UnexSmtRes::IoError(ref e) => write!(fmt, "io error: {}", e),
+    }
+  }
 }
 
 /** Result of an SMT query. */
