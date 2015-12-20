@@ -35,10 +35,20 @@ macro_rules! wrap {
   ($e:expr) => (
     {
       use nom::IResult::* ;
+      use nom::Err ;
       use std::str::from_utf8 ;
       match $e {
         Done(rest, res) => (
           from_utf8(rest).unwrap().to_string(), res
+        ),
+        Error(
+          Err::Position(_, bytes)
+        ) => (
+          String::new(), Err(
+            UnexSmtRes::Error(
+              format!("error at\n{}", from_utf8(bytes).unwrap())
+            )
+          )
         ),
         Error(e) => (
           String::new(), Err(
