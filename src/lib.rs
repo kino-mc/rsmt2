@@ -1100,4 +1100,13 @@ mod solver ;
 
 pub use common::* ;
 pub use conf::* ;
-pub use solver::* ;
+pub use solver::{
+  solver,
+  Kid, Solver, PlainSolver, TeeSolver,
+  Query, QueryExpr, QueryExprInfo, QueryIdent,
+} ;
+
+/** Internal traits used to build solvers. */
+pub mod internals {
+  pub use solver::{ SolverBasic, SolverPrims } ;
+}

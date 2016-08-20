@@ -19,7 +19,7 @@ use std::fs::File ;
 use std::process::{
   Child, ChildStdin, ChildStdout, Command, Stdio
 } ;
-use std::io::{ Write, Read, BufWriter, BufReader } ;
+use std::io::{ Write, BufWriter, BufReader } ;
 
 use nom::multispace ;
 
@@ -440,7 +440,7 @@ impl<
 
 
 /// Most basic function needed to provide SMT-LIB commands.
-trait SolverBasic<'kid, Parser: ParseSmt2 + 'static> {
+pub trait SolverBasic<'kid, Parser: ParseSmt2 + 'static> {
   /// Fetches data.
   fn fetch(& mut self) -> UnitSmtRes ;
   /// Applies a function to the writer on the solver's stdin.
@@ -470,7 +470,7 @@ trait SolverBasic<'kid, Parser: ParseSmt2 + 'static> {
 
 
 /// Primitive functions provided by a solver wrapper.
-trait SolverPrims<
+pub trait SolverPrims<
   'kid, Parser: ParseSmt2 + 'static
 > : SolverBasic<'kid, Parser> {
   /// Fetchs data, applies a parser (passes the internal parser) and returns

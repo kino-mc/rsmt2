@@ -5,11 +5,11 @@ authors = ["Adrien Champion <adrien.champion@email.com>"]
 description = "Wrapper for SMT Lib 2 compliant SMT solvers."
 documentation = "http://adrienchampion.bitbucket.org/rsmt2/rsmt2/"
 homepage = "https://bitbucket.org/AdrienChampion/rsmt2/"
-repository = "https://bitbucket.org/AdrienChampion/rsmt2/src"
+repository = "https://bitbucket.org/AdrienChampion/rsmt2/"
 readme = "README.md"
 keywords = ["SMT", "SAT", "satisfiability", "wrapper", "solver"]
 license = "MIT/Apache-2.0"
 
 [dependencies]
-regex = "*"
-nom = "1.0.1"
+regex = "0.1.73"
+nom = "1.2.4"
