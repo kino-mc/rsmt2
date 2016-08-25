@@ -87,6 +87,22 @@ impl<'a> Sort2Smt for & 'a str {
   }
 }
 
+impl Sym2Smt<()>  for String {
+  fn sym_to_smt2(& self, writer: & mut io::Write, _: & ()) -> IoResUnit {
+    write!(writer, "{}", self)
+  }
+}
+impl Expr2Smt<()> for String {
+  fn expr_to_smt2(& self, writer: & mut io::Write, info: & ()) -> IoResUnit {
+    self.sym_to_smt2(writer, info)
+  }
+}
+impl Sort2Smt for String {
+  fn sort_to_smt2(& self, writer: & mut io::Write) -> IoResUnit {
+    self.sym_to_smt2(writer, & ())
+  }
+}
+
 
 
 /** Generic type for the parsing of an SMT Lib 2 answer.
