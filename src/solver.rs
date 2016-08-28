@@ -519,8 +519,12 @@ SolverPrims<'kid, Parser> {
   fn reset(
     & mut self
   ) -> UnitSmtRes {
-    self.write(
-      |w| smt_cast_io!( write!(w, "(reset)\n") )
+    parse_success!(
+      self for {
+        self.write(
+          |w| smt_cast_io!( write!(w, "(reset)\n") )
+        )
+      }
     )
   }
 
