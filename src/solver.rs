@@ -1160,7 +1160,7 @@ pub trait QueryIdent<
     & mut self, bool_vars: & [ Ident ], info: & Info
   ) -> UnitSmtRes {
     match * self.solver().conf.get_check_sat_assuming() {
-      Ok(ref cmd) => {
+      Some(ref cmd) => {
         self.write(
           |w| {
             smtry_io!( write!(w, "({}\n ", cmd) ) ;

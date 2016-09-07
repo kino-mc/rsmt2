@@ -7,9 +7,7 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-/*!
-Basic types used by the library.
-*/
+//! Basic types used by the library.
 
 use std::io ;
 use std::fmt ;
@@ -17,23 +15,23 @@ use std::fmt ;
 use nom::IResult ;
 
 
-/** Alias for `io` results of unit. */
+/// Alias for `io` results of unit.
 pub type IoResUnit = io::Result<()> ;
-/** Alias for `io` results of `bool`. */
+/// Alias for `io` results of `bool`.
 pub type IoResBool = io::Result<bool> ;
-/** Alias for generic `io` results. */
+/// Alias for generic `io` results.
 pub type IoRes<T> = io::Result<T> ;
 
 
 
-/** Unexpected result for an SMT Lib 2 command. */
+/// Unexpected result for an SMT Lib 2 command.
 #[derive(Debug)]
 pub enum UnexSmtRes {
-  /** An unsupported command was issued. */
+  /// An unsupported command was issued.
   Unsupported,
-  /** A command produced an error. */
+  /// A command produced an error.
   Error(String),
-  /** An input/output error occured. */
+  /// An input/output error occured.
   IoError(io::Error),
 }
 impl fmt::Display for UnexSmtRes {
@@ -46,28 +44,28 @@ impl fmt::Display for UnexSmtRes {
   }
 }
 
-/** Result of an SMT query. */
+/// Result of an SMT query.
 pub type SmtRes<T> = Result<T, UnexSmtRes> ;
 
-/** Result of an SMT statement. */
+/// Result of an SMT statement.
 pub type UnitSmtRes = SmtRes<()> ;
 
 
-/** A symbol printable in the SMT Lib 2 standard given some info. */
+/// A symbol printable in the SMT Lib 2 standard given some info.
 pub trait Sym2Smt<Info> {
-  /** Prints a symbol to a writer given some info. */
+  /// Prints a symbol to a writer given some info.
   fn sym_to_smt2(& self, writer: & mut io::Write, & Info) -> IoResUnit ;
 }
 
-/** An expression printable in the SMT Lib 2 standard given some info. */
+/// An expression printable in the SMT Lib 2 standard given some info.
 pub trait Expr2Smt<Info> {
-  /** Prints an expression to a writer given some info. */
+  /// Prints an expression to a writer given some info.
   fn expr_to_smt2(& self, writer: & mut io::Write, & Info) -> IoResUnit ;
 }
 
-/** A sort printable in the SMT Lib 2 standard. */
+/// A sort printable in the SMT Lib 2 standard.
 pub trait Sort2Smt {
-  /** Prints a sort to a writer info. */
+  /// Prints a sort to a writer info.
   fn sort_to_smt2(& self, writer: & mut io::Write) -> IoResUnit ;
 }
 
@@ -117,15 +115,15 @@ pub type SmtParseResult<T> = Result<T, UnexSmtRes> ;
 Not all of them are necessary depending on the queries wanted. See each method
 for details.*/
 pub trait ParseSmt2 {
-  /** Type of identifiers in the user's structure. */
+  /// Type of identifiers in the user's structure.
   type Ident : ::std::fmt::Debug ;
-  /** Type of values in the user's structure. */
+  /// Type of values in the user's structure.
   type Value : ::std::fmt::Debug ;
-  /** Type of expressions in the user's structure. */
+  /// Type of expressions in the user's structure.
   type Expr :  ::std::fmt::Debug ;
-  /** Type of proofs in the user's structure. */
+  /// Type of proofs in the user's structure.
   type Proof : ::std::fmt::Debug ;
-  /** Type of the info passed when parsing expressions. */
+  /// Type of the info passed when parsing expressions.
   type I ;
 
   /** Parses an ident from self, viewed as a reader.
@@ -204,16 +202,16 @@ impl ParseSmt2 for () {
 
 
 
-/** SMT Lib 2 logics. */
+/// SMT Lib 2 logics.
 #[allow(non_camel_case_types)]
 pub enum Logic {
-  /** Quantifier-free uninterpreted functions. */
+  /// Quantifier-free uninterpreted functions.
   QF_UF,
-  /** Quantifier-free linear integer arithmetic. */
+  /// Quantifier-free linear integer arithmetic.
   QF_LIA,
-  /** Quantifier-free non-linear integer arithmetic. */
+  /// Quantifier-free non-linear integer arithmetic.
   QF_NIA,
-  /** Quantifier-free linear real arithmetic. */
+  /// Quantifier-free linear real arithmetic.
   QF_LRA,
   /** Quantifier-free arrays, uninterpreted functions, linear integer
   arithmetic. */
@@ -221,16 +219,16 @@ pub enum Logic {
   /** Quantifier-free arrays, uninterpreted functions, linear integer
   arithmetic. */
   AUFLIA,
-  /** Arrays, uninterpreted functions, linear integer/real arithmetic. */
+  /// Arrays, uninterpreted functions, linear integer/real arithmetic.
   AUFLIRA,
-  /** arrays, uninterpreted functions, non-linear integer/real arithmetic. */
+  /// arrays, uninterpreted functions, non-linear integer/real arithmetic.
   AUFNIRA,
-  /** Linear real arithmetic. */
+  /// Linear real arithmetic.
   LRA,
 }
 
 impl Logic {
-  /** Prints the logic in a writer in SMT Lib 2 format. */
+  /// Prints the logic in a writer in SMT Lib 2 format.
   pub fn to_smt2(& self, writer: & mut io::Write, _: ()) -> IoResUnit {
     use self::Logic::* ;
     match * self {
