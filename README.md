@@ -1,13 +1,13 @@
 # rsmt2 #
 
-A generic library to interact with SMT lib 2 compliant solvers running in a separate system process, such as Z3 and CVC4.
+A generic library to interact with SMT-LIB 2 compliant solvers running in a separate system process, such as Z3 and CVC4.
 
 * [documentation][doc]
 
 
 # License
 
-Copyright 2015 Adrien Champion. See the COPYRIGHT file at the top-level
+Copyright 2016 Adrien Champion. See the COPYRIGHT file at the top-level
 directory of this distribution.
 
 Licensed under the Apache License, Version 2.0 <LICENSE-APACHE or
