@@ -10,14 +10,12 @@ cache: cargo
 addons:
   apt:
     packages:
-      - gmp
+      - libgmp3-dev
 
 before_script:
 - |
   pip install 'travis-cargo<0.2' --user &&
   export PATH=$HOME/.local/bin:$PATH
-- |
-  echo "$TRAVIS_OS_NAME"
 - |
   if [ "$TRAVIS_OS_NAME" == "linux" ] ; then
     wget https://github.com/Z3Prover/z3/releases/download/z3-4.5.0/z3-4.5.0-x64-ubuntu-14.04.zip &&
