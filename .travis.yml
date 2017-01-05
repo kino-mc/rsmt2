@@ -1,15 +1,12 @@
 language: rust
 
-matrix:
-  include:
-    - os: linux
-      rust: stable
-    - os: linux
-      rust: beta
-    - os: osx
-      rust: stable
-    - os: osx
-      rust: beta
+os:
+  - linux
+  - osx
+
+rust:
+  - stable
+  - beta
 
 sudo: false
 
@@ -44,6 +41,3 @@ before_script:
 script:
   - travis-cargo build
   - travis-cargo test
-
-os:
-  - linux
