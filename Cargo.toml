@@ -11,5 +11,5 @@ keywords = ["SMT", "SAT", "satisfiability", "solver"]
 license = "MIT/Apache-2.0"
 
 [dependencies]
-error-chain = "*"
-nom = "*"
+error-chain = "^0"
+nom = "^2"
