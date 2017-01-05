@@ -11,18 +11,21 @@
 
 use std::str ;
 
-use nom::multispace ;
+use nom::{ IResult, multispace } ;
 
-use common::{ UnexSmtRes, SmtRes } ;
-use common::UnexSmtRes::* ;
+use errors::* ;
 
 
-named!{ pub unsupported<UnexSmtRes>,
-  map!( tag!("unsupported"), |_| Unsupported )
+pub fn unsupported<T>(bytes: & [u8]) -> IResult<& [u8], Res<T>, u32> {
+  map!(
+    bytes,
+    tag!("unsupported"), |_| Err( ErrorKind::Unsupported.into() )
+  )
 }
 
-named!{ pub error<UnexSmtRes>,
+pub fn error<T>(bytes: & [u8]) -> IResult<& [u8], Res<T>, u32> {
   chain!(
+    bytes,
     char!('(') ~
     opt!(multispace) ~
     tag!("error") ~
@@ -32,39 +35,40 @@ named!{ pub error<UnexSmtRes>,
     char!('"') ~
     opt!(multispace) ~
     char!(')'),
-    || Error(str::from_utf8(msg).unwrap().to_string())
+    || match str::from_utf8(msg) {
+      Ok(s) => bail!(
+        ErrorKind::SolverError( s.into() )
+      ),
+      Err(e) => Err(e).chain_err(
+        || ErrorKind::SolverError(
+          "unable to convert solver error to utf8".into()
+        )
+      )
+    }
   )
 }
 
-named!{ pub unexpected<UnexSmtRes>, alt!( unsupported | error ) }
+pub fn unexpected<T>(bytes: & [u8]) -> IResult<& [u8], Res<T>, u32> {
+  alt!( bytes, unsupported | error )
+}
 
-
-pub type SuccessRes = SmtRes<()> ;
-
-named!{ pub success<SuccessRes>,
+named!{ pub success< Res<()> >,
   preceded!(
     opt!(multispace),
     alt!(
       map!( tag!("success"), |_| Ok(()) ) |
-      map!( unexpected, |e| Err(e) )
+      unexpected
     )
   )
 }
 
-// pub fn success(bytes: & [u8]) -> (String, SuccessRes) {
-//   wrap!( parse_success(bytes) )
-// }
-
-
-pub type CheckSatRes = SmtRes<bool> ;
-
-named!{ pub check_sat<CheckSatRes>,
+named!{ pub check_sat< Res<bool> >,
   preceded!(
     opt!(multispace),
     alt!(
       map!( tag!("sat"), |_| Ok(true) ) |
       map!( tag!("unsat"), |_| Ok(false) ) |
-      map!( unexpected, |e| Err(e) )
+      map!( unexpected, |e| e )
     )
   )
 }
@@ -76,8 +80,6 @@ named!{ pub check_sat<CheckSatRes>,
 named!{ pub open_paren<()>,
   map!( preceded!( opt!(multispace), char!('(')), |_| () )
 }
-
-pub type OpenParen = SmtRes<()> ;
 
 named!{ pub close_paren<()>,
   map!( preceded!( opt!(multispace), char!(')') ), |_| () )

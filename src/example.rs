@@ -1,41 +1,17 @@
-// Copyright 2015 Adrien Champion. See the COPYRIGHT file at the top-level
-// directory of this distribution.
-//
-// Licensed under the Apache License, Version 2.0 <LICENSE-APACHE or
-// http://www.apache.org/licenses/LICENSE-2.0> or the MIT license
-// <LICENSE-MIT or http://opensource.org/licenses/MIT>, at your
-// option. This file may not be copied, modified, or distributed
-// except according to those terms.
-
 #![allow(dead_code)]
 
-#[macro_use]
-extern crate nom ;
-
-#[macro_use]
-extern crate rsmt2 ;
 
 use std::io::Write ;
 use std::str::FromStr ;
 use std::str ;
 
-use nom::{
-  IResult, digit, multispace
-} ;
+use nom::{ IResult, digit, multispace } ;
 
-use rsmt2::* ;
+use * ;
 
-use Var::* ;
-use Const::* ;
-use SExpr::* ;
-
-
-// |===| Structures and printing functions.
-
-
-/// An offset gives the index of current and next step.
-#[derive(Debug,Clone,Copy,PartialEq)]
-struct Offset(usize, usize) ;
+use self::Var::* ;
+use self::Const::* ;
+use self::SExpr::* ;
 
 /// Under the hood a symbol is a string.
 type Sym = String ;
@@ -51,6 +27,40 @@ enum Var {
   SVar1(Sym),
 }
 
+/// A constant.
+#[derive(Debug,Clone,PartialEq)]
+enum Const {
+  /// Boolean constant.
+  BConst(bool),
+  /// Integer constant.
+  IConst(usize),
+  /// Rational constant.
+  RConst(usize,usize),
+}
+
+/// An S-expression.
+#[derive(Debug,Clone,PartialEq)]
+enum SExpr {
+  /// A variable.
+  Id(Var),
+  /// A constant.
+  Val(Const),
+  /// An application of function symbol.
+  App(Sym, Vec<SExpr>),
+}
+
+/// An offset gives the index of current and next step.
+#[derive(Debug,Clone,Copy,PartialEq)]
+struct Offset(usize, usize) ;
+
+/// A symbol is a variable and an offset.
+#[derive(Debug,Clone,PartialEq)]
+struct Symbol<'a, 'b>(& 'a Var, & 'b Offset) ;
+
+/// An unrolled SExpr.
+#[derive(Debug,Clone,PartialEq)]
+struct Unrolled<'a, 'b>(& 'a SExpr, & 'b Offset) ;
+
 impl Var {
   pub fn nsvar(s: & str) -> Self { NSVar(s.to_string()) }
   pub fn svar0(s: & str) -> Self { SVar0(s.to_string()) }
@@ -59,7 +69,7 @@ impl Var {
   #[inline(always)]
   pub fn to_smt2(& self, writer: & mut Write, off: & Offset) -> Res<()> {
     smt_cast_io!(
-      "writing a symbol" => match * self {
+      "writing a variable" => match * self {
         NSVar(ref sym) => write!(writer, "|{}|", sym),
         /// SVar at 0, we use the index of the current step.
         SVar0(ref sym) => write!(writer, "|{}@{}|", sym, off.0),
@@ -72,28 +82,6 @@ impl Var {
   pub fn to_sym<'a, 'b>(& 'a self, off: & 'b Offset) -> Symbol<'a, 'b> {
     Symbol(self, off)
   }
-}
-
-/// A symbol is a variable and an offset.
-#[derive(Debug,Clone,PartialEq)]
-struct Symbol<'a, 'b>(& 'a Var, & 'b Offset) ;
-
-/// A symbol can be printed in SMT Lib 2.
-impl<'a, 'b> Sym2Smt<()> for Symbol<'a,'b> {
-  fn sym_to_smt2(& self, writer: & mut Write, _: & ()) -> Res<()> {
-    self.0.to_smt2(writer, self.1)
-  }
-}
-
-/// A constant.
-#[derive(Debug,Clone,PartialEq)]
-enum Const {
-  /// Boolean constant.
-  BConst(bool),
-  /// Integer constant.
-  IConst(usize),
-  /// Rational constant.
-  RConst(usize,usize),
 }
 
 impl Const {
@@ -110,17 +98,6 @@ impl Const {
   }
 }
 
-/// An S-expression.
-#[derive(Debug,Clone,PartialEq)]
-enum SExpr {
-  /// A variable.
-  Id(Var),
-  /// A constant.
-  Val(Const),
-  /// An application of function symbol.
-  App(Sym, Vec<SExpr>),
-}
-
 impl SExpr {
   pub fn app(sym: & str, args: Vec<SExpr>) -> Self {
     App(sym.to_string(), args)
@@ -128,22 +105,25 @@ impl SExpr {
   /// Given an offset, an S-expression can be printed in SMT Lib 2.
   pub fn to_smt2(& self, writer: & mut Write, off: & Offset) -> Res<()> {
     match * self {
-      Id(ref var) => var.to_smt2(writer, off),
-      Val(ref cst) => cst.to_smt2(writer),
+      Id(ref var) => var.to_smt2(writer, off).chain_err(
+        || "while writing an identifier"
+      ),
+      Val(ref cst) => cst.to_smt2(writer).chain_err(
+        || "while writing a plain value"
+      ),
       App(ref sym, ref args) => {
         smtry_io!(
-          "writing an expression" =>
-          write!(writer, "({}", sym)
+          "writing an application (symbol)" => write!(writer, "({}", sym)
         ) ;
         for ref arg in args {
-          smtry_io!( "writing an expression" =>
-            write!(writer, " ") ;
-            arg.to_smt2(writer, off)
+          smtry_io!(
+            "writing an application (args)" =>
+              write!(writer, " ") ;
+              arg.to_smt2(writer, off)
           )
         } ;
         smt_cast_io!(
-          "writing an expression" =>
-            write!(writer, ")")
+          "writing an application (trailer)" => write!(writer, ")")
         )
       }
     }
@@ -153,10 +133,12 @@ impl SExpr {
     Unrolled(self, off)
   }
 }
-
-/// An unrolled SExpr.
-#[derive(Debug,Clone,PartialEq)]
-struct Unrolled<'a, 'b>(& 'a SExpr, & 'b Offset) ;
+/// A symbol can be printed in SMT Lib 2.
+impl<'a, 'b> Sym2Smt<()> for Symbol<'a,'b> {
+  fn sym_to_smt2(& self, writer: & mut Write, _: & ()) -> Res<()> {
+    self.0.to_smt2(writer, self.1)
+  }
+}
 
 /// An unrolled SExpr can be printed in SMT Lib 2.
 impl<'a, 'b> Expr2Smt<()> for Unrolled<'a,'b> {
@@ -164,10 +146,6 @@ impl<'a, 'b> Expr2Smt<()> for Unrolled<'a,'b> {
     self.0.to_smt2(writer, self.1)
   }
 }
-
-
-// |===| Parsers.
-
 /// Helper function, from `& [u8]` to `str`.
 fn to_str(bytes: & [u8]) -> & str {
   match str::from_utf8(bytes) {
@@ -260,7 +238,7 @@ named!{ app<SExpr>,
       opt!(multispace) ~
       // A symbol.
       sym: alt!(
-        map!( one_of!("+-*/<>"), |c: char| c.to_string() ) |
+        map!( one_of!("+/-*<>"), |c: char| c.to_string() ) |
         map!(
           alt!(
             tag!("<=") |
@@ -313,7 +291,7 @@ impl ParseSmt2 for Parser {
     cst(array)
   }
   fn parse_expr<'a>(
-    & self, array: & 'a [u8], _: & ()
+    & self, array: & 'a [u8], _ : & ()
   ) -> IResult<& 'a [u8], SExpr> {
     s_expr(array)
   }
@@ -324,6 +302,7 @@ impl ParseSmt2 for Parser {
   }
 }
 
+/// Convenience macro.
 macro_rules! smtry {
   ($e:expr, failwith $( $msg:expr ),+) => (
     match $e {
@@ -334,12 +313,10 @@ macro_rules! smtry {
 }
 
 #[test]
-fn sync() {
+fn test() {
+
   let conf = SolverConf::z3() ;
 
-  println!("") ;
-
-  println!("Creating kid.") ;
   let mut kid = match Kid::mk(conf) {
     Ok(kid) => kid,
     Err(e) => panic!("Could not spawn solver kid: {:?}", e)
@@ -347,12 +324,10 @@ fn sync() {
 
   {
 
-    println!("Launching solver.") ;
     let mut solver = smtry!(
       solver(& mut kid, Parser),
       failwith "could not create solver: {:?}"
     ) ;
-    println!("") ;
 
     let nsv = Var::nsvar("non stateful var") ;
     let s_nsv = Id(nsv.clone()) ;
@@ -363,30 +338,23 @@ fn sync() {
     let offset1 = Offset(0,1) ;
 
     let sym = nsv.to_sym(& offset1) ;
-    println!("declaring {:?}", sym) ;
     smtry!(
       solver.declare_fun(& sym, &[], & "bool", & ()),
       failwith "declaration failed: {:?}"
     ) ;
 
     let sym = sv_0.to_sym(& offset1) ;
-    println!("declaring {:?}",sym) ;
     smtry!(
       solver.declare_fun(& sym, &[], & "bool", & ()),
       failwith "declaration failed: {:?}"
     ) ;
 
-    println!("") ;
-
     let expr = app1.unroll(& offset1) ;
-    println!("asserting {:?}", expr) ;
     smtry!(
       solver.assert(& expr, & ()),
       failwith "assert failed: {:?}"
     ) ;
-    println!("") ;
 
-    println!("check-sat") ;
     match smtry!(
       solver.check_sat(),
       failwith "error in checksat: {:?}"
@@ -394,9 +362,7 @@ fn sync() {
       true => println!("> sat"),
       false => panic!("expected sat, got unsat"),
     } ;
-    println!("") ;
 
-    println!("get-model") ;
     let model = smtry!(
       solver.get_model(),
       failwith "could not retrieve model: {:?}"
@@ -413,9 +379,7 @@ fn sync() {
         panic!("expected {:?} for {:?}, got {:?}", res, id, v)
       }
     } ;
-    println!("") ;
 
-    println!("get-values") ;
     let values = smtry!(
       solver.get_values(
         & [ app1.unroll(& offset1), app2.unroll(& offset1)], & ()
@@ -429,138 +393,12 @@ fn sync() {
       if v != res {
         panic!("expected {:?} for {:?}, got {:?}", res, e, v)
       }
-    } ;
-    println!("") ;
+    }
 
   }
 
-  println!("Killing solver.") ;
   smtry!(
     kid.kill(),
     failwith "error while killing solver: {:?}"
-  ) ;
-
-  println!("") ;
-}
-
-#[test]
-fn async() {
-  let conf = SolverConf::z3() ;
-
-  println!("") ;
-
-  println!("Creating kid.") ;
-  let mut kid = match Kid::mk(conf) {
-    Ok(kid) => kid,
-    Err(e) => panic!("Could not spawn solver kid: {:?}", e)
-  } ;
-
-  {
-
-    println!("Launching solver.") ;
-    let mut solver = smtry!(
-      solver(& mut kid, Parser),
-      failwith "could not create solver {:?}"
-    ) ;
-    println!("") ;
-
-    let nsv = Var::nsvar("non stateful var") ;
-    let s_nsv = Id(nsv.clone()) ;
-    let sv_0 = Var::svar0("stateful var") ;
-    let s_sv_0 = Id(sv_0.clone()) ;
-    let app2 = SExpr::app("not", vec![ s_sv_0.clone() ]) ;
-    let app1 = SExpr::app("and", vec![ s_nsv.clone(), app2.clone() ]) ;
-    let offset1 = Offset(0,1) ;
-
-    let sym = nsv.to_sym(& offset1) ;
-    println!("declaring {:?}", sym) ;
-    smtry!(
-      solver.declare_fun(& sym, &[], & "bool", & ()),
-      failwith "declaration failed: {:?}"
-    ) ;
-
-    let sym = sv_0.to_sym(& offset1) ;
-    println!("declaring {:?}",sym) ;
-    smtry!(
-      solver.declare_fun(& sym, &[], & "bool", & ()),
-      failwith "declaration failed: {:?}"
-    ) ;
-
-    println!("") ;
-
-    let expr = app1.unroll(& offset1) ;
-    println!("asserting {:?}", expr) ;
-    smtry!(
-      solver.assert(& expr, & ()),
-      failwith "assert failed: {:?}"
-    ) ;
-    println!("") ;
-
-    println!("check-sat") ;
-    smtry!(
-      solver.print_check_sat(),
-      failwith "error requesting checksat: {:?}"
-    ) ;
-    match smtry!(
-      solver.parse_check_sat(),
-      failwith "error in checksat: {:?}"
-    ) {
-      true => println!("> sat"),
-      false => panic!("expected sat, got unsat"),
-    } ;
-    println!("") ;
-
-    println!("get-model") ;
-    smtry!(
-      solver.print_get_model(),
-      failwith "error requesting model: {:?}"
-    ) ;
-    let model = smtry!(
-      solver.parse_get_model(),
-      failwith "could not retrieve model: {:?}"
-    ) ;
-    for (id,v) in model.into_iter() {
-      let res = if id == sv_0 {
-        BConst(false)
-      } else {
-        if id == nsv { BConst(true) } else {
-          panic!("expected {:?} or {:?}, got {:?}", sv_0, nsv, id)
-        }
-      } ;
-      if v != res {
-        panic!("expected {:?} for {:?}, got {:?}", res, id, v)
-      }
-    } ;
-    println!("") ;
-
-    println!("get-values") ;
-    smtry!(
-      solver.print_get_values(
-        & [ app1.unroll(& offset1), app2.unroll(& offset1)], & ()
-      ),
-      failwith "error requesting values: {:?}"
-    ) ;
-    let values = smtry!(
-      solver.parse_get_values(& ()),
-      failwith "error in get-values: {:?}"
-    ) ;
-    for (e,v) in values.into_iter() {
-      let res = if e == app1 || e == app2 { BConst(true) } else {
-        panic!("expected {:?} or {:?}, got {:?}", app1, app2, e)
-      } ;
-      if v != res {
-        panic!("expected {:?} for {:?}, got {:?}", res, e, v)
-      }
-    } ;
-    println!("") ;
-
-  }
-
-  println!("Killing solver.") ;
-  smtry!(
-    kid.kill(),
-    failwith "error while killing solver: {:?}"
-  ) ;
-
-  println!("") ;
+  )
 }

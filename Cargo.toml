@@ -11,5 +11,5 @@ keywords = ["SMT", "SAT", "satisfiability", "wrapper", "solver"]
 license = "MIT/Apache-2.0"
 
 [dependencies]
-regex = "0.1.73"
-nom = "1.2.4"
+error-chain = "*"
+nom = "*"
