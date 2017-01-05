@@ -19,7 +19,7 @@ addons:
 
 before_script:
 - |
-  mkdir $HOME/.local/bin &&
+  mkdir -p $HOME/.local/bin &&
   export PATH=$HOME/.local/bin:$PATH
 - |
   pip install 'travis-cargo<0.2' --user
