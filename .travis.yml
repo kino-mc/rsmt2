@@ -20,8 +20,8 @@ before_script:
   fi
 
 script:
-  - travis-cargo build --verbose
-  - travis-cargo test --verbose
+  - travis-cargo build
+  - travis-cargo test
 
 os:
   - linux
