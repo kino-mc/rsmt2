@@ -1,5 +1,4 @@
-// Copyright 2015 Adrien Champion. See the COPYRIGHT file at the top-level
-// directory of this distribution.
+// See the LICENSE files at the top-level directory of this distribution.
 //
 // Licensed under the Apache License, Version 2.0 <LICENSE-APACHE or
 // http://www.apache.org/licenses/LICENSE-2.0> or the MIT license
@@ -7,13 +6,10 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-/*!
-Wrapper around an SMT Lib 2 compliant solver.
-
-The underlying solver runs in a separate process, communication uses system
-pipes.
-*/
-
+//! Wrapper around an SMT Lib 2 compliant solver.
+//!
+//! The underlying solver runs in a separate process, communication uses system
+//! pipes.
 
 use std::fs::File ;
 use std::process::{
