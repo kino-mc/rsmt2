@@ -1,13 +1,9 @@
 # rsmt2 #
 
-[![Latest Version](https://img.shields.io/crates/v/rsmt2.svg)](https://crates.io/crates/rsmt2)
-
-- `master`: [![Build Status](https://travis-ci.org/kino-mc/rsmt2.svg?branch=master)](https://travis-ci.org/kino-mc/rsmt2)
+- [![Latest Version](https://img.shields.io/crates/v/rsmt2.svg)](https://crates.io/crates/rsmt2) [![Build Status](https://travis-ci.org/kino-mc/rsmt2.svg?branch=master)](https://travis-ci.org/kino-mc/rsmt2) [documentation][doc]
 - `dev`: [![Build Status](https://travis-ci.org/kino-mc/rsmt2.svg?branch=dev)](https://travis-ci.org/kino-mc/rsmt2)
 
 A generic library to interact with SMT-LIB 2 compliant solvers running in a separate system process, such as Z3 and CVC4.
-
-* [documentation][doc]
 
 
 # Known projects using `rsmt2`

@@ -19,14 +19,15 @@ addons:
 
 before_script:
 - |
-  pip install 'travis-cargo<0.2' --user &&
+  mkdir $HOME/.local/bin &&
   export PATH=$HOME/.local/bin:$PATH
+- |
+  pip install 'travis-cargo<0.2' --user
 - |
   if [ "$TRAVIS_OS_NAME" == "linux" ] ; then
     wget https://github.com/Z3Prover/z3/releases/download/z3-4.5.0/z3-4.5.0-x64-ubuntu-14.04.zip &&
     unzip z3-4.5.0-x64-ubuntu-14.04.zip &&
-    mv z3-4.5.0-x64-ubuntu-14.04/bin/z3 $HOME/.local/bin/. &&
-    z3 -h
+    mv z3-4.5.0-x64-ubuntu-14.04/bin/z3 $HOME/.local/bin/.
   fi
 - |
   if [ "$TRAVIS_OS_NAME" == "osx" ] ; then
