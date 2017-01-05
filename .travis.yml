@@ -13,7 +13,9 @@ before_script:
   pip install 'travis-cargo<0.2' --user &&
   export PATH=$HOME/.local/bin:$PATH
 - |
-  if [ $TRAVIS_OS_NAME -eq "linux" ] ; then
+  echo "$TRAVIS_OS_NAME"
+- |
+  if [ "$TRAVIS_OS_NAME" == "linux" ] ; then
     wget z3-4.5.0-x64-debian-8.5.zip &&
     unzip z3-4.5.0-x64-debian-8.5.zip &&
     mv z3-4.5.0-x64-debian-8.5/bin/z3 $HOME/.local/bin/.
