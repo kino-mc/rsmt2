@@ -1,5 +1,4 @@
-// Copyright 2015 Adrien Champion. See the COPYRIGHT file at the top-level
-// directory of this distribution.
+// See the LICENSE files at the top-level directory of this distribution.
 //
 // Licensed under the Apache License, Version 2.0 <LICENSE-APACHE or
 // http://www.apache.org/licenses/LICENSE-2.0> or the MIT license
@@ -14,99 +13,69 @@ use std::fmt ;
 
 use nom::IResult ;
 
-
-/// Alias for `io` results of unit.
-pub type IoResUnit = io::Result<()> ;
-/// Alias for `io` results of `bool`.
-pub type IoResBool = io::Result<bool> ;
-/// Alias for generic `io` results.
-pub type IoRes<T> = io::Result<T> ;
-
-
-
-/// Unexpected result for an SMT Lib 2 command.
-#[derive(Debug)]
-pub enum UnexSmtRes {
-  /// An unsupported command was issued.
-  Unsupported,
-  /// A command produced an error.
-  Error(String),
-  /// An input/output error occured.
-  IoError(io::Error),
-}
-impl fmt::Display for UnexSmtRes {
-  fn fmt(& self, fmt: & mut fmt::Formatter) -> fmt::Result {
-    match * self {
-      UnexSmtRes::Unsupported => write!(fmt, "unsupported"),
-      UnexSmtRes::Error(ref s) => write!(fmt, "{}", s),
-      UnexSmtRes::IoError(ref e) => write!(fmt, "io error: {}", e),
-    }
-  }
-}
-
-/// Result of an SMT query.
-pub type SmtRes<T> = Result<T, UnexSmtRes> ;
-
-/// Result of an SMT statement.
-pub type UnitSmtRes = SmtRes<()> ;
+use errors::* ;
 
 
 /// A symbol printable in the SMT Lib 2 standard given some info.
 pub trait Sym2Smt<Info> {
   /// Prints a symbol to a writer given some info.
-  fn sym_to_smt2(& self, writer: & mut io::Write, & Info) -> IoResUnit ;
+  fn sym_to_smt2(& self, writer: & mut io::Write, & Info) -> Res<()> ;
 }
 
 /// An expression printable in the SMT Lib 2 standard given some info.
 pub trait Expr2Smt<Info> {
   /// Prints an expression to a writer given some info.
-  fn expr_to_smt2(& self, writer: & mut io::Write, & Info) -> IoResUnit ;
+  fn expr_to_smt2(& self, writer: & mut io::Write, & Info) -> Res<()> ;
 }
 
 /// A sort printable in the SMT Lib 2 standard.
 pub trait Sort2Smt {
   /// Prints a sort to a writer info.
-  fn sort_to_smt2(& self, writer: & mut io::Write) -> IoResUnit ;
+  fn sort_to_smt2(& self, writer: & mut io::Write) -> Res<()> ;
+}
+
+/// Prints a string as a symbol.
+fn write(
+  s: & str, w: & mut io::Write, info_1: & str, info_2: & str
+) -> Res<()> {
+  write!(w, "{}", s).chain_err(
+    || ErrorKind::IoError(
+      format!("writing {} as {}", info_1, info_2)
+    )
+  )
 }
 
 impl<'a> Sym2Smt<()>  for & 'a str {
-  fn sym_to_smt2(& self, writer: & mut io::Write, _: & ()) -> IoResUnit {
-    write!(writer, "{}", self)
+  fn sym_to_smt2(& self, writer: & mut io::Write, _: & ()) -> Res<()> {
+    write(self, writer, "& str", "symbol")
   }
 }
 impl<'a> Expr2Smt<()> for & 'a str {
-  fn expr_to_smt2(& self, writer: & mut io::Write, info: & ()) -> IoResUnit {
-    self.sym_to_smt2(writer, info)
+  fn expr_to_smt2(& self, writer: & mut io::Write, _: & ()) -> Res<()> {
+    write(self, writer, "& str", "expression")
   }
 }
 impl<'a> Sort2Smt for & 'a str {
-  fn sort_to_smt2(& self, writer: & mut io::Write) -> IoResUnit {
-    self.sym_to_smt2(writer, & ())
+  fn sort_to_smt2(& self, writer: & mut io::Write) -> Res<()> {
+    write(self, writer, "& str", "sort")
   }
 }
 
 impl Sym2Smt<()>  for String {
-  fn sym_to_smt2(& self, writer: & mut io::Write, _: & ()) -> IoResUnit {
-    write!(writer, "{}", self)
+  fn sym_to_smt2(& self, writer: & mut io::Write, _: & ()) -> Res<()> {
+    write(self, writer, "String", "symbol")
   }
 }
 impl Expr2Smt<()> for String {
-  fn expr_to_smt2(& self, writer: & mut io::Write, info: & ()) -> IoResUnit {
-    self.sym_to_smt2(writer, info)
+  fn expr_to_smt2(& self, writer: & mut io::Write, _: & ()) -> Res<()> {
+    write(self, writer, "String", "expression")
   }
 }
 impl Sort2Smt for String {
-  fn sort_to_smt2(& self, writer: & mut io::Write) -> IoResUnit {
-    self.sym_to_smt2(writer, & ())
+  fn sort_to_smt2(& self, writer: & mut io::Write) -> Res<()> {
+    write(self, writer, "String", "sort")
   }
 }
-
-
-
-/** Generic type for the parsing of an SMT Lib 2 answer.
-
-Either a value of the expected type or an unexpected error. */
-pub type SmtParseResult<T> = Result<T, UnexSmtRes> ;
 
 
 
@@ -226,21 +195,29 @@ pub enum Logic {
   /// Linear real arithmetic.
   LRA,
 }
-
-impl Logic {
-  /// Prints the logic in a writer in SMT Lib 2 format.
-  pub fn to_smt2(& self, writer: & mut io::Write, _: ()) -> IoResUnit {
+impl fmt::Display for Logic {
+  fn fmt(& self, fmt: & mut fmt::Formatter) -> fmt::Result {
     use self::Logic::* ;
     match * self {
-      QF_UF => write!(writer, "QF_UF"),
-      QF_LIA => write!(writer, "QF_LIA"),
-      QF_NIA => write!(writer, "QF_NIA"),
-      QF_LRA => write!(writer, "QF_LRA"),
-      QF_AUFLIA => write!(writer, "QF_AUFLIA"),
-      AUFLIA => write!(writer, "AUFLIA"),
-      AUFLIRA => write!(writer, "AUFLIRA"),
-      AUFNIRA => write!(writer, "AUFNIRA"),
-      LRA => write!(writer, "LRA"),
+      QF_UF => write!(fmt, "QF_UF"),
+      QF_LIA => write!(fmt, "QF_LIA"),
+      QF_NIA => write!(fmt, "QF_NIA"),
+      QF_LRA => write!(fmt, "QF_LRA"),
+      QF_AUFLIA => write!(fmt, "QF_AUFLIA"),
+      AUFLIA => write!(fmt, "AUFLIA"),
+      AUFLIRA => write!(fmt, "AUFLIRA"),
+      AUFNIRA => write!(fmt, "AUFNIRA"),
+      LRA => write!(fmt, "LRA"),
     }
+  }
+}
+impl Logic {
+  /// Prints the logic in a writer in SMT Lib 2 format.
+  pub fn to_smt2(& self, writer: & mut io::Write, _: ()) -> Res<()> {
+    write!(writer, "{}", self).chain_err(
+      || ErrorKind::IoError(
+        format!("could not write logic '{}'", self)
+      )
+    )
   }
 }

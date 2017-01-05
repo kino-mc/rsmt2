@@ -1,18 +1,22 @@
-# rsmt2 #
+# `rsmt2`
+
+[![Build Status](https://travis-ci.org/kino-mc/rsmt2.svg?branch=master)](https://travis-ci.org/kino-mc/rsmt2) [![Latest Version](https://img.shields.io/crates/v/rsmt2.svg)](https://crates.io/crates/rsmt2)
+
+`dev`: [![Build Status](https://travis-ci.org/kino-mc/rsmt2.svg?branch=dev)](https://travis-ci.org/kino-mc/rsmt2)
 
 A generic library to interact with SMT-LIB 2 compliant solvers running in a separate system process, such as Z3 and CVC4.
 
-* [documentation][doc]
+[Crate.io documentation.][doc]
 
+
+
+# Known projects using `rsmt2`
+
+- [kinō][kino], a model-checker for transition systems.
 
 # License
 
-Copyright 2016 Adrien Champion. See the COPYRIGHT file at the top-level
-directory of this distribution.
+MIT/Apache-2.0
 
-Licensed under the Apache License, Version 2.0 <LICENSE-APACHE or
-http://www.apache.org/licenses/LICENSE-2.0> or the MIT license <LICENSE-MIT or
-http://opensource.org/licenses/MIT>, at your option.
-
-
-[doc]: http://adrienchampion.bitbucket.org/rsmt2/rsmt2/ (Documentation)
+[doc]: https://docs.rs/rsmt2 (Documentation)
+[kino]: https://github.com/kino-mc/kino (kino)

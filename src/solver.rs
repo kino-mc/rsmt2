@@ -1,5 +1,4 @@
-// Copyright 2015 Adrien Champion. See the COPYRIGHT file at the top-level
-// directory of this distribution.
+// See the LICENSE files at the top-level directory of this distribution.
 //
 // Licensed under the Apache License, Version 2.0 <LICENSE-APACHE or
 // http://www.apache.org/licenses/LICENSE-2.0> or the MIT license
@@ -7,13 +6,10 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-/*!
-Wrapper around an SMT Lib 2 compliant solver.
-
-The underlying solver runs in a separate process, communication uses system
-pipes.
-*/
-
+//! Wrapper around an SMT Lib 2 compliant solver.
+//!
+//! The underlying solver runs in a separate process, communication uses system
+//! pipes.
 
 use std::fs::File ;
 use std::process::{
@@ -23,11 +19,12 @@ use std::io::{ Write, BufWriter, BufReader } ;
 
 use nom::multispace ;
 
+use errors::* ;
+
 use common::* ;
-use common::UnexSmtRes::* ;
 use conf::SolverConf ;
 use parse::{
-  SuccessRes, success, check_sat, unexpected, open_paren, close_paren
+  success, check_sat, unexpected, open_paren, close_paren
 } ;
 
 
@@ -35,33 +32,30 @@ macro_rules! wrap {
   ($e:expr) => (
     {
       use nom::IResult::* ;
-      use nom::Err ;
       use std::str::from_utf8 ;
       match $e {
-        Done(rest, res) => (
-          from_utf8(rest).unwrap().to_string(), res
-        ),
-        Error(
-          Err::Position(_, bytes)
-        ) => (
-          String::new(), Err(
-            UnexSmtRes::Error(
-              format!("error at\n{}", from_utf8(bytes).unwrap())
+        Done(rest, res) => match from_utf8(rest) {
+          Ok(s) => (s.to_string(), res),
+          Err(e) => (
+            String::new(), Err(e).chain_err(
+              || ErrorKind::IoError(
+                "could not convert remaining bytes to utf8".into()
+              )
             )
-          )
-        ),
+          ),
+        },
         Error(e) => (
           String::new(), Err(
-            UnexSmtRes::Error(
-              format!("{:?}", e)
-            )
+            ErrorKind::ParseError(
+              ::nom::IError::Error(e)
+            ).into()
           )
         ),
         Incomplete(e) => (
           String::new(), Err(
-            UnexSmtRes::Error(
-              format!("{:?}", e)
-            )
+            ErrorKind::ParseError(
+              ::nom::IError::Incomplete(e)
+            ).into()
           )
         ),
       }
@@ -91,31 +85,50 @@ macro_rules! parse_success {
   ) ;
 }
 
+/// Wraps errors (if any) into `IoError`s and early-returns.
+#[macro_export]
 macro_rules! smtry_io {
-  ($e:expr) => (
+  ($info:expr => $e:expr $(;)*) => (
     match $e {
       Ok(something) => something,
-      Err(e) => return Err( UnexSmtRes::IoError(e) ),
+      e => return e.chain_err(
+        || ErrorKind::IoError(
+          format!("while {}", $info)
+        )
+      ),
     }
   ) ;
-  ($e:expr ; $( $tail:expr );+) => (
+  ( $info:expr => $e:expr ; $($tail:tt)+ ) => (
     match $e {
-      Ok(()) => smtry_io!( $( $tail );+ ),
-      Err(e) => return Err( UnexSmtRes::IoError(e) ),
+      Ok(()) => smtry_io!( $info => $( $tail )+ ),
+      e => return e.chain_err(
+        || ErrorKind::IoError(
+          format!("while {}", $info)
+        )
+      ),
     }
   ) ;
 }
+
+/// Wraps errors (if any) into `IoError`s and (**not-early-**)returns the
+/// first error, if any.
+#[macro_export]
 macro_rules! smt_cast_io {
-  ($e:expr) => (
-    match $e {
-      Ok(something) => Ok(something),
-      Err(e) => Err( UnexSmtRes::IoError(e) ),
-    }
+  ($info:expr => $e:expr $(;)*) => (
+    $e.chain_err(
+      || ErrorKind::IoError(
+        format!("while {}", $info)
+      )
+    )
   ) ;
-  ($e:expr ; $( $tail:expr );+) => (
+  ( $info:expr => $e:expr ; $( $tail:tt )+ ) => (
     match $e {
-      Ok(()) => smt_cast_io!( $( $tail );+ ),
-      Err(e) => Err( UnexSmtRes::IoError(e) ),
+      Ok(()) => smt_cast_io!( $info => $( $tail )* ),
+      err => err.chain_err(
+        || ErrorKind::IoError(
+          format!("while {}", $info)
+        )
+      )
     }
   ) ;
 }
@@ -131,10 +144,13 @@ macro_rules! fetch {
     loop {
       use std::io::BufRead ;
       let len = $slf.buff.len() ;
-      match buff.read_line(& mut $slf.buff) {
-        Ok(_) => (),
-        Err(e) => return Err( IoError(e) ),
-      } ;
+      try!(
+        smt_cast_io!(
+          "reading solver's output" => buff.read_line(
+            & mut $slf.buff
+          )
+        )
+      ) ;
       let mut cmt = false ;
       if len + 1 < $slf.buff.len() {
         $start ;
@@ -171,9 +187,9 @@ pub struct Kid {
 }
 impl Kid {
   /// Creates a new solver kid.
-  pub fn mk(conf: SolverConf) -> SmtRes<Self> {
+  pub fn mk(conf: SolverConf) -> Res<Self> {
     // Constructing command and spawning kid.
-    match Command::new(
+    Command::new(
       // Command.
       conf.get_cmd()
     ).args(
@@ -185,22 +201,24 @@ impl Kid {
       Stdio::piped()
     ).stderr(
       Stdio::piped()
-    ).spawn() {
-      Ok(kid) => Ok(
-        Kid {
-          kid: kid,
-          conf: conf,
-        }
-      ),
-      Err(e) => Err( IoError(e) ),
-    }
+    ).spawn().map(
+      |kid| Kid {
+        kid: kid,
+        conf: conf,
+      }
+    ).chain_err(
+      || ErrorKind::IoError(
+        "while spawning child process".into()
+      )
+    )
   }
   /// Kills the solver kid.
-  pub fn kill(mut self) -> UnitSmtRes {
-    match self.kid.kill() {
-      Ok(()) => Ok(()),
-      Err(e) => Err( IoError(e) ),
-    }
+  pub fn kill(mut self) -> Res<()> {
+    self.kid.kill().chain_err(
+      || ErrorKind::IoError(
+        "while killing child process".into()
+      )
+    )
   }
 }
 
@@ -229,17 +247,17 @@ pub struct PlainSolver<'kid, Parser: ParseSmt2 + 'static> {
 }
 impl<'kid, Parser: ParseSmt2 + 'static> PlainSolver<'kid, Parser> {
   /// Creates a plain solver.
-  pub fn mk(kid: & 'kid mut Kid, parser: Parser) -> SmtRes<Self> {
+  pub fn mk(kid: & 'kid mut Kid, parser: Parser) -> Res<Self> {
     let stdin = match kid.kid.stdin.as_mut() {
       Some(stdin) => BufWriter::with_capacity(1000, stdin),
-      None => return Err(
-        Error("could not access stdin of solver kid".to_string())
+      None => bail!(
+        ErrorKind::IoError("could not access stdin of solver kid".into())
       ),
     } ;
     let stdout = match kid.kid.stdout.as_mut() {
       Some(stdout) => BufReader::with_capacity(1000, stdout),
-      None => return Err(
-        Error("could not access stdout of solver kid".to_string())
+      None => bail!(
+        ErrorKind::IoError("could not access stdout of solver kid".into())
       ),
     } ;
     // let stderr = match kid.kid.stderr.as_mut() {
@@ -259,10 +277,7 @@ impl<'kid, Parser: ParseSmt2 + 'static> PlainSolver<'kid, Parser> {
     } ;
     if solver.conf.get_parse_success() {
       // Function `print_success` parses its own success.
-      match solver.print_success() {
-        Ok(()) => (),
-        Err(e) => return Err(e),
-      }
+      try!( solver.print_success() )
     } ;
     Ok(solver)
   }
@@ -283,17 +298,19 @@ impl<'kid, Parser: ParseSmt2 + 'static> PlainSolver<'kid, Parser> {
 impl<
   'kid, Parser: ParseSmt2 + 'static
 > SolverBasic<'kid, Parser> for PlainSolver<'kid, Parser> {
-  fn fetch(& mut self) -> UnitSmtRes {
+  fn fetch(& mut self) -> Res<()> {
     fetch!(self)
   }
   fn write<
-    F: Fn(& mut Write) -> UnitSmtRes
-  >(& mut self, f: F) -> UnitSmtRes {
+    F: Fn(& mut Write) -> Res<()>
+  >(& mut self, f: F) -> Res<()> {
     try!( f(& mut self.stdin) ) ;
-    smtry_io!( self.stdin.flush() ) ;
+    smtry_io!(
+      "flushing solver's stdin" => self.stdin.flush()
+    ) ;
     Ok(())
   }
-  fn comment(& mut self, _: & str) -> UnitSmtRes {
+  fn comment(& mut self, _: & str) -> Res<()> {
     Ok(())
   }
   fn parser(& self) -> & Parser {
@@ -361,27 +378,39 @@ impl<'kid, Parser: ParseSmt2 + 'static> TeeSolver<'kid, Parser> {
 impl<
   'kid, Parser: ParseSmt2 + 'static
 > SolverBasic<'kid, Parser> for TeeSolver<'kid, Parser> {
-  fn fetch(& mut self) -> UnitSmtRes {
+  fn fetch(& mut self) -> Res<()> {
     fetch!(
       self.solver,
-      smtry_io!( write!(self.file, ";; ") ),
-      c => smtry_io!( write!( self.file, "{}", c) )
+      smtry_io!(
+        "writing comment header to tee file" => write!(self.file, ";; ")
+      ),
+      c => smtry_io!(
+        "writing fetched data to tee file" => write!( self.file, "{}", c)
+      )
     )
   }
   /// Applies a function to the writer on the solver's stdin.
   fn write<
-    F: Fn(& mut Write) -> UnitSmtRes
-  >(& mut self, f: F) -> UnitSmtRes {
+    F: Fn(& mut Write) -> Res<()>
+  >(& mut self, f: F) -> Res<()> {
     try!( f(& mut self.solver.stdin) ) ;
-    smtry_io!( self.solver.stdin.flush() ) ;
-    smtry_io!( write!(self.file, "\n") ) ;
+    smtry_io!(
+      "flushing (tee) solver's stdin" => self.solver.stdin.flush()
+    ) ;
+    smtry_io!(
+      "writing newline to tee file" => write!(self.file, "\n")
+    ) ;
     try!( f(& mut self.file) ) ;
-    smtry_io!( self.file.flush() ) ;
+    smtry_io!(
+      "flushing tee file" => self.file.flush()
+    ) ;
     Ok(())
   }
-  fn comment(& mut self, txt: & str) -> UnitSmtRes {
+  fn comment(& mut self, txt: & str) -> Res<()> {
     for line in txt.lines() {
-      smtry_io!( write!(self.file, ";; {}", line) )
+      smtry_io!(
+        "writing comment to tee file" => write!(self.file, ";; {}", line)
+      )
     } ;
     Ok(())
   }
@@ -442,13 +471,13 @@ impl<
 /// Most basic function needed to provide SMT-LIB commands.
 pub trait SolverBasic<'kid, Parser: ParseSmt2 + 'static> {
   /// Fetches data.
-  fn fetch(& mut self) -> UnitSmtRes ;
+  fn fetch(& mut self) -> Res<()> ;
   /// Applies a function to the writer on the solver's stdin.
   fn write<
-    F: Fn(& mut Write) -> UnitSmtRes
-  >(& mut self, f: F) -> UnitSmtRes ;
+    F: Fn(& mut Write) -> Res<()>
+  >(& mut self, f: F) -> Res<()> ;
   /// Writes comments. Ignored for `PlainSolver`.
-  fn comment(& mut self, txt: & str) -> UnitSmtRes ;
+  fn comment(& mut self, txt: & str) -> Res<()> ;
   /// The bytes of the buffer.
   fn as_ref(& self) -> & [u8] ;
   /// The parser.
@@ -476,8 +505,8 @@ pub trait SolverPrims<
   /// Fetchs data, applies a parser (passes the internal parser) and returns
   /// its result.
   fn parse<
-    Out, F: Fn(& [u8], & Parser) -> (String, SmtRes<Out>)
-  >(& mut self, parser: F) -> SmtRes<Out> {
+    Out, F: Fn(& [u8], & Parser) -> (String, Res<Out>)
+  >(& mut self, parser: F) -> Res<Out> {
     try!( self.fetch() ) ;
     let (rest, res) = parser( self.as_ref(), self.parser() ) ;
     let solver = self.solver() ;
@@ -496,7 +525,7 @@ pub trait SolverPrims<
 /// Creates a solver from a kid.
 pub fn solver<'kid, Parser: ParseSmt2 + 'static>(
   kid: & 'kid mut Kid, parser: Parser
-) -> SmtRes< PlainSolver<'kid, Parser> > {
+) -> Res< PlainSolver<'kid, Parser> > {
   PlainSolver::mk(kid, parser)
 }
 
@@ -518,11 +547,13 @@ SolverPrims<'kid, Parser> {
   #[inline(always)]
   fn reset(
     & mut self
-  ) -> UnitSmtRes {
+  ) -> Res<()> {
     parse_success!(
       self for {
         self.write(
-          |w| smt_cast_io!( write!(w, "(reset)\n") )
+          |w| smt_cast_io!(
+            "writing reset command" => write!(w, "(reset)\n")
+          )
         )
       }
     )
@@ -534,14 +565,15 @@ SolverPrims<'kid, Parser> {
   #[inline]
   fn set_logic(
     & mut self, logic: & Logic
-  ) -> UnitSmtRes {
+  ) -> Res<()> {
     parse_success!(
       self for {
         self.write(
           |w| smt_cast_io!(
-            write!(w, "(set-logic ") ;
-            logic.to_smt2(w, ()) ;
-            write!(w, ")\n")
+            "writing set logic command" =>
+              write!(w, "(set-logic ") ;
+              logic.to_smt2(w, ()) ;
+              write!(w, ")\n")
           )
         )
       }
@@ -551,18 +583,14 @@ SolverPrims<'kid, Parser> {
   #[inline]
   fn set_option<Value: ::std::fmt::Display>(
     & mut self, option: & str, value: Value
-  ) -> UnitSmtRes {
+  ) -> Res<()> {
     match option {
       ":interactive_mode" => return Err(
-        Error(
-          "illegal set-option on interactive mode".to_string()
-        )
+        "illegal set-option on interactive mode".into()
       ),
       ":print_success" => return Err(
-        Error(
-          "illegal set-option on print success, \
-          use `SmtConf` to activate it".to_string()
-        )
+        "illegal set-option on print success, \
+        use `SmtConf` to activate it".into()
       ),
       _ => (),
     } ;
@@ -570,7 +598,11 @@ SolverPrims<'kid, Parser> {
       self for {
         self.write(
           |w| smt_cast_io!(
-            write!(w, "(set-option {} {})\n", option, value)
+            format!(
+              "writing set option command ({}: {})", option, value
+            ) => write!(
+              w, "(set-option {} {})\n", option, value
+            )
           )
         )
       }
@@ -578,12 +610,13 @@ SolverPrims<'kid, Parser> {
   }
   /** Activates interactive mode. */
   #[inline(always)]
-  fn interactive_mode(& mut self) -> UnitSmtRes {
+  fn interactive_mode(& mut self) -> Res<()> {
     parse_success!(
       self for {
         self.write(
           |w| smt_cast_io!(
-            write!(w, "(set-option :interactive-mode true)\n")
+            "writing set option command on interactive mode (true)" =>
+              write!(w, "(set-option :interactive-mode true)\n")
           )
         )
       }
@@ -591,12 +624,14 @@ SolverPrims<'kid, Parser> {
   }
   /** Activates print success. */
   #[inline(always)]
-  fn print_success(& mut self) -> UnitSmtRes {
+  fn print_success(& mut self) -> Res<()> {
     parse_success!(
       self for {
         self.write(
           |w| smt_cast_io!(
-            write!(w, "(set-option :print-success true)\n")
+            "writing set option command on print success (true)" => write!(
+              w, "(set-option :print-success true)\n"
+            )
           )
         )
       }
@@ -604,12 +639,13 @@ SolverPrims<'kid, Parser> {
   }
   /** Activates unsat core production. */
   #[inline(always)]
-  fn produce_unsat_core(& mut self) -> UnitSmtRes {
+  fn produce_unsat_core(& mut self) -> Res<()> {
     parse_success!(
       self for {
         self.write(
           |w| smt_cast_io!(
-            write!(w, "(set-option :produce-unsat-cores true)\n")
+            "writing set option command on produce unsat cores (true)" =>
+              write!(w, "(set-option :produce-unsat-cores true)\n")
           )
         )
       }
@@ -617,12 +653,12 @@ SolverPrims<'kid, Parser> {
   }
   /** Shuts the solver down. */
   #[inline(always)]
-  fn exit(& mut self) -> UnitSmtRes {
+  fn exit(& mut self) -> Res<()> {
     parse_success!(
       self for {
         self.write(
           |w| smt_cast_io!(
-            write!(w, "(exit)\n")
+            "writing exit command" => write!(w, "(exit)\n")
           )
         )
       }
@@ -634,12 +670,14 @@ SolverPrims<'kid, Parser> {
 
   /** Pushes `n` layers on the assertion stack. */
   #[inline(always)]
-  fn push(& mut self, n: & u8) -> UnitSmtRes {
+  fn push(& mut self, n: & u8) -> Res<()> {
     parse_success!(
       self for {
         self.write(
           |w| smt_cast_io!(
-            write!(w, "(push {})\n", n)
+            format!("writing push ({}) command", n) => write!(
+              w, "(push {})\n", n
+            )
           )
         )
       }
@@ -647,12 +685,14 @@ SolverPrims<'kid, Parser> {
   }
   /** Pops `n` layers off the assertion stack. */
   #[inline(always)]
-  fn pop(& mut self, n: & u8) -> UnitSmtRes {
+  fn pop(& mut self, n: & u8) -> Res<()> {
     parse_success!(
       self for {
         self.write(
           |w| smt_cast_io!(
-            write!(w, "(pop {})\n", n)
+            format!("writing pop ({}) command", n) => write!(
+              w, "(pop {})\n", n
+            )
           )
         )
       }
@@ -660,12 +700,14 @@ SolverPrims<'kid, Parser> {
   }
   /** Resets the assertions in the solver. */
   #[inline(always)]
-  fn reset_assertions(& mut self) -> UnitSmtRes {
+  fn reset_assertions(& mut self) -> Res<()> {
     parse_success!(
       self for {
         self.write(
           |w| smt_cast_io!(
-            write!(w, "(reset-assertions)\n")
+            format!("writing reset assertions command") => write!(
+              w, "(reset-assertions)\n"
+            )
           )
         )
       }
@@ -679,14 +721,15 @@ SolverPrims<'kid, Parser> {
   #[inline]
   fn declare_sort<Sort: Sort2Smt>(
     & mut self, sort: & Sort, arity: & u8
-  ) -> UnitSmtRes {
+  ) -> Res<()> {
     parse_success!(
       self for {
         self.write(
           |w| smt_cast_io!(
-            write!(w, "(declare-sort ") ;
-            sort.sort_to_smt2(w) ;
-            write!(w, " {})\n", arity)
+            "writing declare sort command" =>
+              write!(w, "(declare-sort ") ;
+              sort.sort_to_smt2(w) ;
+              write!(w, " {})\n", arity)
           )
         )
       }
@@ -698,23 +741,24 @@ SolverPrims<'kid, Parser> {
     Sort: Sort2Smt, I, Expr1: Expr2Smt<I>, Expr2: Expr2Smt<I>
   >(
     & mut self, sort: & Sort, args: & [ Expr1 ], body: & Expr2, info: & I
-  ) -> UnitSmtRes {
+  ) -> Res<()> {
+    let err_info = "writing define sort command" ;
     parse_success!(
       self for {
         self.write(
           |w| {
-            smtry_io!(
+            smtry_io!( err_info =>
               write!(w, "( define-sort ") ;
               sort.sort_to_smt2(w) ;
               write!(w, "\n   ( ")
             ) ;
             for arg in args {
-              smtry_io!(
+              smtry_io!( err_info =>
                 arg.expr_to_smt2(w, info) ;
                 write!(w, " ")
               ) ;
             } ;
-            smt_cast_io!(
+            smt_cast_io!( err_info =>
               write!(w, ")\n   ") ;
               body.expr_to_smt2(w, info) ;
               write!(w, "\n)\n")
@@ -728,23 +772,24 @@ SolverPrims<'kid, Parser> {
   #[inline]
   fn declare_fun<Sort: Sort2Smt, I, Sym: Sym2Smt<I>> (
     & mut self, symbol: & Sym, args: & [ Sort ], out: & Sort, info: & I
-  ) -> UnitSmtRes {
+  ) -> Res<()> {
+    let err_info = "writing declare fun command" ;
     parse_success!(
       self for {
         self.write(
           |w| {
-            smtry_io!(
+            smtry_io!( err_info =>
               write!(w, "(declare-fun ") ;
               symbol.sym_to_smt2(w, info) ;
               write!(w, " ( ")
             ) ;
             for arg in args {
-              smtry_io!(
+              smtry_io!( err_info =>
                 arg.sort_to_smt2(w) ;
                 write!(w, " ")
               ) ;
             } ;
-            smt_cast_io!(
+            smt_cast_io!( err_info =>
               write!(w, ") ") ;
               out.sort_to_smt2(w) ;
               write!(w, ")\n")
@@ -758,16 +803,17 @@ SolverPrims<'kid, Parser> {
   #[inline]
   fn declare_const<Sort: Sort2Smt, I, Sym: Sym2Smt<I>> (
     & mut self, symbol: & Sym, out_sort: & Sort, info: & I
-  ) -> UnitSmtRes {
+  ) -> Res<()> {
     parse_success!(
       self for {
         self.write(
           |w| smt_cast_io!(
-            write!(w, "(declare-const ") ;
-            symbol.sym_to_smt2(w, info) ;
-            write!(w, " ") ;
-            out_sort.sort_to_smt2(w) ;
-            write!(w, ")\n")
+            "writing declare const command" =>
+              write!(w, "(declare-const ") ;
+              symbol.sym_to_smt2(w, info) ;
+              write!(w, " ") ;
+              out_sort.sort_to_smt2(w) ;
+              write!(w, ")\n")
           )
         )
       }
@@ -780,19 +826,20 @@ SolverPrims<'kid, Parser> {
   >(
     & mut self, symbol: & Sym1, args: & [ (Sym2, Sort) ],
     out: & Sort, body: & Expr, info: & I
-  ) -> UnitSmtRes {
+  ) -> Res<()> {
+    let err_info = "writing define fun command" ;
     parse_success!(
       self for {
         self.write(
           |w| {
-            smtry_io!(
+            smtry_io!( err_info =>
               write!(w, "(define-fun ") ;
               symbol.sym_to_smt2(w, info) ;
               write!(w, " ( ")
             ) ;
             for arg in args {
               let (ref sym, ref sort) = * arg ;
-              smtry_io!(
+              smtry_io!( err_info =>
                 write!(w, "(") ;
                 sym.sym_to_smt2(w, info) ;
                 write!(w, " ") ;
@@ -800,7 +847,7 @@ SolverPrims<'kid, Parser> {
                 write!(w, ") ")
               )
             } ;
-            smt_cast_io!(
+            smt_cast_io!( err_info =>
               write!(w, ") ") ;
               out.sort_to_smt2(w) ;
               write!(w, "\n   ") ;
@@ -818,25 +865,26 @@ SolverPrims<'kid, Parser> {
     I, Sort: Sort2Smt, Sym: Sym2Smt<I>, Expr: Expr2Smt<I>
   >(
     & mut self, funs: & [ (Sym, & [ (Sym, Sort) ], Sort, Expr) ], info: & I
-  ) -> UnitSmtRes {
+  ) -> Res<()> {
+    let err_info = "writing define funs rec command" ;
     parse_success!(
       self for {
         self.write(
           |w| {
             // Header.
-            smtry_io!( write!(w, "(define-funs-rec (\n") ) ;
+            smtry_io!( err_info => write!(w, "(define-funs-rec (\n") ) ;
 
             // Signatures.
             for fun in funs {
               let (ref sym, ref args, ref out, _) = * fun ;
-              smtry_io!(
+              smtry_io!( err_info =>
                 write!(w, "   (");
                 sym.sym_to_smt2(w, info) ;
                 write!(w, " ( ")
               ) ;
               for arg in * args {
                 let (ref sym, ref sort) = * arg ;
-                smtry_io!(
+                smtry_io!( err_info =>
                   write!(w, "(") ;
                   sym.sym_to_smt2(w, info) ;
                   write!(w, " ") ;
@@ -844,23 +892,23 @@ SolverPrims<'kid, Parser> {
                   write!(w, ") ")
                 )
               } ;
-              smtry_io!(
+              smtry_io!( err_info =>
                 write!(w, ") ") ;
                 out.sort_to_smt2(w) ;
                 write!(w, ")\n")
               )
             } ;
-            smtry_io!( write!(w, " ) (") ) ;
+            smtry_io!( err_info => write!(w, " ) (") ) ;
 
             // Bodies
             for fun in funs {
               let (_, _, _, ref body) = * fun ;
-              smtry_io!(
+              smtry_io!( err_info =>
                 write!(w, "\n   ") ;
                 body.expr_to_smt2(w, info)
               )
             } ;
-            smt_cast_io!( write!(w, "\n )\n)\n") )
+            smt_cast_io!( err_info => write!(w, "\n )\n)\n") )
           }
         )
       }
@@ -873,23 +921,24 @@ SolverPrims<'kid, Parser> {
   >(
     & mut self,  symbol: & Sym, args: & [ (Sym, Sort) ],
     out: & Sort, body: & Expr, info: & I
-  ) -> UnitSmtRes {
+  ) -> Res<()> {
+    let err_info = "writing define fun rec command" ;
     parse_success!(
       self for {
         self.write(
           |w| {
             // Header.
-            smtry_io!( write!(w, "(define-fun-rec (\n") ) ;
+            smtry_io!( err_info => write!(w, "(define-fun-rec (\n") ) ;
 
             // Signature.
-            smtry_io!(
+            smtry_io!( err_info =>
               write!(w, "   (") ;
               symbol.sym_to_smt2(w, info) ;
               write!(w, " ( ")
             ) ;
             for arg in args {
               let (ref sym, ref sort) = * arg ;
-              smtry_io!(
+              smtry_io!( err_info =>
                 write!(w, "(") ;
                 sym.sym_to_smt2(w, info) ;
                 write!(w, " ") ;
@@ -897,7 +946,7 @@ SolverPrims<'kid, Parser> {
                 write!(w, ") ")
               )
             } ;
-            smtry_io!(
+            smtry_io!( err_info =>
               write!(w, ") ") ;
               out.sort_to_smt2(w) ;
               write!(w, ")\n") ;
@@ -905,7 +954,7 @@ SolverPrims<'kid, Parser> {
             ) ;
 
             // Body.
-            smt_cast_io!(
+            smt_cast_io!( err_info =>
               write!(w, "\n   ") ;
               body.expr_to_smt2(w, info) ;
               write!(w, "\n )\n)\n")
@@ -923,14 +972,15 @@ SolverPrims<'kid, Parser> {
   #[inline]
   fn assert<I, Expr: Expr2Smt<I>>(
     & mut self, expr: & Expr, info: & I
-  ) -> UnitSmtRes {
+  ) -> Res<()> {
     parse_success!(
       self for {
         self.write(
           |w| smt_cast_io!(
-            write!(w, "(assert\n  ") ;
-            expr.expr_to_smt2(w, info) ;
-            write!(w, "\n)\n")
+            "writing assert command" =>
+              write!(w, "(assert\n  ") ;
+              expr.expr_to_smt2(w, info) ;
+              write!(w, "\n)\n")
           )
         )
       }
@@ -941,16 +991,20 @@ SolverPrims<'kid, Parser> {
 
   /** Get info command. */
   #[inline(always)]
-  fn get_info(& mut self, flag: & str) -> UnitSmtRes {
+  fn get_info(& mut self, flag: & str) -> Res<()> {
     self.write(
-      |w| smt_cast_io!( write!(w, "(get-info {})\n", flag) )
+      |w| smt_cast_io!(
+        "writing get info command" => write!(w, "(get-info {})\n", flag)
+      )
     )
   }
   /** Get option command. */
   #[inline(always)]
-  fn get_option(& mut self, option: & str) -> UnitSmtRes {
+  fn get_option(& mut self, option: & str) -> Res<()> {
     self.write(
-      |w| smt_cast_io!( write!(w, "(get-option {})\n", option) )
+      |w| smt_cast_io!(
+        format!("writing get option command ({})", option) =>
+          write!(w, "(get-option {})\n", option) )
     )
   }
 
@@ -958,16 +1012,21 @@ SolverPrims<'kid, Parser> {
 
   /** Set info command. */
   #[inline(always)]
-  fn set_info(& mut self, attribute: & str) -> UnitSmtRes {
+  fn set_info(& mut self, attribute: & str) -> Res<()> {
     self.write(
-      |w| smt_cast_io!( write!(w, "(set-info {})\n", attribute) )
+      |w| smt_cast_io!(
+        format!("writing set option command ({})", attribute) =>
+          write!(w, "(set-info {})\n", attribute) )
     )
   }
   /** Echo command. */
   #[inline(always)]
-  fn echo(& mut self, text: & str) -> UnitSmtRes {
+  fn echo(& mut self, text: & str) -> Res<()> {
     self.write(
-      |w| smt_cast_io!( write!(w, "(echo \"{}\")\n", text) )
+      |w| smt_cast_io!(
+        format!("writing echo command ({})", text) =>
+        write!(w, "(echo \"{}\")\n", text)
+      )
     )
   }
 
@@ -976,7 +1035,7 @@ SolverPrims<'kid, Parser> {
 
   /** Parse success. */
   #[inline]
-  fn parse_success(& mut self) -> SuccessRes {
+  fn parse_success(& mut self) -> Res<()> {
     self.parse( |bytes, _| wrap!( success(bytes) ) )
   }
 }
@@ -1007,20 +1066,22 @@ pub trait Query<
 
   /** Check-sat command. */
   #[inline(always)]
-  fn print_check_sat(& mut self) -> UnitSmtRes {
+  fn print_check_sat(& mut self) -> Res<()> {
     self.write(
-      |w| smt_cast_io!( write!(w, "(check-sat)\n") )
+      |w| smt_cast_io!(
+        "writing check sat query" => write!(w, "(check-sat)\n")
+      )
     )
   }
 
   /** Parse the result of a check-sat. */
   #[inline(always)]
-  fn parse_check_sat(& mut self) -> SmtRes<bool> {
+  fn parse_check_sat(& mut self) -> Res<bool> {
     self.parse( |bytes, _| wrap!( check_sat(bytes) ) )
   }
 
   /** Check-sat command. */
-  fn check_sat(& mut self) -> SmtRes<bool> {
+  fn check_sat(& mut self) -> Res<bool> {
     try_cast!(
       self.print_check_sat()
     ) ;
@@ -1029,22 +1090,24 @@ pub trait Query<
 
   /** Get-model command. */
   #[inline(always)]
-  fn print_get_model(& mut self) -> UnitSmtRes {
+  fn print_get_model(& mut self) -> Res<()> {
     self.write(
-      |w| smt_cast_io!( write!(w, "(get-model)\n") )
+      |w| smt_cast_io!(
+        "writing get model query" => write!(w, "(get-model)\n")
+      )
     )
   }
 
   /** Parse the result of a get-model. */
   fn parse_get_model<'a>(
     & 'a mut self
-  ) -> SmtRes<Vec<(Parser::Ident, Parser::Value)>>
+  ) -> Res<Vec<(Parser::Ident, Parser::Value)>>
   where Parser: 'a {
     self.parse(
       |bytes, parser| wrap!(
         alt!(
           bytes,
-          map!( unexpected, |e| Err(e) ) |
+          unexpected |
           chain!(
             open_paren ~
             opt!(multispace) ~
@@ -1078,7 +1141,7 @@ pub trait Query<
   }
 
   /** Get-model command. */
-  fn get_model(& mut self) -> SmtRes<Vec<(Parser::Ident, Parser::Value)>> {
+  fn get_model(& mut self) -> Res<Vec<(Parser::Ident, Parser::Value)>> {
     try_cast!(
       self.print_get_model()
     ) ;
@@ -1088,14 +1151,14 @@ pub trait Query<
   /** Parse the result of a get-values. */
   fn parse_get_values(
     & mut self, info: & Parser::I
-  ) -> SmtRes<Vec<(Parser::Expr, Parser::Value)>> {
+  ) -> Res<Vec<(Parser::Expr, Parser::Value)>> {
     self.parse(
       |bytes, parser| wrap!(
         call!(
           bytes,
           closure!(
             alt!(
-              map!( unexpected, |e| Err(e) ) |
+              unexpected |
               chain!(
                 open_paren ~
                 vec: many0!(
@@ -1120,33 +1183,46 @@ pub trait Query<
   }
 
   /** Get-assertions command. */
-  fn print_get_assertions(& mut self) -> UnitSmtRes {
+  fn print_get_assertions(& mut self) -> Res<()> {
     self.write(
-      |w| smt_cast_io!( write!(w, "(get-assertions)\n") )
+      |w| smt_cast_io!(
+        "writing get assertions query" => write!(w, "(get-assertions)\n")
+      )
     )
   }
   /** Get-assignment command. */
-  fn print_get_assignment(& mut self) -> UnitSmtRes {
+  fn print_get_assignment(& mut self) -> Res<()> {
     self.write(
-      |w| smt_cast_io!( write!(w, "(get-assignment)\n") )
+      |w| smt_cast_io!(
+        "writing get assignment query" => write!(w, "(get-assignment)\n")
+      )
     )
   }
   /** Get-unsat-assumptions command. */
-  fn print_get_unsat_assumptions(& mut self) -> UnitSmtRes {
+  fn print_get_unsat_assumptions(& mut self) -> Res<()> {
     self.write(
-      |w| smt_cast_io!( write!(w, "(get-unsat-assumptions)\n") )
+      |w| smt_cast_io!(
+        "writing get unsat assumptions query" =>
+          write!(w, "(get-unsat-assumptions)\n")
+      )
     )
   }
   /** Get-proop command. */
-  fn print_get_proof(& mut self) -> UnitSmtRes {
+  fn print_get_proof(& mut self) -> Res<()> {
     self.write(
-      |w| smt_cast_io!( write!(w, "(get-proof)\n") )
+      |w| smt_cast_io!(
+        "writing get proof query" =>
+          write!(w, "(get-proof)\n")
+      )
     )
   }
   /** Get-unsat-core command. */
-  fn print_get_unsat_core(& mut self) -> UnitSmtRes {
+  fn print_get_unsat_core(& mut self) -> Res<()> {
     self.write(
-      |w| smt_cast_io!( write!(w, "(get-unsat-core)\n") )
+      |w| smt_cast_io!(
+        "writing get unsat core query" =>
+          write!(w, "(get-unsat-core)\n")
+      )
     )
   }
 }
@@ -1158,29 +1234,28 @@ pub trait QueryIdent<
   /** Check-sat with assumptions command. */
   fn print_check_sat_assuming(
     & mut self, bool_vars: & [ Ident ], info: & Info
-  ) -> UnitSmtRes {
+  ) -> Res<()> {
+    let err_info = "writing check sat assuming query" ;
     match * self.solver().conf.get_check_sat_assuming() {
       Some(ref cmd) => {
         self.write(
           |w| {
-            smtry_io!( write!(w, "({}\n ", cmd) ) ;
+            smtry_io!( err_info => write!(w, "({}\n ", cmd) ) ;
             for sym in bool_vars {
-              smtry_io!(
+              smtry_io!( err_info =>
                 write!(w, " ") ;
                 sym.sym_to_smt2(w, info)
               )
             } ;
-            smt_cast_io!( write!(w, "\n)\n") )
+            smt_cast_io!( err_info => write!(w, "\n)\n") )
           }
         )
       },
       _ => Err(
-        Error(
-          format!(
-            "check-sat-assuming is not supported for {}",
-            self.solver().conf.style()
-          )
-        )
+        format!(
+          "check-sat-assuming is not supported for {}",
+          self.solver().conf.style()
+        ).into()
       ),
     }
   }
@@ -1188,7 +1263,7 @@ pub trait QueryIdent<
   /** Check-sat assuming command. */
   fn check_sat_assuming(
     & mut self, idents: & [ Ident ], info: & Info
-  ) -> SmtRes<bool> {
+  ) -> Res<bool> {
     try_cast!(
       self.print_check_sat_assuming(idents, info)
     ) ;
@@ -1203,17 +1278,18 @@ pub trait QueryExpr<
   /** Get-values command. */
   fn print_get_values(
     & mut self, exprs: & [ Expr ], info: & Info
-  ) -> UnitSmtRes {
+  ) -> Res<()> {
+    let err_info = "writing get value query" ;
     self.write(
       |w| {
-        smtry_io!( write!(w, "(get-value (") ) ;
+        smtry_io!( err_info => write!(w, "(get-value (") ) ;
         for e in exprs {
-          smtry_io!(
+          smtry_io!( err_info =>
             write!(w, "\n  ") ;
             e.expr_to_smt2(w, info)
           )
         } ;
-        smt_cast_io!( write!(w, "\n) )\n") )
+        smt_cast_io!( err_info => write!(w, "\n) )\n") )
       }
     )
   }
@@ -1226,7 +1302,7 @@ pub trait QueryExprInfo<
   /** Get-values command. */
   fn get_values(
     & mut self, exprs: & [ Expr ], info: & Parser::I
-  ) -> SmtRes<Vec<(Parser::Expr, Parser::Value)>> {
+  ) -> Res<Vec<(Parser::Expr, Parser::Value)>> {
     try_cast!(
       self.print_get_values(exprs, info)
     ) ;
