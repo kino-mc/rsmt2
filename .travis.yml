@@ -1,11 +1,12 @@
 language: rust
-rust:
-  - stable
-  - beta
 
 os:
   - linux
   - osx
+
+rust:
+  - stable
+  - beta
 
 sudo: false
 
