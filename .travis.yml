@@ -30,8 +30,6 @@ before_script:
   fi
 - |
   if [ "$TRAVIS_OS_NAME" == "osx" ] ; then
-    brew update &&
-    brew install gmp &&
     wget https://github.com/Z3Prover/z3/releases/download/z3-4.5.0/z3-4.5.0-x64-osx-10.11.6.zip &&
     unzip z3-4.5.0-x64-osx-10.11.6.zip &&
     mv z3-4.5.0-x64-osx-10.11.6/bin/z3 $HOME/.local/bin/. &&
