@@ -88,7 +88,8 @@ macro_rules! parse_success {
 /// Wraps errors (if any) into `IoError`s and early-returns.
 #[macro_export]
 macro_rules! smtry_io {
-  ($info:expr => $e:expr $(;)*) => (
+  ($info:expr => $e:expr $(;)*) => ({
+    use $crate::ResExt ;
     match $e {
       Ok(something) => something,
       e => return e.chain_err(
@@ -97,8 +98,9 @@ macro_rules! smtry_io {
         )
       ),
     }
-  ) ;
-  ( $info:expr => $e:expr ; $($tail:tt)+ ) => (
+  }) ;
+  ( $info:expr => $e:expr ; $($tail:tt)+ ) => ({
+    use $crate::ResExt ;
     match $e {
       Ok(()) => smtry_io!( $info => $( $tail )+ ),
       e => return e.chain_err(
@@ -107,21 +109,23 @@ macro_rules! smtry_io {
         )
       ),
     }
-  ) ;
+  }) ;
 }
 
 /// Wraps errors (if any) into `IoError`s and (**not-early-**)returns the
 /// first error, if any.
 #[macro_export]
 macro_rules! smt_cast_io {
-  ($info:expr => $e:expr $(;)*) => (
+  ($info:expr => $e:expr $(;)*) => ({
+    use $crate::ResExt ;
     $e.chain_err(
       || $crate::ErrorKind::IoError(
         format!("while {}", $info)
       )
     )
-  ) ;
-  ( $info:expr => $e:expr ; $( $tail:tt )+ ) => (
+  }) ;
+  ( $info:expr => $e:expr ; $( $tail:tt )+ ) => ({
+    use $crate::ResExt ;
     match $e {
       Ok(()) => smt_cast_io!( $info => $( $tail )* ),
       err => err.chain_err(
@@ -130,7 +134,7 @@ macro_rules! smt_cast_io {
         )
       )
     }
-  ) ;
+  }) ;
 }
 
 /// Macro for fetching data from the kid's output.
