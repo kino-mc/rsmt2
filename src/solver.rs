@@ -92,7 +92,7 @@ macro_rules! smtry_io {
     match $e {
       Ok(something) => something,
       e => return e.chain_err(
-        || ErrorKind::IoError(
+        || $crate::ErrorKind::IoError(
           format!("while {}", $info)
         )
       ),
@@ -102,7 +102,7 @@ macro_rules! smtry_io {
     match $e {
       Ok(()) => smtry_io!( $info => $( $tail )+ ),
       e => return e.chain_err(
-        || ErrorKind::IoError(
+        || $crate::ErrorKind::IoError(
           format!("while {}", $info)
         )
       ),
@@ -116,7 +116,7 @@ macro_rules! smtry_io {
 macro_rules! smt_cast_io {
   ($info:expr => $e:expr $(;)*) => (
     $e.chain_err(
-      || ErrorKind::IoError(
+      || $crate::ErrorKind::IoError(
         format!("while {}", $info)
       )
     )
@@ -125,7 +125,7 @@ macro_rules! smt_cast_io {
     match $e {
       Ok(()) => smt_cast_io!( $info => $( $tail )* ),
       err => err.chain_err(
-        || ErrorKind::IoError(
+        || $crate::ErrorKind::IoError(
           format!("while {}", $info)
         )
       )
