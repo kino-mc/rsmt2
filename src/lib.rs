@@ -168,6 +168,7 @@ extern crate rsmt2 ;
 use std::io::Write ;
 
 use rsmt2::* ;
+use rsmt2::errors::* ;
 
 use Var::* ;
 use Const::* ;
@@ -305,6 +306,7 @@ It is now easy to implement `Sym2Smt` and `Expr2Smt`:
 # use std::io::Write ;
 # 
 # use rsmt2::* ;
+# use rsmt2::errors::* ;
 # 
 # use Var::* ;
 # use Const::* ;
@@ -471,6 +473,7 @@ use nom::IResult ;
 # use std::io::Write ;
 # 
 # use rsmt2::* ;
+# use rsmt2::errors::* ;
 # 
 # use Var::* ;
 # use Const::* ;
@@ -653,6 +656,7 @@ macro_rules! smtry {
 
 fn main() {
   use rsmt2::* ;
+  use rsmt2::errors::* ;
 
   let conf = SolverConf::z3() ;
 
@@ -745,7 +749,7 @@ extern crate error_chain ;
 extern crate nom ;
 
 /// Errors of this library.
-mod errors {
+pub mod errors {
   error_chain!{
     types {
       Error, ErrorKind, ResExt, Res ;
@@ -786,7 +790,6 @@ mod solver ;
 
 mod example ;
 
-pub use errors::* ;
 pub use common::* ;
 pub use conf::* ;
 pub use solver::{

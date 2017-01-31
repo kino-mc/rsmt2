@@ -24,6 +24,7 @@ use nom::{
 } ;
 
 use rsmt2::* ;
+use rsmt2::errors::* ;
 
 use Var::* ;
 use Const::* ;

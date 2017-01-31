@@ -15,6 +15,7 @@ use std::str ;
 use nom::{ IResult, digit, multispace } ;
 
 use * ;
+use errors::* ;
 
 use self::Var::* ;
 use self::Const::* ;

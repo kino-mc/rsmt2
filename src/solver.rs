@@ -89,22 +89,22 @@ macro_rules! parse_success {
 #[macro_export]
 macro_rules! smtry_io {
   ($info:expr => $e:expr $(;)*) => ({
-    use $crate::ResExt ;
+    use $crate::errors::ResExt ;
     match $e {
       Ok(something) => something,
       e => return e.chain_err(
-        || $crate::ErrorKind::IoError(
+        || $crate::errors::ErrorKind::IoError(
           format!("while {}", $info)
         )
       ),
     }
   }) ;
   ( $info:expr => $e:expr ; $($tail:tt)+ ) => ({
-    use $crate::ResExt ;
+    use $crate::errors::ResExt ;
     match $e {
       Ok(()) => smtry_io!( $info => $( $tail )+ ),
       e => return e.chain_err(
-        || $crate::ErrorKind::IoError(
+        || $crate::errors::ErrorKind::IoError(
           format!("while {}", $info)
         )
       ),
@@ -117,19 +117,19 @@ macro_rules! smtry_io {
 #[macro_export]
 macro_rules! smt_cast_io {
   ($info:expr => $e:expr $(;)*) => ({
-    use $crate::ResExt ;
+    use $crate::errors::ResExt ;
     $e.chain_err(
-      || $crate::ErrorKind::IoError(
+      || $crate::errors::ErrorKind::IoError(
         format!("while {}", $info)
       )
     )
   }) ;
   ( $info:expr => $e:expr ; $( $tail:tt )+ ) => ({
-    use $crate::ResExt ;
+    use $crate::errors::ResExt ;
     match $e {
       Ok(()) => smt_cast_io!( $info => $( $tail )* ),
       err => err.chain_err(
-        || $crate::ErrorKind::IoError(
+        || $crate::errors::ErrorKind::IoError(
           format!("while {}", $info)
         )
       )
