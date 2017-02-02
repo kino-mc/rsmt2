@@ -656,7 +656,6 @@ macro_rules! smtry {
 
 fn main() {
   use rsmt2::* ;
-  use rsmt2::errors::* ;
 
   let conf = SolverConf::z3() ;
 
