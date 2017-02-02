@@ -6,11 +6,9 @@ os:
 
 rust:
   - stable
-  - beta
+  # - beta
 
 sudo: false
-
-cache: cargo
 
 addons:
   apt:
@@ -21,6 +19,8 @@ before_script:
 - |
   mkdir -p $HOME/.local/bin &&
   export PATH=$HOME/.local/bin:$PATH
+- |
+  pip install 'travis-cargo<0.2' --user
 - |
   if [ "$TRAVIS_OS_NAME" == "linux" ] ; then
     wget https://github.com/Z3Prover/z3/releases/download/z3-4.5.0/z3-4.5.0-x64-ubuntu-14.04.zip &&
@@ -34,5 +34,5 @@ before_script:
   fi
 
 script:
-  - cargo build --release
-  - cargo test
+  - travis-cargo build -- --release
+  - travis-cargo test
