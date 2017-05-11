@@ -7,7 +7,9 @@ documentation = "https://docs.rs/rsmt2"
 homepage = "https://github.com/kino-mc/rsmt2"
 repository = "https://github.com/kino-mc/rsmt2"
 readme = "README.md"
-keywords = ["SMT", "SAT", "satisfiability", "solver"]
+keywords = [
+  "SMT", "SAT", "satisfiability", "solver", "proof", "check", "SMT-LIB"
+]
 license = "MIT/Apache-2.0"
 
 [dependencies]
