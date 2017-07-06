@@ -6,7 +6,7 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-/*! A wrapper around an SMT Lib 2(.5)-compliant SMT solver.
+#![doc = r#"A wrapper around an SMT Lib 2(.5)-compliant SMT solver.
 
 Solvers run in a separate process and communication is achieved *via* system
 pipes.
@@ -228,7 +228,9 @@ impl Var {
   pub fn svar1(s: & str) -> Self { SVar1(s.to_string()) }
   /// Given an offset, a variable can be printed in SMT Lib 2.
   #[inline(always)]
-  pub fn to_smt2(& self, writer: & mut Write, off: & Offset) -> Res<()> {
+  pub fn to_smt2<Writer: Write>(
+    & self, writer: & mut Writer, off: & Offset
+  ) -> Res<()> {
     smt_cast_io!(
       "writing a variable" => match * self {
         NSVar(ref sym) => write!(writer, "|{}|", sym),
@@ -248,7 +250,7 @@ impl Var {
 impl Const {
   /// A constant can be printed in SMT Lib 2.
   #[inline(always)]
-  pub fn to_smt2(& self, writer: & mut Write) -> Res<()> {
+  pub fn to_smt2<Writer: Write>(& self, writer: & mut Writer) -> Res<()> {
     smt_cast_io!(
       "writing a constant" => match * self {
         BConst(ref b) => write!(writer, "{}", b),
@@ -264,7 +266,9 @@ impl SExpr {
     App(sym.to_string(), args)
   }
   /// Given an offset, an S-expression can be printed in SMT Lib 2.
-  pub fn to_smt2(& self, writer: & mut Write, off: & Offset) -> Res<()> {
+  pub fn to_smt2<Writer: Write>(
+    & self, writer: & mut Writer, off: & Offset
+  ) -> Res<()> {
     match * self {
       Id(ref var) => var.to_smt2(writer, off).chain_err(
         || "while writing an identifier"
@@ -366,7 +370,9 @@ It is now easy to implement `Sym2Smt` and `Expr2Smt`:
 #   pub fn svar1(s: & str) -> Self { SVar1(s.to_string()) }
 #   /// Given an offset, a variable can be printed in SMT Lib 2.
 #   #[inline(always)]
-#   pub fn to_smt2(& self, writer: & mut Write, off: & Offset) -> Res<()> {
+#   pub fn to_smt2<Writer: Write>(
+#     & self, writer: & mut Writer, off: & Offset
+#   ) -> Res<()> {
 #     smt_cast_io!(
 #       "writing a variable" => match * self {
 #         NSVar(ref sym) => write!(writer, "|{}|", sym),
@@ -386,7 +392,7 @@ It is now easy to implement `Sym2Smt` and `Expr2Smt`:
 # impl Const {
 #   /// A constant can be printed in SMT Lib 2.
 #   #[inline(always)]
-#   pub fn to_smt2(& self, writer: & mut Write) -> Res<()> {
+#   pub fn to_smt2<Writer: Write>(& self, writer: & mut Writer) -> Res<()> {
 #     smt_cast_io!(
 #       "writing a constant" => match * self {
 #         BConst(ref b) => write!(writer, "{}", b),
@@ -402,7 +408,9 @@ It is now easy to implement `Sym2Smt` and `Expr2Smt`:
 #     App(sym.to_string(), args)
 #   }
 #   /// Given an offset, an S-expression can be printed in SMT Lib 2.
-#   pub fn to_smt2(& self, writer: & mut Write, off: & Offset) -> Res<()> {
+#   pub fn to_smt2<Writer: Write>(
+#     & self, writer: & mut Writer, off: & Offset
+#   ) -> Res<()> {
 #     match * self {
 #       Id(ref var) => var.to_smt2(writer, off).chain_err(
 #         || "while writing an identifier"
@@ -434,14 +442,18 @@ It is now easy to implement `Sym2Smt` and `Expr2Smt`:
 # }
 /// A symbol can be printed in SMT Lib 2.
 impl<'a, 'b> Sym2Smt<()> for Symbol<'a,'b> {
-  fn sym_to_smt2(& self, writer: & mut Write, _: & ()) -> Res<()> {
+  fn sym_to_smt2<Writer: Write>(
+    & self, writer: & mut Writer, _: & ()
+  ) -> Res<()> {
     self.0.to_smt2(writer, self.1)
   }
 }
 
 /// An unrolled SExpr can be printed in SMT Lib 2.
 impl<'a, 'b> Expr2Smt<()> for Unrolled<'a,'b> {
-  fn expr_to_smt2(& self, writer: & mut Write, _: & ()) -> Res<()> {
+  fn expr_to_smt2<Writer: Write>(
+    & self, writer: & mut Writer, _: & ()
+  ) -> Res<()> {
     self.0.to_smt2(writer, self.1)
   }
 }
@@ -533,7 +545,9 @@ use nom::IResult ;
 #   pub fn svar1(s: & str) -> Self { SVar1(s.to_string()) }
 #   /// Given an offset, a variable can be printed in SMT Lib 2.
 #   #[inline(always)]
-#   pub fn to_smt2(& self, writer: & mut Write, off: & Offset) -> Res<()> {
+#   pub fn to_smt2<Writer: Write>(
+#     & self, writer: & mut Writer, off: & Offset
+#   ) -> Res<()> {
 #     smt_cast_io!(
 #       "writing a variable" => match * self {
 #         NSVar(ref sym) => write!(writer, "|{}|", sym),
@@ -553,7 +567,9 @@ use nom::IResult ;
 # impl Const {
 #   /// A constant can be printed in SMT Lib 2.
 #   #[inline(always)]
-#   pub fn to_smt2(& self, writer: & mut Write) -> Res<()> {
+#   pub fn to_smt2<Writer: Write>(
+#     & self, writer: & mut Writer
+#   ) -> Res<()> {
 #     smt_cast_io!(
 #       "writing a constant" => match * self {
 #         BConst(ref b) => write!(writer, "{}", b),
@@ -569,7 +585,9 @@ use nom::IResult ;
 #     App(sym.to_string(), args)
 #   }
 #   /// Given an offset, an S-expression can be printed in SMT Lib 2.
-#   pub fn to_smt2(& self, writer: & mut Write, off: & Offset) -> Res<()> {
+#   pub fn to_smt2<Writer: Write>(
+#     & self, writer: & mut Writer, off: & Offset
+#   ) -> Res<()> {
 #     match * self {
 #       Id(ref var) => var.to_smt2(writer, off).chain_err(
 #         || "while writing an identifier"
@@ -601,14 +619,18 @@ use nom::IResult ;
 # }
 # /// A symbol can be printed in SMT Lib 2.
 # impl<'a, 'b> Sym2Smt<()> for Symbol<'a,'b> {
-#   fn sym_to_smt2(& self, writer: & mut Write, _: & ()) -> Res<()> {
+#   fn sym_to_smt2<Writer: Write>(
+#     & self, writer: & mut Writer, _: & ()
+#   ) -> Res<()> {
 #     self.0.to_smt2(writer, self.1)
 #   }
 # }
 # 
 # /// An unrolled SExpr can be printed in SMT Lib 2.
 # impl<'a, 'b> Expr2Smt<()> for Unrolled<'a,'b> {
-#   fn expr_to_smt2(& self, writer: & mut Write, _: & ()) -> Res<()> {
+#   fn expr_to_smt2<Writer: Write>(
+#     & self, writer: & mut Writer, _: & ()
+#   ) -> Res<()> {
 #     self.0.to_smt2(writer, self.1)
 #   }
 # }
@@ -740,7 +762,7 @@ can view it [here][full example].
 
 [nom page]: https://crates.io/crates/nom (crates.io pafe of the nom library)
 [full example]: ../src/rsmt2/src/example.rs.html (Full example)
-*/
+"#]
 
 #[macro_use]
 extern crate error_chain ;

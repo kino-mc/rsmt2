@@ -58,7 +58,9 @@ impl Var {
   pub fn svar1(s: & str) -> Self { SVar1(s.to_string()) }
   /// Given an offset, a variable can be printed in SMT Lib 2.
   #[inline(always)]
-  pub fn to_smt2(& self, writer: & mut Write, off: & Offset) -> Res<()> {
+  pub fn to_smt2<Writer: Write>(
+    & self, writer: & mut Writer, off: & Offset
+  ) -> Res<()> {
     smt_cast_io!(
       "writing a symbol" => match * self {
         NSVar(ref sym) => write!(writer, "|{}|", sym),
@@ -81,7 +83,9 @@ struct Symbol<'a, 'b>(& 'a Var, & 'b Offset) ;
 
 /// A symbol can be printed in SMT Lib 2.
 impl<'a, 'b> Sym2Smt<()> for Symbol<'a,'b> {
-  fn sym_to_smt2(& self, writer: & mut Write, _: & ()) -> Res<()> {
+  fn sym_to_smt2<Writer: Write>(
+    & self, writer: & mut Writer, _: & ()
+  ) -> Res<()> {
     self.0.to_smt2(writer, self.1)
   }
 }
@@ -100,7 +104,9 @@ enum Const {
 impl Const {
   /// A constant can be printed in SMT Lib 2.
   #[inline(always)]
-  pub fn to_smt2(& self, writer: & mut Write) -> Res<()> {
+  pub fn to_smt2<Writer: Write>(
+    & self, writer: & mut Writer
+  ) -> Res<()> {
     smt_cast_io!(
       "writing a constant" => match * self {
         BConst(ref b) => write!(writer, "{}", b),
@@ -127,7 +133,9 @@ impl SExpr {
     App(sym.to_string(), args)
   }
   /// Given an offset, an S-expression can be printed in SMT Lib 2.
-  pub fn to_smt2(& self, writer: & mut Write, off: & Offset) -> Res<()> {
+  pub fn to_smt2<Writer: Write>(
+    & self, writer: & mut Writer, off: & Offset
+  ) -> Res<()> {
     match * self {
       Id(ref var) => var.to_smt2(writer, off),
       Val(ref cst) => cst.to_smt2(writer),
@@ -161,7 +169,9 @@ struct Unrolled<'a, 'b>(& 'a SExpr, & 'b Offset) ;
 
 /// An unrolled SExpr can be printed in SMT Lib 2.
 impl<'a, 'b> Expr2Smt<()> for Unrolled<'a,'b> {
-  fn expr_to_smt2(& self, writer: & mut Write, _: & ()) -> Res<()> {
+  fn expr_to_smt2<Writer: Write>(
+    & self, writer: & mut Writer, _: & ()
+  ) -> Res<()> {
     self.0.to_smt2(writer, self.1)
   }
 }
