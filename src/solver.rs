@@ -542,8 +542,8 @@ SolverPrims<'kid, Parser> {
 
   // |===| (Re)starting and terminating.
 
-  /** Resets the underlying solver. Restarts the kid process if no reset
-  command is supported. */
+  /// Resets the underlying solver. Restarts the kid process if no reset
+  /// command is supported.
   #[inline(always)]
   fn reset(
     & mut self
@@ -561,7 +561,7 @@ SolverPrims<'kid, Parser> {
 
 
 
-  /** Sets the logic. */
+  /// Sets the logic.
   #[inline]
   fn set_logic(
     & mut self, logic: & Logic
@@ -579,7 +579,7 @@ SolverPrims<'kid, Parser> {
       }
     )
   }
-  /** Set option command. */
+  /// Set option command.
   #[inline]
   fn set_option<Value: ::std::fmt::Display>(
     & mut self, option: & str, value: Value
@@ -608,7 +608,7 @@ SolverPrims<'kid, Parser> {
       }
     )
   }
-  /** Activates interactive mode. */
+  /// Activates interactive mode.
   #[inline(always)]
   fn interactive_mode(& mut self) -> Res<()> {
     parse_success!(
@@ -622,7 +622,7 @@ SolverPrims<'kid, Parser> {
       }
     )
   }
-  /** Activates print success. */
+  /// Activates print success.
   #[inline(always)]
   fn print_success(& mut self) -> Res<()> {
     parse_success!(
@@ -637,7 +637,7 @@ SolverPrims<'kid, Parser> {
       }
     )
   }
-  /** Activates unsat core production. */
+  /// Activates unsat core production.
   #[inline(always)]
   fn produce_unsat_core(& mut self) -> Res<()> {
     parse_success!(
@@ -651,7 +651,7 @@ SolverPrims<'kid, Parser> {
       }
     )
   }
-  /** Shuts the solver down. */
+  /// Shuts the solver down.
   #[inline(always)]
   fn exit(& mut self) -> Res<()> {
     parse_success!(
@@ -668,7 +668,7 @@ SolverPrims<'kid, Parser> {
 
   // |===| Modifying the assertion stack.
 
-  /** Pushes `n` layers on the assertion stack. */
+  /// Pushes `n` layers on the assertion stack.
   #[inline(always)]
   fn push(& mut self, n: & u8) -> Res<()> {
     parse_success!(
@@ -683,7 +683,7 @@ SolverPrims<'kid, Parser> {
       }
     )
   }
-  /** Pops `n` layers off the assertion stack. */
+  /// Pops `n` layers off the assertion stack.
   #[inline(always)]
   fn pop(& mut self, n: & u8) -> Res<()> {
     parse_success!(
@@ -698,7 +698,7 @@ SolverPrims<'kid, Parser> {
       }
     )
   }
-  /** Resets the assertions in the solver. */
+  /// Resets the assertions in the solver.
   #[inline(always)]
   fn reset_assertions(& mut self) -> Res<()> {
     parse_success!(
@@ -717,7 +717,7 @@ SolverPrims<'kid, Parser> {
 
   // |===| Introducing new symbols.
 
-  /** Declares a new sort. */
+  /// Declares a new sort.
   #[inline]
   fn declare_sort<Sort: Sort2Smt>(
     & mut self, sort: & Sort, arity: & u8
@@ -735,7 +735,7 @@ SolverPrims<'kid, Parser> {
       }
     )
   }
-  /** Defines a new sort. */
+  /// Defines a new sort.
   #[inline]
   fn define_sort<
     Sort: Sort2Smt, I, Expr1: Expr2Smt<I>, Expr2: Expr2Smt<I>
@@ -768,7 +768,7 @@ SolverPrims<'kid, Parser> {
       }
     )
   }
-  /** Declares a new function symbol. */
+  /// Declares a new function symbol.
   #[inline]
   fn declare_fun<Sort: Sort2Smt, I, Sym: Sym2Smt<I>> (
     & mut self, symbol: & Sym, args: & [ Sort ], out: & Sort, info: & I
@@ -799,7 +799,7 @@ SolverPrims<'kid, Parser> {
       }
     )
   }
-  /** Declares a new constant. */
+  /// Declares a new constant.
   #[inline]
   fn declare_const<Sort: Sort2Smt, I, Sym: Sym2Smt<I>> (
     & mut self, symbol: & Sym, out_sort: & Sort, info: & I
@@ -819,7 +819,7 @@ SolverPrims<'kid, Parser> {
       }
     )
   }
-  /** Defines a new function symbol. */
+  /// Defines a new function symbol.
   #[inline]
   fn define_fun<
     I, Sort: Sort2Smt, Sym1: Sym2Smt<I>, Sym2: Sym2Smt<I>, Expr: Expr2Smt<I>
@@ -859,7 +859,7 @@ SolverPrims<'kid, Parser> {
       }
     )
   }
-  /** Defines some new (possibily mutually) recursive functions. */
+  /// Defines some new (possibily mutually) recursive functions.
   #[inline]
   fn define_funs_rec<
     I, Sort: Sort2Smt, Sym: Sym2Smt<I>, Expr: Expr2Smt<I>
@@ -914,7 +914,7 @@ SolverPrims<'kid, Parser> {
       }
     )
   }
-  /** Defines a new recursive function. */
+  /// Defines a new recursive function.
   #[inline]
   fn define_fun_rec<
     I, Sort: Sort2Smt, Sym: Sym2Smt<I>, Expr: Expr2Smt<I>
@@ -968,7 +968,7 @@ SolverPrims<'kid, Parser> {
 
   // |===| Asserting and inspecting formulas.
 
-  /** Asserts an expression with some print information. */
+  /// Asserts an expression with some print information.
   #[inline]
   fn assert<I, Expr: Expr2Smt<I>>(
     & mut self, expr: & Expr, info: & I
@@ -989,7 +989,7 @@ SolverPrims<'kid, Parser> {
 
   // |===| Inspecting settings.
 
-  /** Get info command. */
+  /// Get info command.
   #[inline(always)]
   fn get_info(& mut self, flag: & str) -> Res<()> {
     self.write(
@@ -998,7 +998,7 @@ SolverPrims<'kid, Parser> {
       )
     )
   }
-  /** Get option command. */
+  /// Get option command.
   #[inline(always)]
   fn get_option(& mut self, option: & str) -> Res<()> {
     self.write(
@@ -1010,7 +1010,7 @@ SolverPrims<'kid, Parser> {
 
   // |===| Script information.
 
-  /** Set info command. */
+  /// Set info command.
   #[inline(always)]
   fn set_info(& mut self, attribute: & str) -> Res<()> {
     self.write(
@@ -1019,7 +1019,7 @@ SolverPrims<'kid, Parser> {
           write!(w, "(set-info {})\n", attribute) )
     )
   }
-  /** Echo command. */
+  /// Echo command.
   #[inline(always)]
   fn echo(& mut self, text: & str) -> Res<()> {
     self.write(
@@ -1033,7 +1033,7 @@ SolverPrims<'kid, Parser> {
 
   // |===| Parsing simple stuff.
 
-  /** Parse success. */
+  /// Parse success.
   #[inline]
   fn parse_success(& mut self) -> Res<()> {
     self.parse( |bytes, _| wrap!( success(bytes) ) )
@@ -1059,12 +1059,12 @@ macro_rules! try_cast {
 
 
 
-/** Prints queries. */
+/// Prints queries.
 pub trait Query<
   'kid, Parser: ParseSmt2 + 'static
 > : Solver<'kid, Parser> {
 
-  /** Check-sat command. */
+  /// Check-sat command.
   #[inline(always)]
   fn print_check_sat(& mut self) -> Res<()> {
     self.write(
@@ -1074,13 +1074,13 @@ pub trait Query<
     )
   }
 
-  /** Parse the result of a check-sat. */
+  /// Parse the result of a check-sat.
   #[inline(always)]
   fn parse_check_sat(& mut self) -> Res<bool> {
     self.parse( |bytes, _| wrap!( check_sat(bytes) ) )
   }
 
-  /** Check-sat command. */
+  /// Check-sat command.
   fn check_sat(& mut self) -> Res<bool> {
     try_cast!(
       self.print_check_sat()
@@ -1088,7 +1088,7 @@ pub trait Query<
     self.parse_check_sat()
   }
 
-  /** Get-model command. */
+  /// Get-model command.
   #[inline(always)]
   fn print_get_model(& mut self) -> Res<()> {
     self.write(
@@ -1098,7 +1098,7 @@ pub trait Query<
     )
   }
 
-  /** Parse the result of a get-model. */
+  /// Parse the result of a get-model.
   fn parse_get_model<'a>(
     & 'a mut self
   ) -> Res<Vec<(Parser::Ident, Parser::Value)>>
@@ -1108,39 +1108,39 @@ pub trait Query<
         alt!(
           bytes,
           unexpected |
-          chain!(
-            open_paren ~
-            opt!(multispace) ~
-            tag!("model") ~
+          do_parse!(
+            open_paren >>
+            opt!(multispace) >>
+            tag!("model") >>
             vec: many0!(
-              chain!(
-                open_paren ~
-                opt!(multispace) ~
-                tag!("define-fun") ~
-                multispace ~
-                id: call!(|bytes| parser.parse_ident(bytes)) ~
-                open_paren ~
-                close_paren ~
-                opt!(multispace) ~
-                alt!(
+              do_parse!(
+                open_paren >>
+                opt!(multispace) >>
+                tag!("define-fun") >>
+                multispace >>
+                id: call!(|bytes| parser.parse_ident(bytes)) >>
+                open_paren >>
+                close_paren >>
+                opt!(multispace) >>
+                alt_complete!(
                   tag!("Bool") | tag!("Int") | tag!("Real") |
                   tag!("bool") | tag!("int") | tag!("real")
-                ) ~
-                opt!(multispace) ~
-                val: call!(|bytes| parser.parse_value(bytes)) ~
-                close_paren,
-                || (id, val)
+                ) >>
+                opt!(multispace) >>
+                val: call!(|bytes| parser.parse_value(bytes)) >>
+                close_paren >>
+                ((id, val))
               )
-            ) ~
-            close_paren,
-            || Ok(vec)
+            ) >>
+            close_paren >>
+            (Ok(vec))
           )
         )
       )
     )
   }
 
-  /** Get-model command. */
+  /// Get-model command.
   fn get_model(& mut self) -> Res<Vec<(Parser::Ident, Parser::Value)>> {
     try_cast!(
       self.print_get_model()
@@ -1148,41 +1148,37 @@ pub trait Query<
     self.parse_get_model()
   }
 
-  /** Parse the result of a get-values. */
+  /// Parse the result of a get-values.
   fn parse_get_values(
     & mut self, info: & Parser::I
   ) -> Res<Vec<(Parser::Expr, Parser::Value)>> {
     self.parse(
       |bytes, parser| wrap!(
-        call!(
+        alt_complete!(
           bytes,
-          closure!(
-            alt!(
-              unexpected |
-              chain!(
-                open_paren ~
-                vec: many0!(
-                  chain!(
-                    open_paren ~
-                    opt!(multispace) ~
-                    expr: call!(|bytes| parser.parse_expr(bytes, info)) ~
-                    multispace ~
-                    val: call!(|bytes| parser.parse_value(bytes)) ~
-                    close_paren,
-                    || (expr, val)
-                  )
-                ) ~
-                close_paren,
-                || Ok(vec)
+          unexpected |
+          do_parse!(
+            open_paren >>
+            vec: many0!(
+              do_parse!(
+                open_paren >>
+                opt!(multispace) >>
+                expr: call!(|bytes| parser.parse_expr(bytes, info)) >>
+                multispace >>
+                val: call!(|bytes| parser.parse_value(bytes)) >>
+                close_paren >>
+                ((expr, val))
               )
-            )
+            ) >>
+            close_paren >>
+            (Ok(vec))
           )
         )
       )
     )
   }
 
-  /** Get-assertions command. */
+  /// Get-assertions command.
   fn print_get_assertions(& mut self) -> Res<()> {
     self.write(
       |w| smt_cast_io!(
@@ -1190,7 +1186,7 @@ pub trait Query<
       )
     )
   }
-  /** Get-assignment command. */
+  /// Get-assignment command.
   fn print_get_assignment(& mut self) -> Res<()> {
     self.write(
       |w| smt_cast_io!(
@@ -1198,7 +1194,7 @@ pub trait Query<
       )
     )
   }
-  /** Get-unsat-assumptions command. */
+  /// Get-unsat-assumptions command.
   fn print_get_unsat_assumptions(& mut self) -> Res<()> {
     self.write(
       |w| smt_cast_io!(
@@ -1207,7 +1203,7 @@ pub trait Query<
       )
     )
   }
-  /** Get-proop command. */
+  /// Get-proop command.
   fn print_get_proof(& mut self) -> Res<()> {
     self.write(
       |w| smt_cast_io!(
@@ -1216,7 +1212,7 @@ pub trait Query<
       )
     )
   }
-  /** Get-unsat-core command. */
+  /// Get-unsat-core command.
   fn print_get_unsat_core(& mut self) -> Res<()> {
     self.write(
       |w| smt_cast_io!(
@@ -1227,11 +1223,11 @@ pub trait Query<
   }
 }
 
-/** Queries with ident printing. */
+/// Queries with ident printing.
 pub trait QueryIdent<
   'kid, Parser: ParseSmt2 + 'static, Info, Ident: Sym2Smt<Info>
 > : Solver<'kid, Parser> + Query<'kid, Parser> {
-  /** Check-sat with assumptions command. */
+  /// Check-sat with assumptions command.
   fn print_check_sat_assuming(
     & mut self, bool_vars: & [ Ident ], info: & Info
   ) -> Res<()> {
@@ -1260,7 +1256,7 @@ pub trait QueryIdent<
     }
   }
 
-  /** Check-sat assuming command. */
+  /// Check-sat assuming command.
   fn check_sat_assuming(
     & mut self, idents: & [ Ident ], info: & Info
   ) -> Res<bool> {
@@ -1271,11 +1267,11 @@ pub trait QueryIdent<
   }
 }
 
-/** Queries with expr printing. */
+/// Queries with expr printing.
 pub trait QueryExpr<
   'kid, Parser: ParseSmt2 + 'static, Info, Expr: Expr2Smt<Info>
 > : Solver<'kid, Parser> + Query<'kid, Parser> {
-  /** Get-values command. */
+  /// Get-values command.
   fn print_get_values(
     & mut self, exprs: & [ Expr ], info: & Info
   ) -> Res<()> {
@@ -1295,11 +1291,11 @@ pub trait QueryExpr<
   }
 }
 
-/** Queries with expr printing and related print/parse information. */
+/// Queries with expr printing and related print/parse information.
 pub trait QueryExprInfo<
   'kid, Parser: ParseSmt2 + 'static, Expr: Expr2Smt<Parser::I>
 > : Solver<'kid, Parser> + QueryExpr<'kid, Parser, Parser::I, Expr> {
-  /** Get-values command. */
+  /// Get-values command.
   fn get_values(
     & mut self, exprs: & [ Expr ], info: & Parser::I
   ) -> Res<Vec<(Parser::Expr, Parser::Value)>> {

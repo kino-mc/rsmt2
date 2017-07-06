@@ -23,27 +23,28 @@ pub fn unsupported<T>(bytes: & [u8]) -> IResult<& [u8], Res<T>, u32> {
 }
 
 pub fn error<T>(bytes: & [u8]) -> IResult<& [u8], Res<T>, u32> {
-  chain!(
+  do_parse!(
     bytes,
-    char!('(') ~
-    opt!(multispace) ~
-    tag!("error") ~
-    multispace ~
-    char!('"') ~
-    msg: is_not!( "\"" ) ~
-    char!('"') ~
-    opt!(multispace) ~
-    char!(')'),
-    || match str::from_utf8(msg) {
-      Ok(s) => bail!(
-        ErrorKind::SolverError( s.into() )
-      ),
-      Err(e) => Err(e).chain_err(
-        || ErrorKind::SolverError(
-          "unable to convert solver error to utf8".into()
+    char!('(') >>
+    opt!(multispace) >>
+    tag!("error") >>
+    multispace >>
+    char!('"') >>
+    msg: is_not!( "\"" ) >>
+    char!('"') >>
+    opt!(multispace) >>
+    char!(')') >> (
+      match str::from_utf8(msg) {
+        Ok(s) => Err(
+          ErrorKind::SolverError( s.into() ).into()
+        ),
+        Err(e) => Err(e).chain_err(
+          || ErrorKind::SolverError(
+            "unable to convert solver error to utf8".into()
+          )
         )
-      )
-    }
+      }
+    )
   )
 }
 

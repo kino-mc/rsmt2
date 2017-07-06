@@ -1,6 +1,6 @@
 [package]
 name = "rsmt2"
-version = "0.4.5"
+version = "0.5.0"
 authors = ["Adrien Champion <adrien.champion@email.com>"]
 description = "Wrapper for SMT Lib 2 compliant SMT solvers."
 documentation = "https://docs.rs/rsmt2"
@@ -16,4 +16,4 @@ travis-ci = { repository = "kino-mc/rsmt2" }
 
 [dependencies]
 error-chain = "^0"
-nom = "^2"
+nom = "^3"

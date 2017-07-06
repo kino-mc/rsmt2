@@ -200,15 +200,16 @@ named!{ var<Var>,
       char!('|'),
       alt!(
         // State variable.
-        chain!(
-          id: is_not!("@|") ~
-          char!('@') ~
-          off: one_of!("01"),
-          || match off {
-            '0' => SVar0(to_string(id)),
-            '1' => SVar1(to_string(id)),
-            _ => unreachable!(),
-          }
+        do_parse!(
+          id: is_not!("@|") >>
+          char!('@') >>
+          off: one_of!("01") >> (
+            match off {
+              '0' => SVar0(to_string(id)),
+              '1' => SVar1(to_string(id)),
+              _ => unreachable!(),
+            }
+          )
         ) |
         // Non-stateful variable.
         map!( is_not!("|"), |id| NSVar(to_string(id)) )
@@ -235,17 +236,17 @@ named!{ cst<Const>,
         digit, |i| IConst( to_usize(i) )
       ) |
       // Rational.
-      chain!(
-        char!('(') ~
-        opt!(multispace) ~
-        char!('/') ~
-        multispace ~
-        num: digit ~
-        multispace ~
-        den: digit ~
-        opt!(multispace) ~
-        char!(')'),
-        || RConst(to_usize(num), to_usize(den))
+      do_parse!(
+        char!('(') >>
+        opt!(multispace) >>
+        char!('/') >>
+        multispace >>
+        num: digit >>
+        multispace >>
+        den: digit >>
+        opt!(multispace) >>
+        char!(')') >>
+        (RConst(to_usize(num), to_usize(den)))
       )
     )
   )
@@ -255,10 +256,10 @@ named!{ cst<Const>,
 named!{ app<SExpr>,
   preceded!(
     opt!(multispace),
-    chain!(
+    do_parse!(
       // Open paren.
-      char!('(') ~
-      opt!(multispace) ~
+      char!('(') >>
+      opt!(multispace) >>
       // A symbol.
       sym: alt!(
         map!( one_of!("+-*/<>"), |c: char| c.to_string() ) |
@@ -272,15 +273,15 @@ named!{ app<SExpr>,
           ),
           |s| to_string(s)
         )
-      ) ~
-      multispace ~
+      ) >>
+      multispace >>
       // Some arguments (`s_expr` is defined below).
       args: separated_list!(
         multispace, s_expr
-      ) ~
-      opt!(multispace) ~
-      char!(')'),
-      || App(sym, args)
+      ) >>
+      opt!(multispace) >>
+      char!(')') >>
+      (App(sym, args))
     )
   )
 }
