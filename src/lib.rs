@@ -8,6 +8,9 @@
 
 #![doc = r#"A wrapper around an SMT Lib 2(.5)-compliant SMT solver.
 
+See [`CHANGES.md`](https://github.com/kino-mc/rsmt2/blob/master/README.md) for
+the list of changes.
+
 Solvers run in a separate process and communication is achieved *via* system
 pipes.
 
