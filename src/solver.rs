@@ -679,7 +679,7 @@ SolverPrims<'kid, Parser> {
 
   /// Pushes `n` layers on the assertion stack.
   #[inline(always)]
-  fn push(& mut self, n: & u8) -> Res<()> {
+  fn push(& mut self, n: u8) -> Res<()> {
     parse_success!(
       self for {
         stutter_arg!(self.write ;
@@ -694,7 +694,7 @@ SolverPrims<'kid, Parser> {
   }
   /// Pops `n` layers off the assertion stack.
   #[inline(always)]
-  fn pop(& mut self, n: & u8) -> Res<()> {
+  fn pop(& mut self, n: u8) -> Res<()> {
     parse_success!(
       self for {
         stutter_arg!(self.write ;
