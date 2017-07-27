@@ -345,22 +345,16 @@ impl<
 > Query<'kid, Parser> for PlainSolver<'kid, Parser> {}
 
 impl<
-  'kid, Parser: ParseSmt2 + 'static, Info, Ident: Sym2Smt<Info>
-> QueryIdent<
-  'kid, Parser, Info, Ident
-> for PlainSolver<'kid, Parser> {}
+  'kid, Parser: ParseSmt2 + 'static, Info
+> QueryIdent<'kid, Parser, Info> for PlainSolver<'kid, Parser> {}
 
 impl<
-  'kid, Parser: ParseSmt2 + 'static, Info, Expr: Expr2Smt<Info>
-> QueryExpr<
-  'kid, Parser, Info, Expr
-> for PlainSolver<'kid, Parser> {}
+  'kid, Parser: ParseSmt2 + 'static, Info
+> QueryExpr<'kid, Parser, Info> for PlainSolver<'kid, Parser> {}
 
 impl<
-  'kid, Parser: ParseSmt2 + 'static, Expr: Expr2Smt<Parser::I>
-> QueryExprInfo<
-  'kid, Parser, Expr
-> for PlainSolver<'kid, Parser> {}
+  'kid, Parser: ParseSmt2 + 'static
+> QueryExprInfo<'kid, Parser> for PlainSolver<'kid, Parser> {}
 
 
 
@@ -447,22 +441,16 @@ impl<
 > Query<'kid, Parser> for TeeSolver<'kid, Parser> {}
 
 impl<
-  'kid, Parser: ParseSmt2 + 'static, Info, Ident: Sym2Smt<Info>
-> QueryIdent<
-  'kid, Parser, Info, Ident
-> for TeeSolver<'kid, Parser> {}
+  'kid, Parser: ParseSmt2 + 'static, Info
+> QueryIdent<'kid, Parser, Info> for TeeSolver<'kid, Parser> {}
 
 impl<
-  'kid, Parser: ParseSmt2 + 'static, Info, Expr: Expr2Smt<Info>
-> QueryExpr<
-  'kid, Parser, Info, Expr
-> for TeeSolver<'kid, Parser> {}
+  'kid, Parser: ParseSmt2 + 'static, Info
+> QueryExpr<'kid, Parser, Info> for TeeSolver<'kid, Parser> {}
 
 impl<
-  'kid, Parser: ParseSmt2 + 'static, Expr: Expr2Smt<Parser::I>
-> QueryExprInfo<
-  'kid, Parser, Expr
-> for TeeSolver<'kid, Parser> {}
+  'kid, Parser: ParseSmt2 + 'static
+> QueryExprInfo<'kid, Parser> for TeeSolver<'kid, Parser> {}
 
 
 
@@ -1234,10 +1222,10 @@ pub trait Query<
 
 /// Queries with ident printing.
 pub trait QueryIdent<
-  'kid, Parser: ParseSmt2 + 'static, Info, Ident: Sym2Smt<Info>
+  'kid, Parser: ParseSmt2 + 'static, Info
 > : Solver<'kid, Parser> + Query<'kid, Parser> {
   /// Check-sat with assumptions command.
-  fn print_check_sat_assuming(
+  fn print_check_sat_assuming<Ident: Sym2Smt<Info>>(
     & mut self, bool_vars: & [ Ident ], info: & Info
   ) -> Res<()> {
     let err_info = "writing check sat assuming query" ;
@@ -1266,7 +1254,7 @@ pub trait QueryIdent<
   }
 
   /// Check-sat assuming command.
-  fn check_sat_assuming(
+  fn check_sat_assuming<Ident: Sym2Smt<Info>>(
     & mut self, idents: & [ Ident ], info: & Info
   ) -> Res<bool> {
     try_cast!(
@@ -1278,10 +1266,10 @@ pub trait QueryIdent<
 
 /// Queries with expr printing.
 pub trait QueryExpr<
-  'kid, Parser: ParseSmt2 + 'static, Info, Expr: Expr2Smt<Info>
+  'kid, Parser: ParseSmt2 + 'static, Info
 > : Solver<'kid, Parser> + Query<'kid, Parser> {
   /// Get-values command.
-  fn print_get_values(
+  fn print_get_values<Expr: Expr2Smt<Info>>(
     & mut self, exprs: & [ Expr ], info: & Info
   ) -> Res<()> {
     let err_info = "writing get value query" ;
@@ -1302,10 +1290,10 @@ pub trait QueryExpr<
 
 /// Queries with expr printing and related print/parse information.
 pub trait QueryExprInfo<
-  'kid, Parser: ParseSmt2 + 'static, Expr: Expr2Smt<Parser::I>
-> : Solver<'kid, Parser> + QueryExpr<'kid, Parser, Parser::I, Expr> {
+  'kid, Parser: ParseSmt2 + 'static
+> : Solver<'kid, Parser> + QueryExpr<'kid, Parser, Parser::I> {
   /// Get-values command.
-  fn get_values(
+  fn get_values<Expr: Expr2Smt<Parser::I>>(
     & mut self, exprs: & [ Expr ], info: & Parser::I
   ) -> Res<Vec<(Parser::Expr, Parser::Value)>> {
     try_cast!(

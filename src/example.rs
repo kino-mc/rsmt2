@@ -324,6 +324,7 @@ impl ParseSmt2 for Parser {
 }
 
 /// Convenience macro.
+#[allow(unused_macros)]
 macro_rules! smtry {
   ($e:expr, failwith $( $msg:expr ),+) => (
     match $e {
