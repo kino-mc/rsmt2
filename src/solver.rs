@@ -411,7 +411,7 @@ impl<
   fn comment(& mut self, txt: & str) -> Res<()> {
     for line in txt.lines() {
       smtry_io!(
-        "writing comment to tee file" => write!(self.file, ";; {}", line)
+        "writing comment to tee file" => write!(self.file, "\n;; {}", line)
       )
     } ;
     Ok(())
