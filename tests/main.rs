@@ -377,14 +377,14 @@ fn sync() {
     let sym = nsv.to_sym(& offset1) ;
     println!("declaring {:?}", sym) ;
     smtry!(
-      solver.declare_fun(& sym, &[], & "bool", & ()),
+      solver.declare_fun(& sym, &[] as & [& str], & "bool", & ()),
       failwith "declaration failed: {:?}"
     ) ;
 
     let sym = sv_0.to_sym(& offset1) ;
     println!("declaring {:?}",sym) ;
     smtry!(
-      solver.declare_fun(& sym, &[], & "bool", & ()),
+      solver.declare_fun(& sym, &[] as & [& str], & "bool", & ()),
       failwith "declaration failed: {:?}"
     ) ;
 
@@ -487,14 +487,14 @@ fn async() {
     let sym = nsv.to_sym(& offset1) ;
     println!("declaring {:?}", sym) ;
     smtry!(
-      solver.declare_fun(& sym, &[], & "bool", & ()),
+      solver.declare_fun(& sym, &[] as & [& str], & "bool", & ()),
       failwith "declaration failed: {:?}"
     ) ;
 
     let sym = sv_0.to_sym(& offset1) ;
     println!("declaring {:?}",sym) ;
     smtry!(
-      solver.declare_fun(& sym, &[], & "bool", & ()),
+      solver.declare_fun(& sym, &[] as & [& str], & "bool", & ()),
       failwith "declaration failed: {:?}"
     ) ;
 

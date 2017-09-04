@@ -361,13 +361,13 @@ fn test() {
 
     let sym = nsv.to_sym(& offset1) ;
     smtry!(
-      solver.declare_fun(& sym, &[], & "bool", & ()),
+      solver.declare_fun(& sym, &[] as & [& str], & "bool", & ()),
       failwith "declaration failed: {:?}"
     ) ;
 
     let sym = sv_0.to_sym(& offset1) ;
     smtry!(
-      solver.declare_fun(& sym, &[], & "bool", & ()),
+      solver.declare_fun(& sym, &[] as & [& str], & "bool", & ()),
       failwith "declaration failed: {:?}"
     ) ;
 

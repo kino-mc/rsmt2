@@ -48,16 +48,16 @@ fn write(
   )
 }
 
-impl<'a> Sym2Smt<()>  for & 'a str {
+impl<'a, T> Sym2Smt<T> for & 'a str {
   fn sym_to_smt2<Writer>(
-    & self, writer: & mut Writer, _: & ()
+    & self, writer: & mut Writer, _: & T
   ) -> Res<()> where Writer: io::Write {
     write(self, writer, "& str", "symbol")
   }
 }
-impl<'a> Expr2Smt<()> for & 'a str {
+impl<'a, T> Expr2Smt<T> for & 'a str {
   fn expr_to_smt2<Writer>(
-    & self, writer: & mut Writer, _: & ()
+    & self, writer: & mut Writer, _: & T
   ) -> Res<()> where Writer: io::Write {
     write(self, writer, "& str", "expression")
   }
@@ -70,16 +70,16 @@ impl<'a> Sort2Smt for & 'a str {
   }
 }
 
-impl Sym2Smt<()>  for String {
+impl<T> Sym2Smt<T>  for String {
   fn sym_to_smt2<Writer>(
-    & self, writer: & mut Writer, _: & ()
+    & self, writer: & mut Writer, _: & T
   ) -> Res<()> where Writer: io::Write {
     write(self, writer, "String", "symbol")
   }
 }
-impl Expr2Smt<()> for String {
+impl<T> Expr2Smt<T> for String {
   fn expr_to_smt2<Writer>(
-    & self, writer: & mut Writer, _: & ()
+    & self, writer: & mut Writer, _: & T
   ) -> Res<()> where Writer: io::Write {
     write(self, writer, "String", "expression")
   }

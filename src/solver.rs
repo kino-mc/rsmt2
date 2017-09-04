@@ -767,8 +767,8 @@ SolverPrims<'kid, Parser> {
   }
   /// Declares a new function symbol.
   #[inline]
-  fn declare_fun<Sort: Sort2Smt, I, Sym: Sym2Smt<I>> (
-    & mut self, symbol: & Sym, args: & [ Sort ], out: & Sort, info: & I
+  fn declare_fun<Sort1: Sort2Smt, Sort2: Sort2Smt, I, Sym: Sym2Smt<I>> (
+    & mut self, symbol: & Sym, args: & [ Sort1 ], out: & Sort2, info: & I
   ) -> Res<()> {
     let err_info = "writing declare fun command" ;
     parse_success!(
@@ -819,10 +819,12 @@ SolverPrims<'kid, Parser> {
   /// Defines a new function symbol.
   #[inline]
   fn define_fun<
-    I, Sort: Sort2Smt, Sym1: Sym2Smt<I>, Sym2: Sym2Smt<I>, Expr: Expr2Smt<I>
+    I,
+    Sort1: Sort2Smt, Sort2: Sort2Smt,
+    Sym1: Sym2Smt<I>, Sym2: Sym2Smt<I>, Expr: Expr2Smt<I>
   >(
-    & mut self, symbol: & Sym1, args: & [ (Sym2, Sort) ],
-    out: & Sort, body: & Expr, info: & I
+    & mut self, symbol: & Sym1, args: & [ (Sym2, Sort1) ],
+    out: & Sort2, body: & Expr, info: & I
   ) -> Res<()> {
     let err_info = "writing define fun command" ;
     parse_success!(
@@ -859,9 +861,9 @@ SolverPrims<'kid, Parser> {
   /// Defines some new (possibily mutually) recursive functions.
   #[inline]
   fn define_funs_rec<
-    I, Sort: Sort2Smt, Sym: Sym2Smt<I>, Expr: Expr2Smt<I>
+    I, Sort1: Sort2Smt, Sort2: Sort2Smt, Sym: Sym2Smt<I>, Expr: Expr2Smt<I>
   >(
-    & mut self, funs: & [ (Sym, & [ (Sym, Sort) ], Sort, Expr) ], info: & I
+    & mut self, funs: & [ (Sym, & [ (Sym, Sort1) ], Sort2, Expr) ], info: & I
   ) -> Res<()> {
     let err_info = "writing define funs rec command" ;
     parse_success!(
@@ -914,10 +916,10 @@ SolverPrims<'kid, Parser> {
   /// Defines a new recursive function.
   #[inline]
   fn define_fun_rec<
-    I, Sort: Sort2Smt, Sym: Sym2Smt<I>, Expr: Expr2Smt<I>
+    I, Sort1: Sort2Smt, Sort2: Sort2Smt, Sym: Sym2Smt<I>, Expr: Expr2Smt<I>
   >(
-    & mut self,  symbol: & Sym, args: & [ (Sym, Sort) ],
-    out: & Sort, body: & Expr, info: & I
+    & mut self,  symbol: & Sym, args: & [ (Sym, Sort1) ],
+    out: & Sort2, body: & Expr, info: & I
   ) -> Res<()> {
     let err_info = "writing define fun rec command" ;
     parse_success!(
