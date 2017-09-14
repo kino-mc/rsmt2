@@ -193,7 +193,7 @@ pub struct Kid {
 }
 impl Kid {
   /// Creates a new solver kid.
-  pub fn mk(conf: SolverConf) -> Res<Self> {
+  pub fn new(conf: SolverConf) -> Res<Self> {
     // Constructing command and spawning kid.
     Command::new(
       // Command.
@@ -253,7 +253,7 @@ pub struct PlainSolver<'kid, Parser: ParseSmt2 + 'static> {
 }
 impl<'kid, Parser: ParseSmt2 + 'static> PlainSolver<'kid, Parser> {
   /// Creates a plain solver.
-  pub fn mk(kid: & 'kid mut Kid, parser: Parser) -> Res<Self> {
+  pub fn new(kid: & 'kid mut Kid, parser: Parser) -> Res<Self> {
     let stdin = match kid.kid.stdin.as_mut() {
       Some(stdin) => BufWriter::with_capacity(1000, stdin),
       None => bail!(
@@ -523,7 +523,7 @@ pub trait SolverPrims<
 pub fn solver<'kid, Parser: ParseSmt2 + 'static>(
   kid: & 'kid mut Kid, parser: Parser
 ) -> Res< PlainSolver<'kid, Parser> > {
-  PlainSolver::mk(kid, parser)
+  PlainSolver::new(kid, parser)
 }
 
 

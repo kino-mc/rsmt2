@@ -352,7 +352,7 @@ fn sync() {
   println!("") ;
 
   println!("Creating kid.") ;
-  let mut kid = match Kid::mk(conf) {
+  let mut kid = match Kid::new(conf) {
     Ok(kid) => kid,
     Err(e) => panic!("Could not spawn solver kid: {:?}", e)
   } ;
@@ -462,7 +462,7 @@ fn async() {
   println!("") ;
 
   println!("Creating kid.") ;
-  let mut kid = match Kid::mk(conf) {
+  let mut kid = match Kid::new(conf) {
     Ok(kid) => kid,
     Err(e) => panic!("Could not spawn solver kid: {:?}", e)
   } ;

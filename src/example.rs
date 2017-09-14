@@ -339,7 +339,7 @@ fn test() {
 
   let conf = SolverConf::z3() ;
 
-  let mut kid = match Kid::mk(conf) {
+  let mut kid = match Kid::new(conf) {
     Ok(kid) => kid,
     Err(e) => panic!("Could not spawn solver kid: {:?}", e)
   } ;

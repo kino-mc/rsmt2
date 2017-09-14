@@ -84,3 +84,44 @@ named!{ pub open_paren<()>,
 named!{ pub close_paren<()>,
   map!( preceded!( opt!(multispace), char!(')') ), |_| () )
 }
+
+
+// /// SMT-LIB 2.0 parser.
+// pub struct SmtParser<'a> {
+//   /// Text being parsed.
+//   string: & 'a str,
+//   /// Current position in the text.
+//   cursor: usize,
+//   /// Stack of positions, for backtracking.
+//   stack: Vec<usize>,
+// }
+// impl<'a> SmtParser<'a> {
+//   /// Constructor.
+//   pub fn new(string: & 'a str) -> Self {
+//     SmtParser { string, cursor: 0, stack: Vec::with_capacity(3) }
+//   }
+
+//   /// Parses whitespaces or comments.
+//   pub fn ws_cmt(& mut self) {
+//     let mut chars = string[cursor..].chars() ;
+//     let mut cnt = 0 ;
+//     'ws_cmt: while let Some(char) = chars.next() {
+//       cnt += 1 ;
+//       if ! char.is_whitespace() {
+//         if char == ';' {
+//           'comment: while let Some( (_, char) ) = self.next() {
+//             match char {
+//               '\n' => break 'comment,
+//               _ => (),
+//             }
+//           }
+//         } else {
+//           self.cursor += 
+//           break 'ws_cmt
+//         }
+//       }
+//     }
+//   }
+// }
+
+
