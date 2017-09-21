@@ -17,6 +17,8 @@ pipes.
 This library does **not** have a structure for S-expressions. It should be
 provided by the user, as well as the relevant printing and parsing functions.
 
+If you use this library consider contacting us on the [repository](https://github.com/kino-mc/rsmt2) so that we can add your project to the readme.
+
 ## `async` versus `sync`
 
 The functions corresponding to SMT Lib 2 queries come in two flavors,
@@ -772,10 +774,10 @@ pub mod errors {
   }
 }
 
+#[macro_use]
 mod common ;
 mod conf ;
 mod parse ;
-#[macro_use]
 mod solver ;
 
 mod example ;

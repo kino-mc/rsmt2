@@ -38,7 +38,7 @@ pub trait Sort2Smt {
 }
 
 /// Writes a string.
-#[inline]
+#[inline(always)]
 pub fn write_str(
   w: & mut io::Write, s: & str
 ) -> Res<()> {
