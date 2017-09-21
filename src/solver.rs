@@ -27,6 +27,7 @@ use parse::{
   success, check_sat, unexpected, open_paren, close_paren
 } ;
 
+
 macro_rules! stutter_arg {
   ($slf:ident . $fun:ident ; $arg:expr) => (
     $slf.$fun($arg, $arg)
@@ -43,10 +44,9 @@ macro_rules! wrap {
         Done(rest, res) => match from_utf8(rest) {
           Ok(s) => (s.to_string(), res),
           Err(e) => (
-            String::new(), Err(e).chain_err(
-              || ErrorKind::IoError(
-                "could not convert remaining bytes to utf8".into()
-              )
+            String::new(),
+            Err(e).chain_err::<_, ErrorKind>(
+              || "could not convert remaining bytes to utf8".into()
             )
           ),
         },
@@ -91,54 +91,6 @@ macro_rules! parse_success {
   ) ;
 }
 
-/// Wraps errors (if any) into `IoError`s and early-returns.
-#[macro_export]
-macro_rules! smtry_io {
-  ($info:expr => $e:expr $(;)*) => ({
-    match $e {
-      Ok(something) => something,
-      e => return $crate::errors::ResExt::chain_err(
-        e, || $crate::errors::ErrorKind::IoError(
-          format!("while {}", $info)
-        )
-      ),
-    }
-  }) ;
-  ( $info:expr => $e:expr ; $($tail:tt)+ ) => ({
-    match $e {
-      Ok(()) => smtry_io!( $info => $( $tail )+ ),
-      e => return $crate::errors::ResExt::chain_err(
-        e, || $crate::errors::ErrorKind::IoError(
-          format!("while {}", $info)
-        )
-      ),
-    }
-  }) ;
-}
-
-/// Wraps errors (if any) into `IoError`s and (**not-early-**)returns the
-/// first error, if any.
-#[macro_export]
-macro_rules! smt_cast_io {
-  ($info:expr => $e:expr $(;)*) => ({
-    $crate::errors::ResExt::chain_err(
-      $e, || $crate::errors::ErrorKind::IoError(
-        format!("while {}", $info)
-      )
-    )
-  }) ;
-  ( $info:expr => $e:expr ; $( $tail:tt )+ ) => ({
-    match $e {
-      Ok(()) => smt_cast_io!( $info => $( $tail )* ),
-      err => $crate::errors::ResExt::chain_err(
-        err, || $crate::errors::ErrorKind::IoError(
-          format!("while {}", $info)
-        )
-      )
-    }
-  }) ;
-}
-
 /// Macro for fetching data from the kid's output.
 macro_rules! fetch {
   ($slf:expr, $start:expr, $c:ident => $action:expr) => ( {
@@ -150,13 +102,7 @@ macro_rules! fetch {
     loop {
       use std::io::BufRead ;
       let len = $slf.buff.len() ;
-      try!(
-        smt_cast_io!(
-          "reading solver's output" => buff.read_line(
-            & mut $slf.buff
-          )
-        )
-      ) ;
+      buff.read_line(& mut $slf.buff) ? ;
       let mut cmt = false ;
       if len + 1 < $slf.buff.len() {
         $start ;
@@ -212,18 +158,14 @@ impl Kid {
         kid: kid,
         conf: conf,
       }
-    ).chain_err(
-      || ErrorKind::IoError(
-        "while spawning child process".into()
-      )
+    ).chain_err::<_, ErrorKind>(
+      || "while spawning child process".into()
     )
   }
   /// Kills the solver kid.
   pub fn kill(mut self) -> Res<()> {
-    self.kid.kill().chain_err(
-      || ErrorKind::IoError(
-        "while killing child process".into()
-      )
+    self.kid.kill().chain_err::<_, ErrorKind>(
+      || "while killing child process".into()
     )
   }
 }
@@ -312,9 +254,7 @@ impl<
     FTee: Fn(& mut BufWriter<File>) -> Res<()>,
   >(& mut self, f: F, _: FTee) -> Res<()> {
     try!( f(& mut self.stdin) ) ;
-    smtry_io!(
-      "flushing solver's stdin" => self.stdin.flush()
-    ) ;
+    self.stdin.flush() ? ;
     Ok(())
   }
   fn comment(& mut self, _: & str) -> Res<()> {
@@ -382,12 +322,10 @@ impl<
   fn fetch(& mut self) -> Res<()> {
     fetch!(
       self.solver,
-      smtry_io!(
-        "writing comment header to tee file" => write!(self.file, ";; ")
-      ),
-      c => smtry_io!(
-        "writing fetched data to tee file" => write!( self.file, "{}", c)
-      )
+      write!(self.file, ";; ") ?,
+      c => {
+        write!( self.file, "{}", c) ?
+      }
     )
   }
   /// Applies a function to the writer on the solver's stdin.
@@ -396,24 +334,16 @@ impl<
     FTee: Fn(& mut BufWriter<File>) -> Res<()>,
   >(& mut self, f: F, f_tee: FTee) -> Res<()> {
     try!( f(& mut self.solver.stdin) ) ;
-    smtry_io!(
-      "flushing (tee) solver's stdin" => self.solver.stdin.flush()
-    ) ;
-    smtry_io!(
-      "writing newline to tee file" => write!(self.file, "\n")
-    ) ;
-    try!( f_tee(& mut self.file) ) ;
-    smtry_io!(
-      "flushing tee file" => self.file.flush()
-    ) ;
+    self.solver.stdin.flush() ? ;
+    write_str(& mut self.file, "\n") ? ;
+    f_tee(& mut self.file) ? ;
+    self.file.flush() ? ;
     Ok(())
   }
   fn comment(& mut self, txt: & str) -> Res<()> {
     for line in txt.lines() {
-      smtry_io!(
-        "writing comment to tee file" => write!(self.file, "\n;; {}", line)
-      )
-    } ;
+      write!(self.file, "\n;; {}", line) ?
+    }
     Ok(())
   }
   fn parser(& self) -> & Parser {
@@ -547,10 +477,8 @@ SolverPrims<'kid, Parser> {
   ) -> Res<()> {
     parse_success!(
       self for {
-        stutter_arg!(self.write ;
-          |w| smt_cast_io!(
-            "writing reset command" => write!(w, "(reset)\n")
-          )
+        stutter_arg!(
+          self.write ; |w| write_str(w, "(reset)\n")
         )
       }
     )
@@ -565,13 +493,12 @@ SolverPrims<'kid, Parser> {
   ) -> Res<()> {
     parse_success!(
       self for {
-        stutter_arg!(self.write ;
-          |w| smt_cast_io!(
-            "writing set logic command" =>
-              write!(w, "(set-logic ") ;
-              logic.to_smt2(w, ()) ;
-              write!(w, ")\n")
-          )
+        stutter_arg!(
+          self.write ; |w| {
+            write_str(w, "(set-logic ") ? ;
+            logic.to_smt2(w, ()) ? ;
+            write_str(w, ")\n")
+          }
         )
       }
     )
@@ -594,13 +521,10 @@ SolverPrims<'kid, Parser> {
     parse_success!(
       self for {
         stutter_arg!(self.write ;
-          |w| smt_cast_io!(
-            format!(
-              "writing set option command ({}: {})", option, value
-            ) => write!(
-              w, "(set-option {} {})\n", option, value
-            )
-          )
+          |w| {
+            write!(w, "(set-option {} {})\n", option, value) ? ;
+            Ok(())
+          }
         )
       }
     )
@@ -611,10 +535,7 @@ SolverPrims<'kid, Parser> {
     parse_success!(
       self for {
         stutter_arg!(self.write ;
-          |w| smt_cast_io!(
-            "writing set option command on interactive mode (true)" =>
-              write!(w, "(set-option :interactive-mode true)\n")
-          )
+          |w| write_str(w, "(set-option :interactive-mode true)\n")
         )
       }
     )
@@ -625,11 +546,7 @@ SolverPrims<'kid, Parser> {
     parse_success!(
       self for {
         stutter_arg!(self.write ;
-          |w| smt_cast_io!(
-            "writing set option command on print success (true)" => write!(
-              w, "(set-option :print-success true)\n"
-            )
-          )
+          |w| write_str(w, "(set-option :print-success true)\n")
         )
       }
     )
@@ -640,10 +557,7 @@ SolverPrims<'kid, Parser> {
     parse_success!(
       self for {
         stutter_arg!(self.write ;
-          |w| smt_cast_io!(
-            "writing set option command on produce unsat cores (true)" =>
-              write!(w, "(set-option :produce-unsat-cores true)\n")
-          )
+          |w| write_str(w, "(set-option :produce-unsat-cores true)\n")
         )
       }
     )
@@ -654,9 +568,7 @@ SolverPrims<'kid, Parser> {
     parse_success!(
       self for {
         stutter_arg!(self.write ;
-          |w| smt_cast_io!(
-            "writing exit command" => write!(w, "(exit)\n")
-          )
+          |w| write_str(w, "(exit)\n")
         )
       }
     )
@@ -671,11 +583,10 @@ SolverPrims<'kid, Parser> {
     parse_success!(
       self for {
         stutter_arg!(self.write ;
-          |w| smt_cast_io!(
-            format!("writing push ({}) command", n) => write!(
-              w, "(push {})\n", n
-            )
-          )
+          |w| {
+            write!(w, "(push {})\n", n) ? ;
+            Ok(())
+          }
         )
       }
     )
@@ -686,11 +597,10 @@ SolverPrims<'kid, Parser> {
     parse_success!(
       self for {
         stutter_arg!(self.write ;
-          |w| smt_cast_io!(
-            format!("writing pop ({}) command", n) => write!(
-              w, "(pop {})\n", n
-            )
-          )
+          |w| {
+            write!(w, "(pop {})\n", n) ? ;
+            Ok(())
+          }
         )
       }
     )
@@ -701,11 +611,7 @@ SolverPrims<'kid, Parser> {
     parse_success!(
       self for {
         stutter_arg!(self.write ;
-          |w| smt_cast_io!(
-            format!("writing reset assertions command") => write!(
-              w, "(reset-assertions)\n"
-            )
-          )
+          |w| write_str(w, "(reset-assertions)\n")
         )
       }
     )
@@ -722,12 +628,12 @@ SolverPrims<'kid, Parser> {
     parse_success!(
       self for {
         stutter_arg!(self.write ;
-          |w| smt_cast_io!(
-            "writing declare sort command" =>
-              write!(w, "(declare-sort ") ;
-              sort.sort_to_smt2(w) ;
-              write!(w, " {})\n", arity)
-          )
+          |w| {
+            write_str(w, "(declare-sort ") ? ;
+            sort.sort_to_smt2(w) ? ;
+            write!(w, " {})\n", arity) ? ;
+            Ok(())
+          }
         )
       }
     )
@@ -739,27 +645,20 @@ SolverPrims<'kid, Parser> {
   >(
     & mut self, sort: & Sort, args: & [ Expr1 ], body: & Expr2, info: & I
   ) -> Res<()> {
-    let err_info = "writing define sort command" ;
     parse_success!(
       self for {
         stutter_arg!(self.write ;
           |w| {
-            smtry_io!( err_info =>
-              write!(w, "( define-sort ") ;
-              sort.sort_to_smt2(w) ;
-              write!(w, "\n   ( ")
-            ) ;
+            write_str(w, "( define-sort ") ? ;
+            sort.sort_to_smt2(w) ? ;
+            write_str(w, "\n   ( ") ? ;
             for arg in args {
-              smtry_io!( err_info =>
-                arg.expr_to_smt2(w, info) ;
-                write!(w, " ")
-              ) ;
-            } ;
-            smt_cast_io!( err_info =>
-              write!(w, ")\n   ") ;
-              body.expr_to_smt2(w, info) ;
-              write!(w, "\n)\n")
-            )
+              arg.expr_to_smt2(w, info) ? ;
+              write_str(w, " ") ?
+            }
+            write_str(w, ")\n   ") ? ;
+            body.expr_to_smt2(w, info) ? ;
+            write_str(w, "\n)\n")
           }
         )
       }
@@ -770,27 +669,20 @@ SolverPrims<'kid, Parser> {
   fn declare_fun<Sort1: Sort2Smt, Sort2: Sort2Smt, I, Sym: Sym2Smt<I>> (
     & mut self, symbol: & Sym, args: & [ Sort1 ], out: & Sort2, info: & I
   ) -> Res<()> {
-    let err_info = "writing declare fun command" ;
     parse_success!(
       self for {
         stutter_arg!(self.write ;
           |w| {
-            smtry_io!( err_info =>
-              write!(w, "(declare-fun ") ;
-              symbol.sym_to_smt2(w, info) ;
-              write!(w, " ( ")
-            ) ;
+            write_str(w, "(declare-fun ") ? ;
+            symbol.sym_to_smt2(w, info) ? ;
+            write_str(w, " ( ") ? ;
             for arg in args {
-              smtry_io!( err_info =>
-                arg.sort_to_smt2(w) ;
-                write!(w, " ")
-              ) ;
-            } ;
-            smt_cast_io!( err_info =>
-              write!(w, ") ") ;
-              out.sort_to_smt2(w) ;
-              write!(w, ")\n")
-            )
+              arg.sort_to_smt2(w) ? ;
+              write_str(w, " ") ?
+            }
+            write_str(w, ") ") ? ;
+            out.sort_to_smt2(w) ? ;
+            write_str(w, ")\n")
           }
         )
       }
@@ -804,14 +696,13 @@ SolverPrims<'kid, Parser> {
     parse_success!(
       self for {
         stutter_arg!(self.write ;
-          |w| smt_cast_io!(
-            "writing declare const command" =>
-              write!(w, "(declare-const ") ;
-              symbol.sym_to_smt2(w, info) ;
-              write!(w, " ") ;
-              out_sort.sort_to_smt2(w) ;
-              write!(w, ")\n")
-          )
+          |w| {
+            write_str(w, "(declare-const ") ? ;
+            symbol.sym_to_smt2(w, info) ? ;
+            write_str(w, " ") ? ;
+            out_sort.sort_to_smt2(w) ? ;
+            write_str(w, ")\n")
+          }
         )
       }
     )
@@ -826,33 +717,26 @@ SolverPrims<'kid, Parser> {
     & mut self, symbol: & Sym1, args: & [ (Sym2, Sort1) ],
     out: & Sort2, body: & Expr, info: & I
   ) -> Res<()> {
-    let err_info = "writing define fun command" ;
     parse_success!(
       self for {
         stutter_arg!(self.write ;
           |w| {
-            smtry_io!( err_info =>
-              write!(w, "(define-fun ") ;
-              symbol.sym_to_smt2(w, info) ;
-              write!(w, " ( ")
-            ) ;
+            write_str(w, "(define-fun ") ? ;
+            symbol.sym_to_smt2(w, info) ? ;
+            write_str(w, " ( ") ? ;
             for arg in args {
               let (ref sym, ref sort) = * arg ;
-              smtry_io!( err_info =>
-                write!(w, "(") ;
-                sym.sym_to_smt2(w, info) ;
-                write!(w, " ") ;
-                sort.sort_to_smt2(w) ;
-                write!(w, ") ")
-              )
-            } ;
-            smt_cast_io!( err_info =>
-              write!(w, ") ") ;
-              out.sort_to_smt2(w) ;
-              write!(w, "\n   ") ;
-              body.expr_to_smt2(w, info) ;
-              write!(w, "\n)\n")
-            )
+              write_str(w, "(") ? ;
+              sym.sym_to_smt2(w, info) ? ;
+              write_str(w, " ") ? ;
+              sort.sort_to_smt2(w) ? ;
+              write_str(w, ") ") ?
+            }
+            write_str(w, ") ") ? ;
+            out.sort_to_smt2(w) ? ;
+            write_str(w, "\n   ") ? ;
+            body.expr_to_smt2(w, info) ? ;
+            write_str(w, "\n)\n")
           }
         )
       }
@@ -865,49 +749,40 @@ SolverPrims<'kid, Parser> {
   >(
     & mut self, funs: & [ (Sym, & [ (Sym, Sort1) ], Sort2, Expr) ], info: & I
   ) -> Res<()> {
-    let err_info = "writing define funs rec command" ;
     parse_success!(
       self for {
         stutter_arg!(self.write ;
           |w| {
             // Header.
-            smtry_io!( err_info => write!(w, "(define-funs-rec (\n") ) ;
+            write_str(w, "(define-funs-rec (\n") ? ;
 
             // Signatures.
             for fun in funs {
               let (ref sym, ref args, ref out, _) = * fun ;
-              smtry_io!( err_info =>
-                write!(w, "   (");
-                sym.sym_to_smt2(w, info) ;
-                write!(w, " ( ")
-              ) ;
+              write_str(w, "   (") ? ;
+              sym.sym_to_smt2(w, info) ? ;
+              write_str(w, " ( ") ? ;
               for arg in * args {
                 let (ref sym, ref sort) = * arg ;
-                smtry_io!( err_info =>
-                  write!(w, "(") ;
-                  sym.sym_to_smt2(w, info) ;
-                  write!(w, " ") ;
-                  sort.sort_to_smt2(w) ;
-                  write!(w, ") ")
-                )
-              } ;
-              smtry_io!( err_info =>
-                write!(w, ") ") ;
-                out.sort_to_smt2(w) ;
-                write!(w, ")\n")
-              )
-            } ;
-            smtry_io!( err_info => write!(w, " ) (") ) ;
+                write_str(w, "(") ? ;
+                sym.sym_to_smt2(w, info) ? ;
+                write_str(w, " ") ? ;
+                sort.sort_to_smt2(w) ? ;
+                write_str(w, ") ") ?
+              }
+              write_str(w, ") ") ? ;
+              out.sort_to_smt2(w) ? ;
+              write_str(w, ")\n") ?
+            }
+            write_str(w, " ) (") ? ;
 
             // Bodies
             for fun in funs {
               let (_, _, _, ref body) = * fun ;
-              smtry_io!( err_info =>
-                write!(w, "\n   ") ;
-                body.expr_to_smt2(w, info)
-              )
-            } ;
-            smt_cast_io!( err_info => write!(w, "\n )\n)\n") )
+              write_str(w, "\n   ") ? ;
+              body.expr_to_smt2(w, info) ?
+            }
+            write_str(w, "\n )\n)\n")
           }
         )
       }
@@ -921,43 +796,34 @@ SolverPrims<'kid, Parser> {
     & mut self,  symbol: & Sym, args: & [ (Sym, Sort1) ],
     out: & Sort2, body: & Expr, info: & I
   ) -> Res<()> {
-    let err_info = "writing define fun rec command" ;
     parse_success!(
       self for {
         stutter_arg!(self.write ;
           |w| {
             // Header.
-            smtry_io!( err_info => write!(w, "(define-fun-rec (\n") ) ;
+            write_str(w, "(define-fun-rec (\n") ? ;
 
             // Signature.
-            smtry_io!( err_info =>
-              write!(w, "   (") ;
-              symbol.sym_to_smt2(w, info) ;
-              write!(w, " ( ")
-            ) ;
+            write_str(w, "   (") ? ;
+            symbol.sym_to_smt2(w, info) ? ;
+            write_str(w, " ( ") ? ;
             for arg in args {
               let (ref sym, ref sort) = * arg ;
-              smtry_io!( err_info =>
-                write!(w, "(") ;
-                sym.sym_to_smt2(w, info) ;
-                write!(w, " ") ;
-                sort.sort_to_smt2(w) ;
-                write!(w, ") ")
-              )
-            } ;
-            smtry_io!( err_info =>
-              write!(w, ") ") ;
-              out.sort_to_smt2(w) ;
-              write!(w, ")\n") ;
-              write!(w, " ) (")
-            ) ;
+              write_str(w, "(") ? ;
+              sym.sym_to_smt2(w, info) ? ;
+              write_str(w, " ") ? ;
+              sort.sort_to_smt2(w) ? ;
+              write_str(w, ") ") ?
+            }
+            write_str(w, ") ") ? ;
+            out.sort_to_smt2(w) ? ;
+            write_str(w, ")\n") ? ;
+            write_str(w, " ) (") ? ;
 
             // Body.
-            smt_cast_io!( err_info =>
-              write!(w, "\n   ") ;
-              body.expr_to_smt2(w, info) ;
-              write!(w, "\n )\n)\n")
-            )
+            write_str(w, "\n   ") ? ;
+            body.expr_to_smt2(w, info) ? ;
+            write_str(w, "\n )\n)\n")
           }
         )
       }
@@ -975,12 +841,11 @@ SolverPrims<'kid, Parser> {
     parse_success!(
       self for {
         stutter_arg!(self.write ;
-          |w| smt_cast_io!(
-            "writing assert command" =>
-              write!(w, "(assert\n  ") ;
-              expr.expr_to_smt2(w, info) ;
-              write!(w, "\n)\n")
-          )
+          |w| {
+            write_str(w, "(assert\n  ") ? ;
+            expr.expr_to_smt2(w, info) ? ;
+            write_str(w, "\n)\n")
+          }
         )
       }
     )
@@ -992,18 +857,14 @@ SolverPrims<'kid, Parser> {
   #[inline(always)]
   fn get_info(& mut self, flag: & str) -> Res<()> {
     stutter_arg!(self.write ;
-      |w| smt_cast_io!(
-        "writing get info command" => write!(w, "(get-info {})\n", flag)
-      )
+      |w| { write!(w, "(get-info {})\n", flag) ? ; Ok(()) }
     )
   }
   /// Get option command.
   #[inline(always)]
   fn get_option(& mut self, option: & str) -> Res<()> {
     stutter_arg!(self.write ;
-      |w| smt_cast_io!(
-        format!("writing get option command ({})", option) =>
-          write!(w, "(get-option {})\n", option) )
+      |w| { write!(w, "(get-option {})\n", option) ? ; Ok(()) }
     )
   }
 
@@ -1013,19 +874,14 @@ SolverPrims<'kid, Parser> {
   #[inline(always)]
   fn set_info(& mut self, attribute: & str) -> Res<()> {
     stutter_arg!(self.write ;
-      |w| smt_cast_io!(
-        format!("writing set option command ({})", attribute) =>
-          write!(w, "(set-info {})\n", attribute) )
+      |w| { write!(w, "(set-info {})\n", attribute) ? ; Ok(()) }
     )
   }
   /// Echo command.
   #[inline(always)]
   fn echo(& mut self, text: & str) -> Res<()> {
     stutter_arg!(self.write ;
-      |w| smt_cast_io!(
-        format!("writing echo command ({})", text) =>
-        write!(w, "(echo \"{}\")\n", text)
-      )
+      |w| { write!(w, "(echo \"{}\")\n", text) ? ; Ok(()) }
     )
   }
 
@@ -1045,19 +901,6 @@ SolverPrims<'kid, Parser> {
 
 
 
-macro_rules! try_cast {
-  ($e:expr) => (
-    match $e {
-      Ok(something) => something,
-      Err(e) => return Err(e),
-    }
-  ) ;
-}
-
-
-
-
-
 /// Prints queries.
 pub trait Query<
   'kid, Parser: ParseSmt2 + 'static
@@ -1067,9 +910,7 @@ pub trait Query<
   #[inline(always)]
   fn print_check_sat(& mut self) -> Res<()> {
     stutter_arg!(self.write ;
-      |w| smt_cast_io!(
-        "writing check sat query" => write!(w, "(check-sat)\n")
-      )
+      |w| write_str(w, "(check-sat)\n")
     )
   }
 
@@ -1081,9 +922,7 @@ pub trait Query<
 
   /// Check-sat command.
   fn check_sat(& mut self) -> Res<bool> {
-    try_cast!(
-      self.print_check_sat()
-    ) ;
+    self.print_check_sat() ? ;
     self.parse_check_sat()
   }
 
@@ -1091,9 +930,7 @@ pub trait Query<
   #[inline(always)]
   fn print_get_model(& mut self) -> Res<()> {
     stutter_arg!(self.write ;
-      |w| smt_cast_io!(
-        "writing get model query" => write!(w, "(get-model)\n")
-      )
+      |w| write_str(w, "(get-model)\n")
     )
   }
 
@@ -1141,9 +978,7 @@ pub trait Query<
 
   /// Get-model command.
   fn get_model(& mut self) -> Res<Vec<(Parser::Ident, Parser::Value)>> {
-    try_cast!(
-      self.print_get_model()
-    ) ;
+    self.print_get_model() ? ;
     self.parse_get_model()
   }
 
@@ -1180,44 +1015,31 @@ pub trait Query<
   /// Get-assertions command.
   fn print_get_assertions(& mut self) -> Res<()> {
     stutter_arg!(self.write ;
-      |w| smt_cast_io!(
-        "writing get assertions query" => write!(w, "(get-assertions)\n")
-      )
+      |w| write_str(w, "(get-assertions)\n")
     )
   }
   /// Get-assignment command.
   fn print_get_assignment(& mut self) -> Res<()> {
     stutter_arg!(self.write ;
-      |w| smt_cast_io!(
-        "writing get assignment query" => write!(w, "(get-assignment)\n")
-      )
+      |w| write_str(w, "(get-assignment)\n")
     )
   }
   /// Get-unsat-assumptions command.
   fn print_get_unsat_assumptions(& mut self) -> Res<()> {
     stutter_arg!(self.write ;
-      |w| smt_cast_io!(
-        "writing get unsat assumptions query" =>
-          write!(w, "(get-unsat-assumptions)\n")
-      )
+      |w| write_str(w, "(get-unsat-assumptions)\n")
     )
   }
   /// Get-proop command.
   fn print_get_proof(& mut self) -> Res<()> {
     stutter_arg!(self.write ;
-      |w| smt_cast_io!(
-        "writing get proof query" =>
-          write!(w, "(get-proof)\n")
-      )
+      |w| write_str(w, "(get-proof)\n")
     )
   }
   /// Get-unsat-core command.
   fn print_get_unsat_core(& mut self) -> Res<()> {
     stutter_arg!(self.write ;
-      |w| smt_cast_io!(
-        "writing get unsat core query" =>
-          write!(w, "(get-unsat-core)\n")
-      )
+      |w| write_str(w, "(get-unsat-core)\n")
     )
   }
 }
@@ -1230,19 +1052,16 @@ pub trait QueryIdent<
   fn print_check_sat_assuming<Ident: Sym2Smt<Info>>(
     & mut self, bool_vars: & [ Ident ], info: & Info
   ) -> Res<()> {
-    let err_info = "writing check sat assuming query" ;
     match * self.solver().conf.get_check_sat_assuming() {
       Some(ref cmd) => {
         stutter_arg!(self.write ;
           |w| {
-            smtry_io!( err_info => write!(w, "({}\n ", cmd) ) ;
+            write!(w, "({}\n ", cmd) ? ;
             for sym in bool_vars {
-              smtry_io!( err_info =>
-                write!(w, " ") ;
-                sym.sym_to_smt2(w, info)
-              )
+              write_str(w, " ") ? ;
+              sym.sym_to_smt2(w, info) ?
             } ;
-            smt_cast_io!( err_info => write!(w, "\n)\n") )
+            write_str(w, "\n)\n")
           }
         )
       },
@@ -1259,9 +1078,7 @@ pub trait QueryIdent<
   fn check_sat_assuming<Ident: Sym2Smt<Info>>(
     & mut self, idents: & [ Ident ], info: & Info
   ) -> Res<bool> {
-    try_cast!(
-      self.print_check_sat_assuming(idents, info)
-    ) ;
+    self.print_check_sat_assuming(idents, info) ? ;
     self.parse_check_sat()
   }
 }
@@ -1274,17 +1091,14 @@ pub trait QueryExpr<
   fn print_get_values<Expr: Expr2Smt<Info>>(
     & mut self, exprs: & [ Expr ], info: & Info
   ) -> Res<()> {
-    let err_info = "writing get value query" ;
     stutter_arg!(self.write ;
       |w| {
-        smtry_io!( err_info => write!(w, "(get-value (") ) ;
+        write!(w, "(get-value (") ? ;
         for e in exprs {
-          smtry_io!( err_info =>
-            write!(w, "\n  ") ;
-            e.expr_to_smt2(w, info)
-          )
-        } ;
-        smt_cast_io!( err_info => write!(w, "\n) )\n") )
+          write_str(w, "\n  ") ? ;
+          e.expr_to_smt2(w, info) ?
+        }
+        write_str(w, "\n) )\n")
       }
     )
   }
@@ -1298,9 +1112,7 @@ pub trait QueryExprInfo<
   fn get_values<Expr: Expr2Smt<Parser::I>>(
     & mut self, exprs: & [ Expr ], info: & Parser::I
   ) -> Res<Vec<(Parser::Expr, Parser::Value)>> {
-    try_cast!(
-      self.print_get_values(exprs, info)
-    ) ;
+    self.print_get_values(exprs, info) ? ;
     self.parse_get_values(info)
   }
 }

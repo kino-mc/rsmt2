@@ -37,36 +37,34 @@ pub trait Sort2Smt {
   where Writer: io::Write ;
 }
 
-/// Prints a string as a symbol.
-fn write(
-  s: & str, w: & mut io::Write, info_1: & str, info_2: & str
+/// Writes a string.
+#[inline]
+pub fn write_str(
+  w: & mut io::Write, s: & str
 ) -> Res<()> {
-  write!(w, "{}", s).chain_err(
-    || ErrorKind::IoError(
-      format!("writing {} as {}", info_1, info_2)
-    )
-  )
+  w.write_all( s.as_bytes() ) ? ;
+  Ok(())
 }
 
 impl<'a, T> Sym2Smt<T> for & 'a str {
   fn sym_to_smt2<Writer>(
     & self, writer: & mut Writer, _: & T
   ) -> Res<()> where Writer: io::Write {
-    write(self, writer, "& str", "symbol")
+    write_str(writer, self)
   }
 }
 impl<'a, T> Expr2Smt<T> for & 'a str {
   fn expr_to_smt2<Writer>(
     & self, writer: & mut Writer, _: & T
   ) -> Res<()> where Writer: io::Write {
-    write(self, writer, "& str", "expression")
+    write_str(writer, self)
   }
 }
 impl<'a> Sort2Smt for & 'a str {
   fn sort_to_smt2<Writer>(
     & self, writer: & mut Writer
   ) -> Res<()> where Writer: io::Write {
-    write(self, writer, "& str", "sort")
+    write_str(writer, self)
   }
 }
 
@@ -74,21 +72,21 @@ impl<T> Sym2Smt<T>  for String {
   fn sym_to_smt2<Writer>(
     & self, writer: & mut Writer, _: & T
   ) -> Res<()> where Writer: io::Write {
-    write(self, writer, "String", "symbol")
+    write_str(writer, self)
   }
 }
 impl<T> Expr2Smt<T> for String {
   fn expr_to_smt2<Writer>(
     & self, writer: & mut Writer, _: & T
   ) -> Res<()> where Writer: io::Write {
-    write(self, writer, "String", "expression")
+    write_str(writer, self)
   }
 }
 impl Sort2Smt for String {
   fn sort_to_smt2<Writer>(
     & self, writer: & mut Writer
   ) -> Res<()> where Writer: io::Write {
-    write(self, writer, "String", "sort")
+    write_str(writer, self)
   }
 }
 
@@ -229,10 +227,7 @@ impl fmt::Display for Logic {
 impl Logic {
   /// Prints the logic in a writer in SMT Lib 2 format.
   pub fn to_smt2(& self, writer: & mut io::Write, _: ()) -> Res<()> {
-    write!(writer, "{}", self).chain_err(
-      || ErrorKind::IoError(
-        format!("could not write logic '{}'", self)
-      )
-    )
+    write!(writer, "{}", self) ? ;
+    Ok(())
   }
 }

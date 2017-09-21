@@ -12,7 +12,6 @@
 #[macro_use]
 extern crate nom ;
 
-#[macro_use]
 extern crate rsmt2 ;
 
 use std::io::Write ;
@@ -61,15 +60,14 @@ impl Var {
   pub fn to_smt2<Writer: Write>(
     & self, writer: & mut Writer, off: & Offset
   ) -> Res<()> {
-    smt_cast_io!(
-      "writing a symbol" => match * self {
-        NSVar(ref sym) => write!(writer, "|{}|", sym),
-        /// SVar at 0, we use the index of the current step.
-        SVar0(ref sym) => write!(writer, "|{}@{}|", sym, off.0),
-        /// SVar at 1, we use the index of the next step.
-        SVar1(ref sym) => write!(writer, "|{}@{}|", sym, off.1),
-      }
-    )
+    match * self {
+      NSVar(ref sym) => write!(writer, "|{}|", sym) ?,
+      /// SVar at 0, we use the index of the current step.
+      SVar0(ref sym) => write!(writer, "|{}@{}|", sym, off.0) ?,
+      /// SVar at 1, we use the index of the next step.
+      SVar1(ref sym) => write!(writer, "|{}@{}|", sym, off.1) ?,
+    }
+    Ok(())
   }
   /// Given an offset, a variable can become a Symbol.
   pub fn to_sym<'a, 'b>(& 'a self, off: & 'b Offset) -> Symbol<'a, 'b> {
@@ -107,13 +105,12 @@ impl Const {
   pub fn to_smt2<Writer: Write>(
     & self, writer: & mut Writer
   ) -> Res<()> {
-    smt_cast_io!(
-      "writing a constant" => match * self {
-        BConst(ref b) => write!(writer, "{}", b),
-        IConst(ref i) => write!(writer, "{}", i),
-        RConst(ref num, ref den) => write!(writer, "(/ {} {})", num, den),
-      }
-    )
+    match * self {
+      BConst(ref b) => write!(writer, "{}", b) ?,
+      IConst(ref i) => write!(writer, "{}", i) ?,
+      RConst(ref num, ref den) => write!(writer, "(/ {} {})", num, den) ?,
+    }
+    Ok(())
   }
 }
 
@@ -140,20 +137,13 @@ impl SExpr {
       Id(ref var) => var.to_smt2(writer, off),
       Val(ref cst) => cst.to_smt2(writer),
       App(ref sym, ref args) => {
-        smtry_io!(
-          "writing an expression" =>
-          write!(writer, "({}", sym)
-        ) ;
+        write!(writer, "({}", sym) ? ;
         for ref arg in args {
-          smtry_io!( "writing an expression" =>
-            write!(writer, " ") ;
-            arg.to_smt2(writer, off)
-          )
-        } ;
-        smt_cast_io!(
-          "writing an expression" =>
-            write!(writer, ")")
-        )
+          write!(writer, " ") ? ;
+          arg.to_smt2(writer, off) ?
+        }
+        write!(writer, ")") ? ;
+        Ok(())
       }
     }
   }

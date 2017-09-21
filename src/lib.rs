@@ -165,7 +165,6 @@ We begin by writing printing functions taking an offset for our structure, as
 well as simple helper funtions:
 
 ```
-#[macro_use]
 extern crate rsmt2 ;
 
 use std::io::Write ;
@@ -234,15 +233,14 @@ impl Var {
   pub fn to_smt2<Writer: Write>(
     & self, writer: & mut Writer, off: & Offset
   ) -> Res<()> {
-    smt_cast_io!(
-      "writing a variable" => match * self {
-        NSVar(ref sym) => write!(writer, "|{}|", sym),
-        /// SVar at 0, we use the index of the current step.
-        SVar0(ref sym) => write!(writer, "|{}@{}|", sym, off.0),
-        /// SVar at 1, we use the index of the next step.
-        SVar1(ref sym) => write!(writer, "|{}@{}|", sym, off.1),
-      }
-    )
+    match * self {
+      NSVar(ref sym) => write!(writer, "|{}|", sym) ?,
+      /// SVar at 0, we use the index of the current step.
+      SVar0(ref sym) => write!(writer, "|{}@{}|", sym, off.0) ?,
+      /// SVar at 1, we use the index of the next step.
+      SVar1(ref sym) => write!(writer, "|{}@{}|", sym, off.1) ?,
+    }
+    Ok(())
   }
   /// Given an offset, a variable can become a Symbol.
   pub fn to_sym<'a, 'b>(& 'a self, off: & 'b Offset) -> Symbol<'a, 'b> {
@@ -254,13 +252,12 @@ impl Const {
   /// A constant can be printed in SMT Lib 2.
   #[inline(always)]
   pub fn to_smt2<Writer: Write>(& self, writer: & mut Writer) -> Res<()> {
-    smt_cast_io!(
-      "writing a constant" => match * self {
-        BConst(ref b) => write!(writer, "{}", b),
-        IConst(ref i) => write!(writer, "{}", i),
-        RConst(ref num, ref den) => write!(writer, "(/ {} {})", num, den),
-      }
-    )
+    match * self {
+      BConst(ref b) => write!(writer, "{}", b) ?,
+      IConst(ref i) => write!(writer, "{}", i) ?,
+      RConst(ref num, ref den) => write!(writer, "(/ {} {})", num, den) ?,
+    }
+    Ok(())
   }
 }
 
@@ -273,26 +270,16 @@ impl SExpr {
     & self, writer: & mut Writer, off: & Offset
   ) -> Res<()> {
     match * self {
-      Id(ref var) => var.to_smt2(writer, off).chain_err(
-        || "while writing an identifier"
-      ),
-      Val(ref cst) => cst.to_smt2(writer).chain_err(
-        || "while writing a plain value"
-      ),
+      Id(ref var) => var.to_smt2(writer, off),
+      Val(ref cst) => cst.to_smt2(writer),
       App(ref sym, ref args) => {
-        smtry_io!(
-          "writing an application (symbol)" => write!(writer, "({}", sym)
-        ) ;
+        write!(writer, "({}", sym) ? ;
         for ref arg in args {
-          smtry_io!(
-            "writing an application (args)" =>
-              write!(writer, " ") ;
-              arg.to_smt2(writer, off)
-          )
-        } ;
-        smt_cast_io!(
-          "writing an application (trailer)" => write!(writer, ")")
-        )
+          write!(writer, " ") ? ;
+          arg.to_smt2(writer, off) ?
+        }
+        write!(writer, ")") ? ;
+        Ok(())
       }
     }
   }
@@ -307,7 +294,7 @@ impl SExpr {
 It is now easy to implement `Sym2Smt` and `Expr2Smt`:
 
 ```
-# #[macro_use]
+#
 # extern crate rsmt2 ;
 # 
 # use std::io::Write ;
@@ -376,15 +363,14 @@ It is now easy to implement `Sym2Smt` and `Expr2Smt`:
 #   pub fn to_smt2<Writer: Write>(
 #     & self, writer: & mut Writer, off: & Offset
 #   ) -> Res<()> {
-#     smt_cast_io!(
-#       "writing a variable" => match * self {
-#         NSVar(ref sym) => write!(writer, "|{}|", sym),
-#         /// SVar at 0, we use the index of the current step.
-#         SVar0(ref sym) => write!(writer, "|{}@{}|", sym, off.0),
-#         /// SVar at 1, we use the index of the next step.
-#         SVar1(ref sym) => write!(writer, "|{}@{}|", sym, off.1),
-#       }
-#     )
+#     match * self {
+#       NSVar(ref sym) => write!(writer, "|{}|", sym) ?,
+#       /// SVar at 0, we use the index of the current step.
+#       SVar0(ref sym) => write!(writer, "|{}@{}|", sym, off.0) ?,
+#       /// SVar at 1, we use the index of the next step.
+#       SVar1(ref sym) => write!(writer, "|{}@{}|", sym, off.1) ?,
+#     }
+#     Ok(())
 #   }
 #   /// Given an offset, a variable can become a Symbol.
 #   pub fn to_sym<'a, 'b>(& 'a self, off: & 'b Offset) -> Symbol<'a, 'b> {
@@ -396,13 +382,12 @@ It is now easy to implement `Sym2Smt` and `Expr2Smt`:
 #   /// A constant can be printed in SMT Lib 2.
 #   #[inline(always)]
 #   pub fn to_smt2<Writer: Write>(& self, writer: & mut Writer) -> Res<()> {
-#     smt_cast_io!(
-#       "writing a constant" => match * self {
-#         BConst(ref b) => write!(writer, "{}", b),
-#         IConst(ref i) => write!(writer, "{}", i),
-#         RConst(ref num, ref den) => write!(writer, "(/ {} {})", num, den),
-#       }
-#     )
+#     match * self {
+#       BConst(ref b) => write!(writer, "{}", b) ?,
+#       IConst(ref i) => write!(writer, "{}", i) ?,
+#       RConst(ref num, ref den) => write!(writer, "(/ {} {})", num, den) ?,
+#     }
+#     Ok(())
 #   }
 # }
 # 
@@ -415,26 +400,16 @@ It is now easy to implement `Sym2Smt` and `Expr2Smt`:
 #     & self, writer: & mut Writer, off: & Offset
 #   ) -> Res<()> {
 #     match * self {
-#       Id(ref var) => var.to_smt2(writer, off).chain_err(
-#         || "while writing an identifier"
-#       ),
-#       Val(ref cst) => cst.to_smt2(writer).chain_err(
-#         || "while writing a plain value"
-#       ),
+#       Id(ref var) => var.to_smt2(writer, off),
+#       Val(ref cst) => cst.to_smt2(writer),
 #       App(ref sym, ref args) => {
-#         smtry_io!(
-#           "writing an application (symbol)" => write!(writer, "({}", sym)
-#         ) ;
+#         write!(writer, "({}", sym) ? ;
 #         for ref arg in args {
-#           smtry_io!(
-#             "writing an application (args)" =>
-#               write!(writer, " ") ;
-#               arg.to_smt2(writer, off)
-#           )
-#         } ;
-#         smt_cast_io!(
-#           "writing an application (trailer)" => write!(writer, ")")
-#         )
+#           write!(writer, " ") ? ;
+#           arg.to_smt2(writer, off) ?
+#         }
+#         write!(writer, ")") ? ;
+#         Ok(())
 #       }
 #     }
 #   }
@@ -480,7 +455,6 @@ So, we define a dummy parser for now and perform a `check-sat`:
 // Parser library.
 #[macro_use]
 extern crate nom ;
-#[macro_use]
 extern crate rsmt2 ;
 
 use nom::IResult ;
@@ -551,15 +525,14 @@ use nom::IResult ;
 #   pub fn to_smt2<Writer: Write>(
 #     & self, writer: & mut Writer, off: & Offset
 #   ) -> Res<()> {
-#     smt_cast_io!(
-#       "writing a variable" => match * self {
-#         NSVar(ref sym) => write!(writer, "|{}|", sym),
-#         /// SVar at 0, we use the index of the current step.
-#         SVar0(ref sym) => write!(writer, "|{}@{}|", sym, off.0),
-#         /// SVar at 1, we use the index of the next step.
-#         SVar1(ref sym) => write!(writer, "|{}@{}|", sym, off.1),
-#       }
-#     )
+#     match * self {
+#       NSVar(ref sym) => write!(writer, "|{}|", sym) ?,
+#       /// SVar at 0, we use the index of the current step.
+#       SVar0(ref sym) => write!(writer, "|{}@{}|", sym, off.0) ?,
+#       /// SVar at 1, we use the index of the next step.
+#       SVar1(ref sym) => write!(writer, "|{}@{}|", sym, off.1) ?,
+#     }
+#     Ok(())
 #   }
 #   /// Given an offset, a variable can become a Symbol.
 #   pub fn to_sym<'a, 'b>(& 'a self, off: & 'b Offset) -> Symbol<'a, 'b> {
@@ -573,13 +546,12 @@ use nom::IResult ;
 #   pub fn to_smt2<Writer: Write>(
 #     & self, writer: & mut Writer
 #   ) -> Res<()> {
-#     smt_cast_io!(
-#       "writing a constant" => match * self {
-#         BConst(ref b) => write!(writer, "{}", b),
-#         IConst(ref i) => write!(writer, "{}", i),
-#         RConst(ref num, ref den) => write!(writer, "(/ {} {})", num, den),
-#       }
-#     )
+#     match * self {
+#       BConst(ref b) => write!(writer, "{}", b) ?,
+#       IConst(ref i) => write!(writer, "{}", i) ?,
+#       RConst(ref num, ref den) => write!(writer, "(/ {} {})", num, den) ?,
+#     }
+#     Ok(())
 #   }
 # }
 # 
@@ -592,26 +564,16 @@ use nom::IResult ;
 #     & self, writer: & mut Writer, off: & Offset
 #   ) -> Res<()> {
 #     match * self {
-#       Id(ref var) => var.to_smt2(writer, off).chain_err(
-#         || "while writing an identifier"
-#       ),
-#       Val(ref cst) => cst.to_smt2(writer).chain_err(
-#         || "while writing a plain value"
-#       ),
+#       Id(ref var) => var.to_smt2(writer, off),
+#       Val(ref cst) => cst.to_smt2(writer),
 #       App(ref sym, ref args) => {
-#         smtry_io!(
-#           "writing an application (symbol)" => write!(writer, "({}", sym)
-#         ) ;
+#         write!(writer, "({}", sym) ? ;
 #         for ref arg in args {
-#           smtry_io!(
-#             "writing an application (args)" =>
-#               write!(writer, " ") ;
-#               arg.to_smt2(writer, off)
-#           )
-#         } ;
-#         smt_cast_io!(
-#           "writing an application (trailer)" => write!(writer, ")")
-#         )
+#           write!(writer, " ") ? ;
+#           arg.to_smt2(writer, off) ?
+#         }
+#         write!(writer, ")") ? ;
+#         Ok(())
 #       }
 #     }
 #   }
@@ -779,22 +741,26 @@ pub mod errors {
       Error, ErrorKind, ResExt, Res ;
     }
 
+    foreign_links {
+      Io(::std::io::Error) #[doc = "IO error."] ;
+    }
+
     errors {
       #[doc = "The solver reported `unsupported`."]
       Unsupported {
         description("unsupported command")
       }
 
-      #[doc = "The solver reported an error."]
-      SolverError(s: String) {
-        description("solver error")
-        display("solver error: \"{}\"", s)
-      }
-
       #[doc = "IO error."]
       IoError(s: String) {
         description("input/output error")
         display("IO error: \"{}\"", s)
+      }
+
+      #[doc = "The solver reported an error."]
+      SolverError(s: String) {
+        description("solver error")
+        display("solver error: \"{}\"", s)
       }
 
       #[doc = "Parsing error ([`nom`](https://crates.io/crates/nom) style)."]
