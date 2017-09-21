@@ -15,6 +15,7 @@ use std::str ;
 use nom::{ IResult, digit, multispace } ;
 
 use * ;
+use to_smt::* ;
 use errors::* ;
 
 use self::Var::* ;
@@ -324,6 +325,7 @@ macro_rules! smtry {
 
 #[test]
 fn test() {
+  use conf::* ;
 
   let conf = SolverConf::z3() ;
 

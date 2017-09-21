@@ -23,6 +23,8 @@ use nom::{
 } ;
 
 use rsmt2::* ;
+use rsmt2::conf::* ;
+use rsmt2::to_smt::* ;
 use rsmt2::errors::* ;
 
 use Var::* ;

@@ -280,22 +280,6 @@ impl<
 > Solver<'kid, Parser> for PlainSolver<'kid, Parser> {}
 
 
-impl<
-  'kid, Parser: ParseSmt2 + 'static
-> Query<'kid, Parser> for PlainSolver<'kid, Parser> {}
-
-impl<
-  'kid, Parser: ParseSmt2 + 'static, Info
-> QueryIdent<'kid, Parser, Info> for PlainSolver<'kid, Parser> {}
-
-impl<
-  'kid, Parser: ParseSmt2 + 'static, Info
-> QueryExpr<'kid, Parser, Info> for PlainSolver<'kid, Parser> {}
-
-impl<
-  'kid, Parser: ParseSmt2 + 'static
-> QueryExprInfo<'kid, Parser> for PlainSolver<'kid, Parser> {}
-
 
 
 
@@ -364,23 +348,6 @@ impl<
 impl<
   'kid, Parser: ParseSmt2 + 'static
 > Solver<'kid, Parser> for TeeSolver<'kid, Parser> {}
-
-
-impl<
-  'kid, Parser: ParseSmt2 + 'static
-> Query<'kid, Parser> for TeeSolver<'kid, Parser> {}
-
-impl<
-  'kid, Parser: ParseSmt2 + 'static, Info
-> QueryIdent<'kid, Parser, Info> for TeeSolver<'kid, Parser> {}
-
-impl<
-  'kid, Parser: ParseSmt2 + 'static, Info
-> QueryExpr<'kid, Parser, Info> for TeeSolver<'kid, Parser> {}
-
-impl<
-  'kid, Parser: ParseSmt2 + 'static
-> QueryExprInfo<'kid, Parser> for TeeSolver<'kid, Parser> {}
 
 
 
@@ -462,7 +429,7 @@ pub fn solver<'kid, Parser: ParseSmt2 + 'static>(
 
 
 
-/// Provides SMT-LIB commands that are not queries.
+/// Provides SMT-LIB commands.
 pub trait Solver<'kid, Parser: ParseSmt2 + 'static> :
 SolverPrims<'kid, Parser> {
 
@@ -641,10 +608,18 @@ SolverPrims<'kid, Parser> {
   /// Defines a new sort.
   #[inline]
   fn define_sort<
-    Sort: Sort2Smt, I, Expr1: Expr2Smt<I>, Expr2: Expr2Smt<I>
+    'a, Sort, I, Arg, ArgIter, Args: ?Sized, Body
   >(
-    & mut self, sort: & Sort, args: & [ Expr1 ], body: & Expr2, info: & I
-  ) -> Res<()> {
+    & mut self, sort: & Sort, args: & 'a Args, body: & Body, info: & I
+  ) -> Res<()>
+  where
+  Sort: Sort2Smt,
+  Arg: Expr2Smt<I> + 'a,
+  Body: Expr2Smt<I>,
+  ArgIter: Iterator<Item = & 'a Arg>,
+  & 'a Args: IntoIterator<
+    Item = & 'a Arg, IntoIter = ArgIter
+  > {
     parse_success!(
       self for {
         stutter_arg!(self.write ;
@@ -666,9 +641,19 @@ SolverPrims<'kid, Parser> {
   }
   /// Declares a new function symbol.
   #[inline]
-  fn declare_fun<Sort1: Sort2Smt, Sort2: Sort2Smt, I, Sym: Sym2Smt<I>> (
-    & mut self, symbol: & Sym, args: & [ Sort1 ], out: & Sort2, info: & I
-  ) -> Res<()> {
+  fn declare_fun<
+    'a, FunSym, ArgSort, ArgIter, Args: ?Sized, I, OutSort
+  > (
+    & mut self, symbol: & FunSym, args: & 'a Args, out: & OutSort, info: & I
+  ) -> Res<()>
+  where
+  FunSym: Sym2Smt<I>,
+  ArgSort: Sort2Smt + 'a,
+  OutSort: Sort2Smt,
+  ArgIter: Iterator<Item = & 'a ArgSort>,
+  & 'a Args: IntoIterator<
+    Item = & 'a ArgSort, IntoIter = ArgIter
+  > {
     parse_success!(
       self for {
         stutter_arg!(self.write ;
@@ -676,7 +661,7 @@ SolverPrims<'kid, Parser> {
             write_str(w, "(declare-fun ") ? ;
             symbol.sym_to_smt2(w, info) ? ;
             write_str(w, " ( ") ? ;
-            for arg in args {
+            for arg in args.into_iter() {
               arg.sort_to_smt2(w) ? ;
               write_str(w, " ") ?
             }
@@ -690,7 +675,7 @@ SolverPrims<'kid, Parser> {
   }
   /// Declares a new constant.
   #[inline]
-  fn declare_const<Sort: Sort2Smt, I, Sym: Sym2Smt<I>> (
+  fn declare_const<Sym: Sym2Smt<I>, Sort: Sort2Smt, I> (
     & mut self, symbol: & Sym, out_sort: & Sort, info: & I
   ) -> Res<()> {
     parse_success!(
@@ -710,13 +695,21 @@ SolverPrims<'kid, Parser> {
   /// Defines a new function symbol.
   #[inline]
   fn define_fun<
-    I,
-    Sort1: Sort2Smt, Sort2: Sort2Smt,
-    Sym1: Sym2Smt<I>, Sym2: Sym2Smt<I>, Expr: Expr2Smt<I>
+    'a, FunSym, ArgSym, ArgSort, ArgIter, Args: ?Sized, OutSort, Body, I
   >(
-    & mut self, symbol: & Sym1, args: & [ (Sym2, Sort1) ],
-    out: & Sort2, body: & Expr, info: & I
-  ) -> Res<()> {
+    & mut self, symbol: & FunSym, args: & 'a Args,
+    out: & OutSort, body: & Body, info: & I
+  ) -> Res<()>
+  where
+  ArgSort: Sort2Smt + 'a,
+  OutSort: Sort2Smt,
+  FunSym: Sym2Smt<I>,
+  ArgSym: Sym2Smt<I> + 'a,
+  Body: Expr2Smt<I>,
+  ArgIter: Iterator<Item = & 'a (ArgSym, ArgSort)>,
+  & 'a Args: IntoIterator<
+    Item = & 'a (ArgSym, ArgSort), IntoIter = ArgIter
+  > {
     parse_success!(
       self for {
         stutter_arg!(self.write ;
@@ -745,10 +738,25 @@ SolverPrims<'kid, Parser> {
   /// Defines some new (possibily mutually) recursive functions.
   #[inline]
   fn define_funs_rec<
-    I, Sort1: Sort2Smt, Sort2: Sort2Smt, Sym: Sym2Smt<I>, Expr: Expr2Smt<I>
+    'a, FunSym, ArgSym, ArgSort, ArgIter, Args, OutSort, Body,
+    FunIter, Funs: ?Sized, I
   >(
-    & mut self, funs: & [ (Sym, & [ (Sym, Sort1) ], Sort2, Expr) ], info: & I
-  ) -> Res<()> {
+    & mut self, funs: & 'a Funs, info: & I
+  ) -> Res<()>
+  where
+  FunSym: Sym2Smt<I> + 'a,
+  ArgSym: Sym2Smt<I> + 'a,
+  ArgSort: Sort2Smt + 'a,
+  OutSort: Sort2Smt + 'a,
+  Body: Expr2Smt<I> + 'a,
+  ArgIter: Iterator<Item = & 'a (ArgSym, ArgSort)>,
+  & 'a Args: IntoIterator<
+    Item = & 'a (ArgSym, ArgSort), IntoIter = ArgIter
+  > + 'a,
+  FunIter: Iterator<Item = & 'a (FunSym, Args, OutSort, Body)>,
+  & 'a Funs: IntoIterator<
+    Item = & 'a (FunSym, Args, OutSort, Body), IntoIter = FunIter
+  > {
     parse_success!(
       self for {
         stutter_arg!(self.write ;
@@ -762,7 +770,7 @@ SolverPrims<'kid, Parser> {
               write_str(w, "   (") ? ;
               sym.sym_to_smt2(w, info) ? ;
               write_str(w, " ( ") ? ;
-              for arg in * args {
+              for arg in args {
                 let (ref sym, ref sort) = * arg ;
                 write_str(w, "(") ? ;
                 sym.sym_to_smt2(w, info) ? ;
@@ -791,11 +799,21 @@ SolverPrims<'kid, Parser> {
   /// Defines a new recursive function.
   #[inline]
   fn define_fun_rec<
-    I, Sort1: Sort2Smt, Sort2: Sort2Smt, Sym: Sym2Smt<I>, Expr: Expr2Smt<I>
+    'a, FunSym, ArgSym, ArgSort, ArgIter, Args: ?Sized, OutSort, Body, I
   >(
-    & mut self,  symbol: & Sym, args: & [ (Sym, Sort1) ],
-    out: & Sort2, body: & Expr, info: & I
-  ) -> Res<()> {
+    & mut self,  symbol: & FunSym, args: & 'a Args,
+    out: & OutSort, body: & Body, info: & I
+  ) -> Res<()>
+  where
+  ArgSort: Sort2Smt + 'a,
+  OutSort: Sort2Smt,
+  FunSym: Sym2Smt<I>,
+  ArgSym: Sym2Smt<I> + 'a,
+  Body: Expr2Smt<I>,
+  ArgIter: Iterator<Item = & 'a (ArgSym, ArgSort)>,
+  & 'a Args: IntoIterator<
+    Item = & 'a (ArgSym, ArgSort), IntoIter = ArgIter
+  > {
     parse_success!(
       self for {
         stutter_arg!(self.write ;
@@ -893,18 +911,6 @@ SolverPrims<'kid, Parser> {
   fn parse_success(& mut self) -> Res<()> {
     self.parse( |bytes, _| wrap!( success(bytes) ) )
   }
-}
-
-
-
-
-
-
-
-/// Prints queries.
-pub trait Query<
-  'kid, Parser: ParseSmt2 + 'static
-> : Solver<'kid, Parser> {
 
   /// Check-sat command.
   #[inline(always)]
@@ -1042,16 +1048,53 @@ pub trait Query<
       |w| write_str(w, "(get-unsat-core)\n")
     )
   }
-}
 
-/// Queries with ident printing.
-pub trait QueryIdent<
-  'kid, Parser: ParseSmt2 + 'static, Info
-> : Solver<'kid, Parser> + Query<'kid, Parser> {
+  /// Get-values command.
+  fn print_get_values<'a, Expr, ExprIter, Exprs: ?Sized>(
+    & mut self, exprs: & 'a Exprs, info: & Parser::I
+  ) -> Res<()>
+  where
+  Expr: Expr2Smt< Parser::I > + 'a,
+  ExprIter: Iterator<Item = & 'a Expr>,
+  & 'a Exprs: IntoIterator<
+    Item = & 'a Expr, IntoIter = ExprIter
+  > {
+    stutter_arg!(self.write ;
+      |w| {
+        write!(w, "(get-value (") ? ;
+        for e in exprs {
+          write_str(w, "\n  ") ? ;
+          e.expr_to_smt2(w, info) ?
+        }
+        write_str(w, "\n) )\n")
+      }
+    )
+  }
+
+  /// Get-values command.
+  fn get_values<'a, Expr, ExprIter, Exprs: ?Sized>(
+    & mut self, exprs: & 'a Exprs, info: & Parser::I
+  ) -> Res<Vec<(Parser::Expr, Parser::Value)>>
+  where
+  Expr: Expr2Smt<Parser::I> +'a,
+  ExprIter: Iterator<Item = & 'a Expr>,
+  & 'a Exprs: IntoIterator<
+    Item = & 'a Expr, IntoIter = ExprIter
+  > {
+    self.print_get_values(exprs, info) ? ;
+    self.parse_get_values(info)
+  }
+
   /// Check-sat with assumptions command.
-  fn print_check_sat_assuming<Ident: Sym2Smt<Info>>(
-    & mut self, bool_vars: & [ Ident ], info: & Info
-  ) -> Res<()> {
+  fn print_check_sat_assuming<'a, Ident, IdentIter, Idents: ?Sized>(
+    & mut self, bool_vars: & 'a Idents, info: & Parser::I
+  ) -> Res<()>
+  where
+  Ident: Sym2Smt<Parser::I> + 'a,
+  IdentIter: Iterator<Item = & 'a Ident>,
+  & 'a Idents: IntoIterator<
+    Item = & 'a Ident, IntoIter = IdentIter
+  > {
     match * self.solver().conf.get_check_sat_assuming() {
       Some(ref cmd) => {
         stutter_arg!(self.write ;
@@ -1075,44 +1118,16 @@ pub trait QueryIdent<
   }
 
   /// Check-sat assuming command.
-  fn check_sat_assuming<Ident: Sym2Smt<Info>>(
-    & mut self, idents: & [ Ident ], info: & Info
-  ) -> Res<bool> {
+  fn check_sat_assuming<'a, Ident, IdentIter, Idents: ?Sized>(
+    & mut self, idents: & 'a Idents, info: & Parser::I
+  ) -> Res<bool>
+  where
+  Ident: Sym2Smt<Parser::I> + 'a,
+  IdentIter: Iterator<Item = & 'a Ident>,
+  & 'a Idents: IntoIterator<
+    Item = & 'a Ident, IntoIter = IdentIter
+  > {
     self.print_check_sat_assuming(idents, info) ? ;
     self.parse_check_sat()
-  }
-}
-
-/// Queries with expr printing.
-pub trait QueryExpr<
-  'kid, Parser: ParseSmt2 + 'static, Info
-> : Solver<'kid, Parser> + Query<'kid, Parser> {
-  /// Get-values command.
-  fn print_get_values<Expr: Expr2Smt<Info>>(
-    & mut self, exprs: & [ Expr ], info: & Info
-  ) -> Res<()> {
-    stutter_arg!(self.write ;
-      |w| {
-        write!(w, "(get-value (") ? ;
-        for e in exprs {
-          write_str(w, "\n  ") ? ;
-          e.expr_to_smt2(w, info) ?
-        }
-        write_str(w, "\n) )\n")
-      }
-    )
-  }
-}
-
-/// Queries with expr printing and related print/parse information.
-pub trait QueryExprInfo<
-  'kid, Parser: ParseSmt2 + 'static
-> : Solver<'kid, Parser> + QueryExpr<'kid, Parser, Parser::I> {
-  /// Get-values command.
-  fn get_values<Expr: Expr2Smt<Parser::I>>(
-    & mut self, exprs: & [ Expr ], info: & Parser::I
-  ) -> Res<Vec<(Parser::Expr, Parser::Value)>> {
-    self.print_get_values(exprs, info) ? ;
-    self.parse_get_values(info)
   }
 }

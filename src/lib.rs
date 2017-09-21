@@ -420,6 +420,8 @@ It is now easy to implement `Sym2Smt` and `Expr2Smt`:
 #     Unrolled(self, off)
 #   }
 # }
+use rsmt2::to_smt::{ Sym2Smt, Expr2Smt } ;
+
 /// A symbol can be printed in SMT Lib 2.
 impl<'a, 'b> Sym2Smt<()> for Symbol<'a,'b> {
   fn sym_to_smt2<Writer: Write>(
@@ -584,6 +586,7 @@ use nom::IResult ;
 #     Unrolled(self, off)
 #   }
 # }
+# use rsmt2::to_smt::* ;
 # /// A symbol can be printed in SMT Lib 2.
 # impl<'a, 'b> Sym2Smt<()> for Symbol<'a,'b> {
 #   fn sym_to_smt2<Writer: Write>(
@@ -645,6 +648,7 @@ macro_rules! smtry {
 
 fn main() {
   use rsmt2::* ;
+  use rsmt2::conf::SolverConf ;
 
   let conf = SolverConf::z3() ;
 
@@ -776,21 +780,23 @@ pub mod errors {
 
 #[macro_use]
 mod common ;
-mod conf ;
+pub mod conf ;
 mod parse ;
 mod solver ;
 
 mod example ;
 
-pub use common::* ;
-pub use conf::* ;
+pub use common::{ ParseSmt2 } ;
 pub use solver::{
-  solver,
-  Kid, Solver, PlainSolver, TeeSolver,
-  Query, QueryExpr, QueryExprInfo, QueryIdent,
+  solver, Kid, Solver, PlainSolver, TeeSolver
 } ;
 
 /// Internal traits used to build solvers.
 pub mod internals {
   pub use solver::{ SolverBasic, SolverPrims } ;
+}
+
+/// Traits your types must implement so that `rsmt2` can use them.
+pub mod to_smt {
+  pub use common::{ Expr2Smt, Sort2Smt, Sym2Smt } ;
 }
