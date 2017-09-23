@@ -806,7 +806,7 @@ pub trait Solver<
   /// Parse the result of a get-model.
   fn parse_get_model<Ident, Type, Value>(
     & mut self
-  ) -> Res<Vec<(Ident, Type, Value)>>
+  ) -> Res<Vec<(Ident, Vec<Type>, Type, Value)>>
   where Parser: IdentParser<Ident, Type> + ValueParser<Value> {
     let (smt_parser, parser) = self.parsers() ;
     smt_parser.get_model(parser)
@@ -815,10 +815,28 @@ pub trait Solver<
   /// Get-model command.
   fn get_model<Ident, Type, Value>(
     & mut self
-  ) -> Res<Vec<(Ident, Type, Value)>>
+  ) -> Res<Vec<(Ident, Vec<Type>, Type, Value)>>
   where Parser: IdentParser<Ident, Type> + ValueParser<Value> {
     self.print_get_model() ? ;
     self.parse_get_model()
+  }
+
+  /// Parse the result of a get-model where all the symbols are nullary.
+  fn parse_get_model_const<Ident, Type, Value>(
+    & mut self
+  ) -> Res<Vec<(Ident, Type, Value)>>
+  where Parser: IdentParser<Ident, Type> + ValueParser<Value> {
+    let (smt_parser, parser) = self.parsers() ;
+    smt_parser.get_model_const(parser)
+  }
+
+  /// Get-model command when all the symbols are nullary.
+  fn get_model_const<Ident, Type, Value>(
+    & mut self
+  ) -> Res<Vec<(Ident, Type, Value)>>
+  where Parser: IdentParser<Ident, Type> + ValueParser<Value> {
+    self.print_get_model() ? ;
+    self.parse_get_model_const()
   }
 
 

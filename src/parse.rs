@@ -69,6 +69,7 @@ impl<R: BufRead> SmtParser<R> {
   /// set at its beginning.
   pub fn load_sexpr(& mut self) -> Res<usize> {
     self.spc_cmt() ;
+    // self.print("") ;
     let (mut op_paren, mut cl_paren) = (0, 0) ;
     let mut quoted_ident = false ;
     let mut start = self.cursor ;
@@ -76,13 +77,18 @@ impl<R: BufRead> SmtParser<R> {
 
     // println!("  loading:") ;
     'load: loop {
-      self.read_line() ? ;
+      if start == self.buff.len() {
+        self.read_line() ?
+      }
+      debug_assert!(op_paren >= cl_paren) ;
 
       'lines: for line in self.buff[start..].lines() {
+        debug_assert!(op_paren >= cl_paren) ;
         // println!("  > {}", line) ;
         let mut this_end = start ;
         let mut chars = line.chars() ;
         'this_line: while let Some(c) = chars.next() {
+          debug_assert!(op_paren >= cl_paren) ;
           this_end += 1 ;
           // println!("  '{}' {}/{} |{}|", c, op_paren, cl_paren, quoted_ident) ;
           
@@ -105,17 +111,20 @@ impl<R: BufRead> SmtParser<R> {
                 }
               },
               _ => if ! c.is_whitespace() && op_paren == 0 {
-                print!("... `") ;
+                // print!("... `") ;
                 'token: for c in chars {
-                  print!("{}", c) ;
+                  if c.is_whitespace() { break 'token }
                   match c {
-                    ')' | '(' | '|' |
-                    _ if c.is_whitespace() => break 'token,
-                    _ => (),
+                    ')' | '(' | '|' => {
+                      // println!("` | {}", this_end) ;
+                      break 'token
+                    },
+                    _ => {
+                      // print!("{}[{}]", c, this_end) ;
+                      this_end += 1
+                    },
                   }
-                  this_end += 1 ;
                 }
-                println!("`") ;
                 end = this_end ;
                 break 'load
               },
@@ -130,6 +139,7 @@ impl<R: BufRead> SmtParser<R> {
 
     }
     self.spc_cmt() ;
+    // println!("{} .. {}", self.cursor, end) ;
     Ok(end)
   }
 
@@ -152,7 +162,10 @@ impl<R: BufRead> SmtParser<R> {
         let nu_count = count + line.len() + 1 ;
         if self.cursor <= nu_count {
           printed_cursor = true ;
-          println!("{0}| {1: >2$}^", pref, "", self.cursor - count)
+          println!(
+            "{0}| {1: >2$}^",
+            pref, "", self.cursor - count
+          )
         }
         count = nu_count ;
       }
@@ -286,8 +299,8 @@ impl<R: BufRead> SmtParser<R> {
   }
 
 
-  /// Parses the result of a get-model.
-  pub fn get_model<Ident, Value, Type, Parser>(
+  /// Parses the result of a get-model where all symbols are nullary.
+  pub fn get_model_const<Ident, Value, Type, Parser>(
     & mut self, parser: Parser
   ) -> Res< Vec<(Ident, Type, Value)> >
   where Parser: IdentParser<Ident, Type> + ValueParser<Value> {
@@ -296,9 +309,35 @@ impl<R: BufRead> SmtParser<R> {
     while ! self.try_tag(")") ? {
       tags!{ self => "(", "define-fun" }
       let id = parser.parse_ident( self.get_sexpr() ? ) ? ;
+      tags!{ self => "(", ")" }
       let typ = parser.parse_type( self.get_sexpr() ? ) ? ;
       let value = parser.parse_value( self.get_sexpr() ? ) ? ;
       model.push( (id, typ, value) ) ;
+      tags!{ self => ")" }
+    }
+    Ok(model)
+  }
+
+
+  /// Parses the result of a get-model.
+  pub fn get_model<Ident, Value, Type, Parser>(
+    & mut self, parser: Parser
+  ) -> Res< Vec<(Ident, Vec<Type>, Type, Value)> >
+  where Parser: IdentParser<Ident, Type> + ValueParser<Value> {
+    let mut model = Vec::new() ;
+    tags!{ self => "(", "model" }
+    while ! self.try_tag(")") ? {
+      tags!{ self => "(", "define-fun" }
+      let id = parser.parse_ident( self.get_sexpr() ? ) ? ;
+      tags!{ self => "(" }
+      let mut args = Vec::new() ;
+      while ! self.try_tag(")") ? {
+        let typ = parser.parse_type(self.get_sexpr() ? ) ? ;
+        args.push(typ)
+      }
+      let typ = parser.parse_type( self.get_sexpr() ? ) ? ;
+      let value = parser.parse_value( self.get_sexpr() ? ) ? ;
+      model.push( (id, args, typ, value) ) ;
       tags!{ self => ")" }
     }
     Ok(model)

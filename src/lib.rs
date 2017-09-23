@@ -66,6 +66,10 @@ enum Var {
   SVar1(Sym),
 }
 
+/// A type.
+#[derive(Debug,Clone,Copy,PartialEq)]
+enum Type { Int, Bool, Real }
+
 /// A constant.
 #[derive(Debug,Clone,PartialEq)]
 enum Const {
@@ -106,6 +110,10 @@ are:
 #   /// State variable in the next step.
 #   SVar1(Sym),
 # }
+#
+# /// A type.
+# #[derive(Debug,Clone,Copy,PartialEq)]
+# enum Type { Int, Bool, Real }
 # 
 # /// A constant.
 # #[derive(Debug,Clone,PartialEq)]
@@ -193,6 +201,10 @@ use SExpr::* ;
 #   /// State variable in the next step.
 #   SVar1(Sym),
 # }
+#
+# /// A type.
+# #[derive(Debug,Clone,Copy,PartialEq)]
+# enum Type { Int, Bool, Real }
 # 
 # /// A constant.
 # #[derive(Debug,Clone,PartialEq)]
@@ -233,7 +245,6 @@ impl Var {
   pub fn svar0(s: & str) -> Self { SVar0(s.to_string()) }
   pub fn svar1(s: & str) -> Self { SVar1(s.to_string()) }
   /// Given an offset, a variable can be printed in SMT Lib 2.
-  #[inline(always)]
   pub fn to_smt2<Writer: Write>(
     & self, writer: & mut Writer, off: & Offset
   ) -> Res<()> {
@@ -254,7 +265,6 @@ impl Var {
 
 impl Const {
   /// A constant can be printed in SMT Lib 2.
-  #[inline(always)]
   pub fn to_smt2<Writer: Write>(& self, writer: & mut Writer) -> Res<()> {
     match * self {
       BConst(ref b) => write!(writer, "{}", b) ?,
@@ -323,6 +333,10 @@ It is now easy to implement `Sym2Smt` and `Expr2Smt`:
 #   /// State variable in the next step.
 #   SVar1(Sym),
 # }
+#
+# /// A type.
+# #[derive(Debug,Clone,Copy,PartialEq)]
+# enum Type { Int, Bool, Real }
 # 
 # /// A constant.
 # #[derive(Debug,Clone,PartialEq)]
@@ -448,19 +462,18 @@ impl<'a, 'b> Expr2Smt<()> for Unrolled<'a,'b> {
 ### Before writing the parsers...
 
 ...we can actually already test our structure. To create a solver, one must
-give an implementation of `ParseSmt2`. But we can define a dummy parser as long
-as we don't actually need to parse anything specific to our structure.
+provide a parser for the custom structures. It will be used by some of the
+functions in the [`Solver`](./trait.Solver.html) trait. The
+[`get_model`](trait.Solver.html#method.get_model) function for instance
+requires the parser to implement the [IdentParser](trait.IdentParser.html) and
+[ValueParser](trait.ValueParser.html) traits.
 
-That is, as long as we only use the `check-sat` and `check-sat-assuming`
-queries. On the other hand, we will not be able to call, say, `get-model` for
-now because then we would need to provide a parser for symbols and values.
-
-So, we define a dummy parser for now and perform a `check-sat`:
+Most of the other functions of `Solver` do not require anything however, this
+the case of [`check_sat`](trait.Solver.html#method.check_sat) for example.
 
 ```
-// Parser library.
-extern crate rsmt2 ;
-
+# // Parser library.
+# extern crate rsmt2 ;
 # use std::io::Write ;
 # 
 # use rsmt2::* ;
@@ -483,6 +496,10 @@ extern crate rsmt2 ;
 #   /// State variable in the next step.
 #   SVar1(Sym),
 # }
+#
+# /// A type.
+# #[derive(Debug,Clone,Copy,PartialEq)]
+# enum Type { Int, Bool, Real }
 # 
 # /// A constant.
 # #[derive(Debug,Clone,PartialEq)]
@@ -602,37 +619,6 @@ extern crate rsmt2 ;
 #     self.0.to_smt2(writer, self.1)
 #   }
 # }
-/// Dummy parser.
-struct Parser ;
-impl ParseSmt2 for Parser {
-  type Ident = Var ;
-  type Value = Const ;
-  type Expr = SExpr ;
-  type Proof = () ;
-  type I = () ;
-
-  fn parse_ident<'a>(
-    & self, array: & 'a [u8]
-  ) -> IResult<& 'a [u8], Var> {
-    panic!("not implemented")
-  }
-  fn parse_value<'a>(
-    & self, array: & 'a [u8]
-  ) -> IResult<& 'a [u8], Const> {
-    panic!("not implemented")
-  }
-  fn parse_expr<'a>(
-    & self, array: & 'a [u8], _: & ()
-  ) -> IResult<& 'a [u8], SExpr> {
-    panic!("not implemented")
-  }
-  fn parse_proof<'a>(
-    & self, _: & 'a [u8]
-  ) -> IResult<& 'a [u8], ()> {
-    panic!("not implemented")
-  }
-}
-
 /// Convenience macro.
 macro_rules! smtry {
   ($e:expr, failwith $( $msg:expr ),+) => (
@@ -643,6 +629,314 @@ macro_rules! smtry {
   ) ;
 }
 
+
+fn main() {
+  use rsmt2::* ;
+  use rsmt2::conf::SolverConf ;
+
+  let conf = SolverConf::z3() ;
+
+  let mut kid = match Kid::new(conf) {
+    Ok(kid) => kid,
+    Err(e) => panic!("Could not spawn solver kid: {:?}", e)
+  } ;
+
+  {
+
+    let mut solver = smtry!(
+      solver(& mut kid, ()),
+      failwith "could not create solver: {:?}"
+    ) ;
+
+    let nsv = Var::nsvar("non stateful var") ;
+    let s_nsv = Id(nsv.clone()) ;
+    let sv_0 = Var::svar0("stateful var") ;
+    let s_sv_0 = Id(sv_0.clone()) ;
+    let app2 = SExpr::app("not", vec![ s_sv_0.clone() ]) ;
+    let app1 = SExpr::app("and", vec![ s_nsv.clone(), app2.clone() ]) ;
+    let offset1 = Offset(0,1) ;
+
+    let sym = nsv.to_sym(& offset1) ;
+    smtry!(
+      solver.declare_fun(& sym, &[] as & [& str], & "Bool", & ()),
+      failwith "declaration failed: {:?}"
+    ) ;
+
+    let sym = sv_0.to_sym(& offset1) ;
+    smtry!(
+      solver.declare_fun(& sym, &[] as & [& str], & "Bool", & ()),
+      failwith "declaration failed: {:?}"
+    ) ;
+
+    let expr = app1.unroll(& offset1) ;
+    smtry!(
+      solver.assert(& expr, & ()),
+      failwith "assert failed: {:?}"
+    ) ;
+
+    match smtry!(
+      solver.check_sat(),
+      failwith "error in checksat: {:?}"
+    ) {
+      true => (),
+      false => panic!("expected sat, got unsat"),
+    }
+
+  }
+
+  smtry!(
+    kid.kill(),
+    failwith "error while killing solver: {:?}"
+  ) ;
+}
+```
+
+### Parsing
+
+Note that there is no reason *a priori* for the structures returned by the
+parsers to be the same as the one used for printing. In our running example,
+parsing a variable with an offset of `6` (in a `get-values` for example) as
+an `SExpr` is ambiguous. Is `6` the index of the current or next step? What's
+the other index?
+
+For this simple example however, we will use the same structures. Despite the
+fact that it makes little sense.
+
+```
+# // Parser library.
+# extern crate rsmt2 ;
+# use std::io::Write ;
+# 
+# use rsmt2::* ;
+# use rsmt2::errors::* ;
+# 
+# use Var::* ;
+# use Const::* ;
+# use SExpr::* ;
+# 
+# /// Under the hood a symbol is a string.
+# type Sym = String ;
+# 
+# /// A variable wraps a symbol.
+# #[derive(Debug,Clone,PartialEq)]
+# enum Var {
+#   /// Variable constant in time (Non-Stateful Var: SVar).
+#   NSVar(Sym),
+#   /// State variable in the current step.
+#   SVar0(Sym),
+#   /// State variable in the next step.
+#   SVar1(Sym),
+# }
+# impl Var {
+#   fn sym(& self) -> & str {
+#     match * self { NSVar(ref s) => s, SVar0(ref s) => s, SVar1(ref s) => s }
+#   }
+# }
+#
+# /// A type.
+# #[derive(Debug,Clone,Copy,PartialEq)]
+# enum Type { Int, Bool, Real }
+# 
+# /// A constant.
+# #[derive(Debug,Clone,PartialEq)]
+# enum Const {
+#   /// Boolean constant.
+#   BConst(bool),
+#   /// Integer constant.
+#   IConst(usize),
+#   /// Rational constant.
+#   RConst(usize,usize),
+# }
+# 
+# /// An S-expression.
+# #[derive(Debug,Clone,PartialEq)]
+# enum SExpr {
+#   /// A variable.
+#   Id(Var),
+#   /// A constant.
+#   Val(Const),
+#   /// An application of function symbol.
+#   App(Sym, Vec<SExpr>),
+# }
+#
+# /// An offset gives the index of current and next step.
+# #[derive(Debug,Clone,Copy,PartialEq)]
+# struct Offset(usize, usize) ;
+# 
+# /// A symbol is a variable and an offset.
+# #[derive(Debug,Clone,PartialEq)]
+# struct Symbol<'a, 'b>(& 'a Var, & 'b Offset) ;
+# 
+# /// An unrolled SExpr.
+# #[derive(Debug,Clone,PartialEq)]
+# struct Unrolled<'a, 'b>(& 'a SExpr, & 'b Offset) ;
+#
+# impl Var {
+#   pub fn nsvar(s: & str) -> Self { NSVar(s.to_string()) }
+#   pub fn svar0(s: & str) -> Self { SVar0(s.to_string()) }
+#   pub fn svar1(s: & str) -> Self { SVar1(s.to_string()) }
+#   /// Given an offset, a variable can be printed in SMT Lib 2.
+#   #[inline(always)]
+#   pub fn to_smt2<Writer: Write>(
+#     & self, writer: & mut Writer, off: & Offset
+#   ) -> Res<()> {
+#     match * self {
+#       NSVar(ref sym) => write!(writer, "|{}|", sym) ?,
+#       /// SVar at 0, we use the index of the current step.
+#       SVar0(ref sym) => write!(writer, "|{}@{}|", sym, off.0) ?,
+#       /// SVar at 1, we use the index of the next step.
+#       SVar1(ref sym) => write!(writer, "|{}@{}|", sym, off.1) ?,
+#     }
+#     Ok(())
+#   }
+#   /// Given an offset, a variable can become a Symbol.
+#   pub fn to_sym<'a, 'b>(& 'a self, off: & 'b Offset) -> Symbol<'a, 'b> {
+#     Symbol(self, off)
+#   }
+# }
+# 
+# impl Const {
+#   /// A constant can be printed in SMT Lib 2.
+#   #[inline(always)]
+#   pub fn to_smt2<Writer: Write>(
+#     & self, writer: & mut Writer
+#   ) -> Res<()> {
+#     match * self {
+#       BConst(ref b) => write!(writer, "{}", b) ?,
+#       IConst(ref i) => write!(writer, "{}", i) ?,
+#       RConst(ref num, ref den) => write!(writer, "(/ {} {})", num, den) ?,
+#     }
+#     Ok(())
+#   }
+# }
+# 
+# impl SExpr {
+#   pub fn app(sym: & str, args: Vec<SExpr>) -> Self {
+#     App(sym.to_string(), args)
+#   }
+#   /// Given an offset, an S-expression can be printed in SMT Lib 2.
+#   pub fn to_smt2<Writer: Write>(
+#     & self, writer: & mut Writer, off: & Offset
+#   ) -> Res<()> {
+#     match * self {
+#       Id(ref var) => var.to_smt2(writer, off),
+#       Val(ref cst) => cst.to_smt2(writer),
+#       App(ref sym, ref args) => {
+#         write!(writer, "({}", sym) ? ;
+#         for ref arg in args {
+#           write!(writer, " ") ? ;
+#           arg.to_smt2(writer, off) ?
+#         }
+#         write!(writer, ")") ? ;
+#         Ok(())
+#       }
+#     }
+#   }
+#   /// Given an offset, an S-expression can be unrolled.
+#   pub fn unroll<'a, 'b>(& 'a self, off: & 'b Offset) -> Unrolled<'a,'b> {
+#     Unrolled(self, off)
+#   }
+# }
+# use rsmt2::to_smt::* ;
+# /// A symbol can be printed in SMT Lib 2.
+# impl<'a, 'b> Sym2Smt<()> for Symbol<'a,'b> {
+#   fn sym_to_smt2<Writer: Write>(
+#     & self, writer: & mut Writer, _: & ()
+#   ) -> Res<()> {
+#     self.0.to_smt2(writer, self.1)
+#   }
+# }
+# 
+# /// An unrolled SExpr can be printed in SMT Lib 2.
+# impl<'a, 'b> Expr2Smt<()> for Unrolled<'a,'b> {
+#   fn expr_to_smt2<Writer: Write>(
+#     & self, writer: & mut Writer, _: & ()
+#   ) -> Res<()> {
+#     self.0.to_smt2(writer, self.1)
+#   }
+# }
+# /// Convenience macro.
+# macro_rules! smtry {
+#   ($e:expr, failwith $( $msg:expr ),+) => (
+#     match $e {
+#       Ok(something) => something,
+#       Err(e) => panic!( $($msg),+ , e)
+#     }
+#   ) ;
+# }
+#[macro_use]
+extern crate error_chain ;
+
+/// Parser structure.
+#[derive(Clone, Copy)]
+struct Parser ;
+impl IdentParser< (Var, Option<usize>), Type > for Parser {
+  fn parse_ident(self, s: & str) -> Res<(Var, Option<usize>)> {
+    if s.len() <= 2 { bail!("not one of my idents...") }
+    let s = & s[ 1 .. (s.len() - 1) ] ; // Removing surrounding pipes.
+    let mut parts = s.split("@") ;
+    let id = if let Some(id) = parts.next() { id.to_string() } else {
+      bail!("nothing between my pipes!")
+    } ;
+    if let Some(index) = parts.next() {
+      use std::str::FromStr ;
+      Ok( (
+        Var::SVar0(id),
+        Some(
+          usize::from_str(index).chain_err(
+            || format!("while parsing the offset in `{}`", s)
+          ) ?
+        )
+      ) )
+    } else {
+      Ok( (Var::NSVar(id), None) )
+    }
+  }
+  fn parse_type(self, s: & str) -> Res<Type> {
+    match s {
+      "Int" => Ok( Type::Int ),
+      "Bool" => Ok( Type::Bool ),
+      "Real" => Ok( Type::Real ),
+      _ => bail!( format!("unknown type `{}`", s) ),
+    }
+  }
+}
+
+impl ValueParser< Const > for Parser {
+  fn parse_value(self, s: & str) -> Res<Const> {
+    if s == "true" {
+      return Ok( Const::BConst(true) )
+    } else if s == "false" {
+      return Ok( Const::BConst(false) )
+    }
+
+    use std::str::FromStr ;
+    if let Ok(int) = usize::from_str(s) {
+      return Ok( Const::IConst(int) )
+    }
+
+    let msg = format!("unexpected value `{}`", s) ;
+
+    let mut tokens = s.split_whitespace() ;
+
+    match tokens.next() {
+      Some("(/") => (),
+      Some("(") => if tokens.next() != Some("/") { bail!(msg) },
+      _ => bail!(msg),
+    }
+
+    match (
+      tokens.next().map(|t| usize::from_str(t)),
+      tokens.next().map(|t| usize::from_str(t)),
+      tokens.next(),
+    ) {
+      (
+        Some(Ok(num)), Some(Ok(den)), Some(")")
+      ) => Ok( Const::RConst(num, den) ),
+      _ => bail!(msg),
+    }
+  }
+}
 
 fn main() {
   use rsmt2::* ;
@@ -672,13 +966,13 @@ fn main() {
 
     let sym = nsv.to_sym(& offset1) ;
     smtry!(
-      solver.declare_fun(& sym, &[] as & [& str], & "bool", & ()),
+      solver.declare_fun(& sym, &[] as & [& str], & "Bool", & ()),
       failwith "declaration failed: {:?}"
     ) ;
 
     let sym = sv_0.to_sym(& offset1) ;
     smtry!(
-      solver.declare_fun(& sym, &[] as & [& str], & "bool", & ()),
+      solver.declare_fun(& sym, &[] as & [& str], & "Bool", & ()),
       failwith "declaration failed: {:?}"
     ) ;
 
@@ -688,14 +982,27 @@ fn main() {
       failwith "assert failed: {:?}"
     ) ;
 
-    match smtry!(
+    if ! smtry!(
       solver.check_sat(),
       failwith "error in checksat: {:?}"
     ) {
-      true => (),
-      false => panic!("expected sat, got unsat"),
+      panic!("expected sat, got unsat")
     }
 
+    let model = smtry!(
+      solver.get_model(),
+      failwith "while getting model: {:?}"
+    ) ;
+
+    for ((var, off), args, typ, val) in model {
+      if var.sym() == "stateful var" {
+        assert_eq!(off, Some(0)) ;
+        assert_eq!(val, Const::BConst(false))
+      } else if var.sym() == "non stateful var" {
+        assert_eq!(off, None) ;
+        assert_eq!(val, Const::BConst(true))
+      }
+    }
   }
 
   smtry!(
@@ -705,32 +1012,6 @@ fn main() {
 }
 ```
 
-### Parsing
-
-This library uses the [`nom`][nom page] parser combinator library. Users can
-use whatever they want as long as they implement the `ParseSmt2` trait.
-
-Note that there is no reason *a priori* for the structures returned by the
-parsers to be the same as the one used for printing. In our running example,
-parsing a variable with an offset of `6` (in a `get-values` for example) as
-an `SExpr` is ambiguous. Is `6` the index of the current or next step? What's
-the other index?
-
-For this simple example however, we will use the same structures. Despite the
-fact that it makes little sense.
-
-Unfortunately writing the code as a (**tested**) documentation comment does not
-work currently. The `nom` macros recurse quite deeply and the thread for the
-test overflows its stack. I do not know how to fix this. Please contact me if
-you do.
-
-The implementation of the parser, as well as an example using `get-model` and
-`get-values` are written as a private test/example directly in the source. You
-can view it [here][full example].
-
-
-[nom page]: https://crates.io/crates/nom (crates.io pafe of the nom library)
-[full example]: ../src/rsmt2/src/example.rs.html (Full example)
 "#]
 
 #[macro_use]
@@ -783,7 +1064,7 @@ pub mod errors {
 #[macro_use]
 mod common ;
 pub mod conf ;
-pub mod parse ;
+mod parse ;
 mod solver ;
 
 pub use solver::{
