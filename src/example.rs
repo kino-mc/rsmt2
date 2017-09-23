@@ -12,8 +12,6 @@ use std::io::Write ;
 use std::str::FromStr ;
 use std::str ;
 
-use nom::{ IResult, digit, multispace } ;
-
 use * ;
 use to_smt::* ;
 use errors::* ;
@@ -25,8 +23,17 @@ use self::SExpr::* ;
 /// Under the hood a symbol is a string.
 type Sym = String ;
 
+/// A type.
+#[derive(Debug, Clone, Copy, PartialEq)]
+enum Type {
+  /// Int.
+  Int,
+  /// Bool.
+  Bool,
+}
+
 /// A variable wraps a symbol.
-#[derive(Debug,Clone,PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 enum Var {
   /// Variable constant in time (Non-Stateful Var: SVar).
   NSVar(Sym),
@@ -37,7 +44,7 @@ enum Var {
 }
 
 /// A constant.
-#[derive(Debug,Clone,PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 enum Const {
   /// Boolean constant.
   BConst(bool),
@@ -47,8 +54,11 @@ enum Const {
   RConst(usize,usize),
 }
 
+/// A type.
+#[derive(Debug, Clone, PartialEq)]
+
 /// An S-expression.
-#[derive(Debug,Clone,PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 enum SExpr {
   /// A variable.
   Id(Var),
@@ -59,15 +69,15 @@ enum SExpr {
 }
 
 /// An offset gives the index of current and next step.
-#[derive(Debug,Clone,Copy,PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 struct Offset(usize, usize) ;
 
 /// A symbol is a variable and an offset.
-#[derive(Debug,Clone,PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 struct Symbol<'a, 'b>(& 'a Var, & 'b Offset) ;
 
 /// An unrolled SExpr.
-#[derive(Debug,Clone,PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 struct Unrolled<'a, 'b>(& 'a SExpr, & 'b Offset) ;
 
 impl Var {
@@ -153,132 +163,10 @@ impl<'a, 'b> Expr2Smt<()> for Unrolled<'a,'b> {
     self.0.to_smt2(writer, self.1)
   }
 }
-/// Helper function, from `& [u8]` to `str`.
-fn to_str(bytes: & [u8]) -> & str {
-  match str::from_utf8(bytes) {
-    Ok(string) => string,
-    Err(e) => panic!("can't convert {:?} to string ({:?})", bytes, e),
-  }
-}
 
-/// Helper function, from `& [u8]` to `String`.
-fn to_string(bytes: & [u8]) -> String {
-  to_str(bytes).to_string()
-}
-
-/// Helper function, from `& [u8]` to `usize`.
-fn to_usize(bytes: & [u8]) -> usize {
-  let string = to_str(bytes) ;
-  match FromStr::from_str( string ) {
-    Ok(int) => int,
-    Err(e) => panic!("can't convert {} to usize ({:?})", string, e),
-  }
-}
-
-/// Parser for variables.
-named!{ var<Var>,
-  // Pipe-delimited symbol.
-  preceded!(
-    opt!(multispace),
-    delimited!(
-      char!('|'),
-      alt_complete!(
-        // State variable.
-        do_parse!(
-          id: is_not!("@|") >>
-          char!('@') >>
-          off: one_of!("01") >> (
-            match off {
-              '0' => SVar0(to_string(id)),
-              '1' => SVar1(to_string(id)),
-              _ => unreachable!(),
-            }
-          )
-        ) |
-        // Non-stateful variable.
-        map!( is_not!("|"), |id| NSVar(to_string(id)) )
-      ),
-      char!('|')
-    )
-  )
-}
-
-/// Parser for constants.
-named!{ cst<Const>,
-  preceded!(
-    opt!(multispace),
-    alt_complete!(
-      // Boolean.
-      map!(
-        alt_complete!(
-          map!( tag!("true"), |_| true ) | map!( tag!("false"), |_| false )
-        ),
-        |b| BConst(b)
-      ) |
-      // Integer.
-      map!(
-        digit, |i| IConst( to_usize(i) )
-      ) |
-      // Rational.
-      do_parse!(
-        char!('(') >>
-        opt!(multispace) >>
-        char!('/') >>
-        multispace >>
-        num: digit >>
-        multispace >>
-        den: digit >>
-        opt!(multispace) >>
-        char!(')') >> (
-          RConst(to_usize(num), to_usize(den))
-        )
-      )
-    )
-  )
-}
-
-/// Parser for function symbol applications.
-named!{ app<SExpr>,
-  preceded!(
-    opt!(multispace),
-    do_parse!(
-      // Open paren.
-      char!('(') >>
-      opt!(multispace) >>
-      // A symbol.
-      sym: alt_complete!(
-        map!( one_of!("+/-*<>"), |c: char| c.to_string() ) |
-        map!(
-          alt_complete!(
-            tag!("<=") |
-            tag!(">=") |
-            tag!("and") |
-            tag!("or") |
-            tag!("not")
-          ),
-          |s| to_string(s)
-        )
-      ) >>
-      multispace >>
-      // Some arguments (`s_expr` is defined below).
-      args: separated_list!(
-        multispace, s_expr
-      ) >>
-      opt!(multispace) >>
-      char!(')') >> (
-        App(sym, args)
-      )
-    )
-  )
-}
-
-/// Parser for S-expressions.
-named!{ s_expr<SExpr>,
-  alt_complete!(
-    map!( var, |v| Id(v) ) |
-    map!( cst, |c| Val(c) ) |
-    app
-  )
+struct NuParser ;
+impl IdentParser<Var, Type> for NuParser {
+  fn parse_ident(self, input: & str)
 }
 
 /// Parser structure for S-expressions.

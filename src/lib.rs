@@ -17,7 +17,9 @@ pipes.
 This library does **not** have a structure for S-expressions. It should be
 provided by the user, as well as the relevant printing and parsing functions.
 
-If you use this library consider contacting us on the [repository](https://github.com/kino-mc/rsmt2) so that we can add your project to the readme.
+If you use this library consider contacting us on the
+[repository](https://github.com/kino-mc/rsmt2) so that we can add your project
+to the readme.
 
 ## `async` versus `sync`
 
@@ -457,11 +459,7 @@ So, we define a dummy parser for now and perform a `check-sat`:
 
 ```
 // Parser library.
-#[macro_use]
-extern crate nom ;
 extern crate rsmt2 ;
-
-use nom::IResult ;
 
 # use std::io::Write ;
 # 
@@ -737,8 +735,6 @@ can view it [here][full example].
 
 #[macro_use]
 extern crate error_chain ;
-#[macro_use]
-extern crate nom ;
 
 /// Errors of this library.
 pub mod errors {
@@ -773,10 +769,12 @@ pub mod errors {
         display("solver error: \"{}\"", s)
       }
 
-      #[doc = "Parsing error ([`nom`](https://crates.io/crates/nom) style)."]
-      ParseError(e: ::nom::IError) {
-        description("parsing error")
-        display("parsing error: \"{:?}\"", e)
+      #[doc =
+        "Parse error, contains the s-expression on which the error happened"
+      ]
+      ParseError(msg: String, sexpr: String) {
+        description("parse error")
+        display("parse error: {} on `{}`", msg, sexpr)
       }
     }
   }
@@ -785,19 +783,20 @@ pub mod errors {
 #[macro_use]
 mod common ;
 pub mod conf ;
-mod parse ;
+pub mod parse ;
 mod solver ;
 
-mod example ;
-
-pub use common::{ ParseSmt2 } ;
 pub use solver::{
   solver, Kid, Solver, PlainSolver, TeeSolver
+} ;
+pub use parse::{
+  IdentParser, ValueParser, ExprParser, ProofParser
 } ;
 
 /// Internal traits used to build solvers.
 pub mod internals {
-  pub use solver::{ SolverBasic, SolverPrims } ;
+  pub use parse::SmtParser ;
+  pub use solver::SolverBasic ;
 }
 
 /// Traits your types must implement so that `rsmt2` can use them.

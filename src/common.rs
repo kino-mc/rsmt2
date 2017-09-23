@@ -11,8 +11,6 @@
 use std::io ;
 use std::fmt ;
 
-use nom::IResult ;
-
 use errors::* ;
 
 
@@ -90,97 +88,6 @@ impl Sort2Smt for String {
   }
 }
 
-
-
-/** Parsers on the user's structure.
-
-Not all of them are necessary depending on the queries wanted. See each method
-for details.*/
-pub trait ParseSmt2 {
-  /// Type of identifiers in the user's structure.
-  type Ident : ::std::fmt::Debug ;
-  /// Type of values in the user's structure.
-  type Value : ::std::fmt::Debug ;
-  /// Type of expressions in the user's structure.
-  type Expr :  ::std::fmt::Debug ;
-  /// Type of proofs in the user's structure.
-  type Proof : ::std::fmt::Debug ;
-  /// Type of the info passed when parsing expressions.
-  type I ;
-
-  /** Parses an ident from self, viewed as a reader.
-  
-  Required by
-  
-  * `get-assignment`
-  * `get-model`
-  * `get-unsat-assumptions`
-  * `get-unsat-core` */
-  #[inline(always)]
-  fn parse_ident<'a>(
-    & self, & 'a [u8]
-  ) -> IResult<& 'a [u8], Self::Ident> ;
-
-  /** Parses a value from self, viewed as a reader.
-
-  Required by
-
-  * `get-value`
-  * `get-assignment`
-  * `get-model` */
-  #[inline(always)]
-  fn parse_value<'a>(
-    & self, & 'a [u8]
-  ) -> IResult<& 'a [u8], Self::Value> ;
-
-  /** Parses an expression from self, viewed as a reader.
-
-  Required by
-
-  * `get_assertions` */
-  #[inline(always)]
-  fn parse_expr<'a>(
-    & self, & 'a [u8], & Self::I
-  ) -> IResult<& 'a [u8], Self::Expr> ;
-
-  /** Parses a proof from self, viewed as a reader.
-
-  Required by
-
-  * `get_proof` */
-  #[inline(always)]
-  fn parse_proof<'a>(
-    & self, & 'a [u8]
-  ) -> IResult<& 'a [u8], Self::Proof> ;
-}
-
-impl ParseSmt2 for () {
-  type Ident = () ;
-  type Value = () ;
-  type Expr = () ;
-  type Proof = () ;
-  type I = () ;
-  fn parse_ident<'a>(
-    & self, _: & 'a [u8]
-  ) -> IResult<& 'a [u8], Self::Ident> {
-    panic!("parser on () called")
-  }
-  fn parse_value<'a>(
-    & self, _: & 'a [u8]
-  ) -> IResult<& 'a [u8], Self::Value> {
-    panic!("parser on () called")
-  }
-  fn parse_expr<'a>(
-    & self, _: & 'a [u8], _: & ()
-  ) -> IResult<& 'a [u8], Self::Expr> {
-    panic!("parser on () called")
-  }
-  fn parse_proof<'a>(
-    & self, _: & 'a [u8]
-  ) -> IResult<& 'a [u8], Self::Proof> {
-    panic!("parser on () called")
-  }
-}
 
 
 

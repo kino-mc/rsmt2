@@ -16,4 +16,3 @@ travis-ci = { repository = "kino-mc/rsmt2" }
 
 [dependencies]
 error-chain = "^0"
-nom = "^3"

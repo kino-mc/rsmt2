@@ -9,6 +9,15 @@ A generic library to interact with SMT-LIB 2 compliant solvers running in a sepa
 
 If you use this library consider contacting us on the [repository](https://github.com/kino-mc/rsmt2) so that we can add your project to the readme.
 
+See [`CHANGES.md`](https://github.com/kino-mc/rsmt2/blob/master/README.md) for
+the list of changes.
+
+
+# Missing features
+
+- support for solvers other than z3
+- `get-proof`
+
 
 # Known projects using `rsmt2`
 

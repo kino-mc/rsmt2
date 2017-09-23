@@ -17,15 +17,11 @@ use std::process::{
 } ;
 use std::io::{ Write, BufWriter, BufReader } ;
 
-use nom::multispace ;
-
 use errors::* ;
 
 use common::* ;
 use conf::SolverConf ;
-use parse::{
-  success, check_sat, unexpected, open_paren, close_paren
-} ;
+use parse::{ SmtParser, IdentParser, ValueParser, ExprParser } ;
 
 
 macro_rules! stutter_arg {
@@ -34,40 +30,6 @@ macro_rules! stutter_arg {
   ) ;
 }
 
-
-macro_rules! wrap {
-  ($e:expr) => (
-    {
-      use nom::IResult::* ;
-      use std::str::from_utf8 ;
-      match $e {
-        Done(rest, res) => match from_utf8(rest) {
-          Ok(s) => (s.to_string(), res),
-          Err(e) => (
-            String::new(),
-            Err(e).chain_err::<_, ErrorKind>(
-              || "could not convert remaining bytes to utf8".into()
-            )
-          ),
-        },
-        Error(e) => (
-          String::new(), Err(
-            ErrorKind::ParseError(
-              ::nom::IError::Error(e)
-            ).into()
-          )
-        ),
-        Incomplete(e) => (
-          String::new(), Err(
-            ErrorKind::ParseError(
-              ::nom::IError::Incomplete(e)
-            ).into()
-          )
-        ),
-      }
-    }
-  )
-}
 
 #[cfg(not(no_parse_success))]
 macro_rules! parse_success {
@@ -89,42 +51,6 @@ macro_rules! parse_success {
   ($slf:ident for $b:block) => (
     $b
   ) ;
-}
-
-/// Macro for fetching data from the kid's output.
-macro_rules! fetch {
-  ($slf:expr, $start:expr, $c:ident => $action:expr) => ( {
-    ::std::mem::swap(& mut $slf.buff, & mut $slf.swap) ;
-    let mut buff = & mut $slf.stdout ;
-    let mut cnt = 0 ;
-    let mut qid = false ;
-    let mut str = false ;
-    loop {
-      use std::io::BufRead ;
-      let len = $slf.buff.len() ;
-      buff.read_line(& mut $slf.buff) ? ;
-      let mut cmt = false ;
-      if len + 1 < $slf.buff.len() {
-        $start ;
-        $slf.buff.trim_right() ;
-        for $c in $slf.buff.chars().skip(len) {
-          $action ;
-          let normal = ! (qid || str || cmt) ;
-          match $c {
-            ';' if normal => cmt = true,
-            '(' if normal => cnt += 1,
-            ')' if normal => cnt -= 1,
-            '|' if ! (str || cmt) => qid = ! qid,
-            '"' if ! (qid || cmt) => str = ! str,
-            _ => (),
-          }
-        } ;
-        if cnt == 0 { break }
-      } ;
-    } ;
-    Ok(())
-  } ) ;
-  ($slf:ident) => ( fetch!( $slf, (), c => () ) ) ;
 }
 
 
@@ -177,23 +103,19 @@ impl Kid {
 
 
 /// Plain solver, as opposed to `TeeSolver` which logs IOs.
-pub struct PlainSolver<'kid, Parser: ParseSmt2 + 'static> {
+pub struct PlainSolver<'kid, Parser: Copy> {
   /// Solver configuration.
   conf: & 'kid SolverConf,
   /// Kid's stdin.
   stdin: BufWriter<& 'kid mut ChildStdin>,
-  /// Kid's stdout.
-  stdout: BufReader<& 'kid mut ChildStdout>,
+  /// Stdout parser.
+  smt_parser: SmtParser< BufReader<& 'kid mut ChildStdout> >,
   // /// Kid's stderr.
   // stderr: BufReader<& 'kid mut ChildStderr>,
-  /// Line buffer for the kid's output.
-  buff: String,
-  /// Line swapper.
-  swap: String,
   /// User-provided parser.
   parser: Parser,
 }
-impl<'kid, Parser: ParseSmt2 + 'static> PlainSolver<'kid, Parser> {
+impl<'kid, Parser: Copy> PlainSolver<'kid, Parser> {
   /// Creates a plain solver.
   pub fn new(kid: & 'kid mut Kid, parser: Parser) -> Res<Self> {
     let stdin = match kid.kid.stdin.as_mut() {
@@ -217,10 +139,8 @@ impl<'kid, Parser: ParseSmt2 + 'static> PlainSolver<'kid, Parser> {
     let mut solver = PlainSolver {
       conf: & kid.conf,
       stdin: stdin,
-      stdout: stdout,
+      smt_parser: SmtParser::new(stdout),
       // stderr: stderr,
-      buff: String::with_capacity(1000),
-      swap: String::with_capacity(1000),
       parser: parser,
     } ;
     if solver.conf.get_parse_success() {
@@ -244,11 +164,17 @@ impl<'kid, Parser: ParseSmt2 + 'static> PlainSolver<'kid, Parser> {
 }
 
 impl<
-  'kid, Parser: ParseSmt2 + 'static
+  'kid, Parser: Copy
 > SolverBasic<'kid, Parser> for PlainSolver<'kid, Parser> {
-  fn fetch(& mut self) -> Res<()> {
-    fetch!(self)
+  fn parsers(& mut self) -> (
+    & mut SmtParser< BufReader<& 'kid mut ChildStdout> >,
+    Parser
+  ) {
+    (& mut self.smt_parser, self.parser)
   }
+  // fn fetch(& mut self) -> Res<()> {
+  //   fetch!(self)
+  // }
   fn write<
     F: Fn(& mut BufWriter<& mut ChildStdin>) -> Res<()>,
     FTee: Fn(& mut BufWriter<File>) -> Res<()>,
@@ -260,23 +186,17 @@ impl<
   fn comment(& mut self, _: & str) -> Res<()> {
     Ok(())
   }
-  fn parser(& self) -> & Parser {
-    & self.parser
-  }
-  fn as_ref(& self) -> & [u8] {
-    self.buff.as_ref()
-  }
   fn solver(& mut self) -> & mut PlainSolver<'kid, Parser> {
     self
   }
 }
 
-impl<
-  'kid, Parser: ParseSmt2 + 'static
-> SolverPrims<'kid, Parser> for PlainSolver<'kid, Parser> {}
+// impl<
+//   'kid, Parser: ParseSmt2 + 'static
+// > SolverPrims<'kid, Parser> for PlainSolver<'kid, Parser> {}
 
 impl<
-  'kid, Parser: ParseSmt2 + 'static
+  'kid, Parser: Copy
 > Solver<'kid, Parser> for PlainSolver<'kid, Parser> {}
 
 
@@ -291,28 +211,24 @@ impl<
 
 
 /// Wrapper around a `PlainSolver` logging IOs to a file.
-pub struct TeeSolver<'kid, Parser: ParseSmt2 + 'static> {
+pub struct TeeSolver<'kid, Parser: Copy> {
   solver: PlainSolver<'kid, Parser>,
   file: BufWriter<File>,
 }
-impl<'kid, Parser: ParseSmt2 + 'static> TeeSolver<'kid, Parser> {
+impl<'kid, Parser: Copy> TeeSolver<'kid, Parser> {
   /// Configuration of the solver.
   pub fn conf(& self) -> & SolverConf { self.solver.conf }
 }
 
 impl<
-  'kid, Parser: ParseSmt2 + 'static
+  'kid, Parser: Copy
 > SolverBasic<'kid, Parser> for TeeSolver<'kid, Parser> {
-  fn fetch(& mut self) -> Res<()> {
-    fetch!(
-      self.solver,
-      write!(self.file, ";; ") ?,
-      c => {
-        write!( self.file, "{}", c) ?
-      }
-    )
+  fn parsers(& mut self) -> (
+    & mut SmtParser< BufReader<& 'kid mut ChildStdout> >,
+    Parser
+  ) {
+    self.solver.parsers()
   }
-  /// Applies a function to the writer on the solver's stdin.
   fn write<
     F: Fn(& mut BufWriter<& mut ChildStdin>) -> Res<()>,
     FTee: Fn(& mut BufWriter<File>) -> Res<()>,
@@ -330,23 +246,17 @@ impl<
     }
     Ok(())
   }
-  fn parser(& self) -> & Parser {
-    & self.solver.parser
-  }
-  fn as_ref(& self) -> & [u8] {
-    & self.solver.buff.as_ref()
-  }
   fn solver(& mut self) -> & mut PlainSolver<'kid, Parser> {
     & mut self.solver
   }
 }
 
-impl<
-  'kid, Parser: ParseSmt2 + 'static
-> SolverPrims<'kid, Parser> for TeeSolver<'kid, Parser> {}
+// impl<
+//   'kid, Parser: ParseSmt2 + 'static
+// > SolverPrims<'kid, Parser> for TeeSolver<'kid, Parser> {}
 
 impl<
-  'kid, Parser: ParseSmt2 + 'static
+  'kid, Parser: Copy
 > Solver<'kid, Parser> for TeeSolver<'kid, Parser> {}
 
 
@@ -362,9 +272,13 @@ impl<
 
 
 /// Most basic function needed to provide SMT-LIB commands.
-pub trait SolverBasic<'kid, Parser: ParseSmt2 + 'static> {
-  /// Fetches data.
-  fn fetch(& mut self) -> Res<()> ;
+pub trait SolverBasic<'kid, Parser: Copy> {
+  /// Accessor to the parser.
+  #[inline]
+  fn parsers(& mut self) -> (
+    & mut SmtParser< BufReader<& 'kid mut ChildStdout> >,
+    Parser
+  ) ;
   /// Applies a function to the writer on the solver's stdin.
   fn write<
     F: Fn(& mut BufWriter<& mut ChildStdin>) -> Res<()>,
@@ -372,10 +286,6 @@ pub trait SolverBasic<'kid, Parser: ParseSmt2 + 'static> {
   >(& mut self, f: F, f_tee: FTee) -> Res<()> ;
   /// Writes comments. Ignored for `PlainSolver`.
   fn comment(& mut self, txt: & str) -> Res<()> ;
-  /// The bytes of the buffer.
-  fn as_ref(& self) -> & [u8] ;
-  /// The parser.
-  fn parser(& self) -> & Parser ;
   /// The plain solver.
   fn solver(& mut self) -> & mut PlainSolver<'kid, Parser> ;
 }
@@ -388,36 +298,8 @@ pub trait SolverBasic<'kid, Parser: ParseSmt2 + 'static> {
 
 
 
-
-
-
-
-/// Primitive functions provided by a solver wrapper.
-pub trait SolverPrims<
-  'kid, Parser: ParseSmt2 + 'static
-> : SolverBasic<'kid, Parser> {
-  /// Fetchs data, applies a parser (passes the internal parser) and returns
-  /// its result.
-  fn parse<
-    Out, F: Fn(& [u8], & Parser) -> (String, Res<Out>)
-  >(& mut self, parser: F) -> Res<Out> {
-    try!( self.fetch() ) ;
-    let (rest, res) = parser( self.as_ref(), self.parser() ) ;
-    let solver = self.solver() ;
-    solver.swap.clear() ;
-    solver.swap.extend( rest.chars() ) ;
-    res
-  }
-}
-
-
-
-
-
-
-
 /// Creates a solver from a kid.
-pub fn solver<'kid, Parser: ParseSmt2 + 'static>(
+pub fn solver<'kid, Parser: Copy>(
   kid: & 'kid mut Kid, parser: Parser
 ) -> Res< PlainSolver<'kid, Parser> > {
   PlainSolver::new(kid, parser)
@@ -430,8 +312,9 @@ pub fn solver<'kid, Parser: ParseSmt2 + 'static>(
 
 
 /// Provides SMT-LIB commands.
-pub trait Solver<'kid, Parser: ParseSmt2 + 'static> :
-SolverPrims<'kid, Parser> {
+pub trait Solver<
+  'kid, Parser: Copy
+> : SolverBasic<'kid, Parser> {
 
 
   // |===| (Re)starting and terminating.
@@ -904,14 +787,6 @@ SolverPrims<'kid, Parser> {
   }
 
 
-  // |===| Parsing simple stuff.
-
-  /// Parse success.
-  #[inline]
-  fn parse_success(& mut self) -> Res<()> {
-    self.parse( |bytes, _| wrap!( success(bytes) ) )
-  }
-
   /// Check-sat command.
   #[inline(always)]
   fn print_check_sat(& mut self) -> Res<()> {
@@ -920,10 +795,44 @@ SolverPrims<'kid, Parser> {
     )
   }
 
+  /// Get-model command.
+  #[inline(always)]
+  fn print_get_model(& mut self) -> Res<()> {
+    stutter_arg!(self.write ;
+      |w| write_str(w, "(get-model)\n")
+    )
+  }
+
+  /// Parse the result of a get-model.
+  fn parse_get_model<Ident, Type, Value>(
+    & mut self
+  ) -> Res<Vec<(Ident, Type, Value)>>
+  where Parser: IdentParser<Ident, Type> + ValueParser<Value> {
+    let (smt_parser, parser) = self.parsers() ;
+    smt_parser.get_model(parser)
+  }
+
+  /// Get-model command.
+  fn get_model<Ident, Type, Value>(
+    & mut self
+  ) -> Res<Vec<(Ident, Type, Value)>>
+  where Parser: IdentParser<Ident, Type> + ValueParser<Value> {
+    self.print_get_model() ? ;
+    self.parse_get_model()
+  }
+
+
+
+  /// Parse success.
+  #[inline]
+  fn parse_success(& mut self) -> Res<()> {
+    self.parsers().0.success()
+  }
+
   /// Parse the result of a check-sat, turns `unknown` results into errors.
   #[inline(always)]
   fn parse_check_sat(& mut self) -> Res<bool> {
-    if let Some(res) = self.parse_check_sat_or_unknown() ? {
+    if let Some(res) = self.parsers().0.check_sat() ? {
       Ok(res)
     } else {
       Err( ErrorKind::Unknown.into() )
@@ -933,7 +842,7 @@ SolverPrims<'kid, Parser> {
   /// Parse the result of a check-sat, turns `unknown` results into `None`.
   #[inline(always)]
   fn parse_check_sat_or_unknown(& mut self) -> Res< Option<bool> > {
-    self.parse( |bytes, _| wrap!( check_sat(bytes) ) )
+    self.parsers().0.check_sat()
   }
 
   /// Check-sat command, turns `unknown` results into errors.
@@ -946,92 +855,6 @@ SolverPrims<'kid, Parser> {
   fn check_sat_or_unknown(& mut self) -> Res< Option<bool> > {
     self.print_check_sat() ? ;
     self.parse_check_sat_or_unknown()
-  }
-
-  /// Get-model command.
-  #[inline(always)]
-  fn print_get_model(& mut self) -> Res<()> {
-    stutter_arg!(self.write ;
-      |w| write_str(w, "(get-model)\n")
-    )
-  }
-
-  /// Parse the result of a get-model.
-  fn parse_get_model<'a>(
-    & 'a mut self
-  ) -> Res<Vec<(Parser::Ident, Parser::Value)>>
-  where Parser: 'a {
-    self.parse(
-      |bytes, parser| wrap!(
-        alt!(
-          bytes,
-          unexpected |
-          do_parse!(
-            open_paren >>
-            opt!(multispace) >>
-            tag!("model") >>
-            vec: many0!(
-              do_parse!(
-                open_paren >>
-                opt!(multispace) >>
-                tag!("define-fun") >>
-                multispace >>
-                id: call!(|bytes| parser.parse_ident(bytes)) >>
-                open_paren >>
-                close_paren >>
-                opt!(multispace) >>
-                alt_complete!(
-                  tag!("Bool") | tag!("Int") | tag!("Real") |
-                  tag!("bool") | tag!("int") | tag!("real")
-                ) >>
-                opt!(multispace) >>
-                val: call!(|bytes| parser.parse_value(bytes)) >>
-                close_paren >>
-                ((id, val))
-              )
-            ) >>
-            close_paren >>
-            (Ok(vec))
-          )
-        )
-      )
-    )
-  }
-
-  /// Get-model command.
-  fn get_model(& mut self) -> Res<Vec<(Parser::Ident, Parser::Value)>> {
-    self.print_get_model() ? ;
-    self.parse_get_model()
-  }
-
-  /// Parse the result of a get-values.
-  fn parse_get_values(
-    & mut self, info: & Parser::I
-  ) -> Res<Vec<(Parser::Expr, Parser::Value)>> {
-    self.parse(
-      |bytes, parser| wrap!(
-        alt_complete!(
-          bytes,
-          unexpected |
-          do_parse!(
-            open_paren >>
-            vec: many0!(
-              do_parse!(
-                open_paren >>
-                opt!(multispace) >>
-                expr: call!(|bytes| parser.parse_expr(bytes, info)) >>
-                multispace >>
-                val: call!(|bytes| parser.parse_value(bytes)) >>
-                close_paren >>
-                ((expr, val))
-              )
-            ) >>
-            close_paren >>
-            (Ok(vec))
-          )
-        )
-      )
-    )
   }
 
   /// Get-assertions command.
@@ -1052,7 +875,7 @@ SolverPrims<'kid, Parser> {
       |w| write_str(w, "(get-unsat-assumptions)\n")
     )
   }
-  /// Get-proop command.
+  /// Get-proof command.
   fn print_get_proof(& mut self) -> Res<()> {
     stutter_arg!(self.write ;
       |w| write_str(w, "(get-proof)\n")
@@ -1066,11 +889,11 @@ SolverPrims<'kid, Parser> {
   }
 
   /// Get-values command.
-  fn print_get_values<'a, Expr, ExprIter, Exprs: ?Sized>(
-    & mut self, exprs: & 'a Exprs, info: & Parser::I
+  fn print_get_values<'a, Info, Expr, ExprIter, Exprs: ?Sized>(
+    & mut self, exprs: & 'a Exprs, info: & Info
   ) -> Res<()>
   where
-  Expr: Expr2Smt< Parser::I > + 'a,
+  Expr: Expr2Smt< Info > + 'a,
   ExprIter: Iterator<Item = & 'a Expr>,
   & 'a Exprs: IntoIterator<
     Item = & 'a Expr, IntoIter = ExprIter
@@ -1080,33 +903,43 @@ SolverPrims<'kid, Parser> {
         write!(w, "(get-value (") ? ;
         for e in exprs {
           write_str(w, "\n  ") ? ;
-          e.expr_to_smt2(w, info) ?
+          e.expr_to_smt2(w, & info) ?
         }
         write_str(w, "\n) )\n")
       }
     )
   }
 
+  /// Parse the result of a get-values.
+  fn parse_get_values<Info: Clone, Expr, Value>(
+    & mut self, info: Info
+  ) -> Res<Vec<(Expr, Value)>>
+  where Parser: ExprParser<Expr, Info> + ValueParser<Value> {
+    let (smt_parser, parser) = self.parsers() ;
+    smt_parser.get_values(parser, info)
+  }
+
   /// Get-values command.
-  fn get_values<'a, Expr, ExprIter, Exprs: ?Sized>(
-    & mut self, exprs: & 'a Exprs, info: & Parser::I
-  ) -> Res<Vec<(Parser::Expr, Parser::Value)>>
+  fn get_values<'a, Info: Clone, Expr, ExprIter, Exprs: ?Sized, Value>(
+    & mut self, exprs: & 'a Exprs, info: Info
+  ) -> Res<Vec<(Expr, Value)>>
   where
-  Expr: Expr2Smt<Parser::I> +'a,
+  Parser: ExprParser<Expr, Info> + ValueParser<Value>,
+  Expr: Expr2Smt<Info> + 'a,
   ExprIter: Iterator<Item = & 'a Expr>,
   & 'a Exprs: IntoIterator<
     Item = & 'a Expr, IntoIter = ExprIter
   > {
-    self.print_get_values(exprs, info) ? ;
+    self.print_get_values(exprs, & info) ? ;
     self.parse_get_values(info)
   }
 
   /// Check-sat with assumptions command.
-  fn print_check_sat_assuming<'a, Ident, IdentIter, Idents: ?Sized>(
-    & mut self, bool_vars: & 'a Idents, info: & Parser::I
+  fn print_check_sat_assuming<'a, Info, Ident, IdentIter, Idents: ?Sized>(
+    & mut self, bool_vars: & 'a Idents, info: & Info
   ) -> Res<()>
   where
-  Ident: Sym2Smt<Parser::I> + 'a,
+  Ident: Sym2Smt<Info> + 'a,
   IdentIter: Iterator<Item = & 'a Ident>,
   & 'a Idents: IntoIterator<
     Item = & 'a Ident, IntoIter = IdentIter
@@ -1134,11 +967,11 @@ SolverPrims<'kid, Parser> {
   }
 
   /// Check-sat assuming command, turns `unknown` results into errors.
-  fn check_sat_assuming<'a, Ident, IdentIter, Idents: ?Sized>(
-    & mut self, idents: & 'a Idents, info: & Parser::I
+  fn check_sat_assuming<'a, Info, Ident, IdentIter, Idents: ?Sized>(
+    & mut self, idents: & 'a Idents, info: & Info
   ) -> Res<bool>
   where
-  Ident: Sym2Smt<Parser::I> + 'a,
+  Ident: Sym2Smt<Info> + 'a,
   IdentIter: Iterator<Item = & 'a Ident>,
   & 'a Idents: IntoIterator<
     Item = & 'a Ident, IntoIter = IdentIter
@@ -1148,11 +981,11 @@ SolverPrims<'kid, Parser> {
   }
 
   /// Check-sat assuming command, turns `unknown` results into `None`.
-  fn check_sat_assuming_or_unknown<'a, Ident, IdentIter, Idents: ?Sized>(
-    & mut self, idents: & 'a Idents, info: & Parser::I
+  fn check_sat_assuming_or_unknown<'a, Info, Ident, IdentIter, Idents: ?Sized>(
+    & mut self, idents: & 'a Idents, info: & Info
   ) -> Res<Option<bool>>
   where
-  Ident: Sym2Smt<Parser::I> + 'a,
+  Ident: Sym2Smt<Info> + 'a,
   IdentIter: Iterator<Item = & 'a Ident>,
   & 'a Idents: IntoIterator<
     Item = & 'a Ident, IntoIter = IdentIter
