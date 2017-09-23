@@ -1,12 +1,25 @@
-// See the LICENSE files at the top-level directory of this distribution.
-//
-// Licensed under the Apache License, Version 2.0 <LICENSE-APACHE or
-// http://www.apache.org/licenses/LICENSE-2.0> or the MIT license
-// <LICENSE-MIT or http://opensource.org/licenses/MIT>, at your
-// option. This file may not be copied, modified, or distributed
-// except according to those terms.
-
 //! SMT Lib 2 result parsers.
+//!
+//! Depending on the commands you plan to use, your parser will need to
+//! implement
+//!
+//! |                                         | for                         |
+//! |:---------------------------------------:|:---------------------------:|
+//! | [`IdentParser`](trait.IdentParser.html) | `get-model`                 |
+//! | [`ValueParser`](trait.ValueParser.html) | `get-model` and `get-value` |
+//! | [`ExprParser`](trait.ExprParser.html)   | `get-value`                 |
+//! | [`ProofParser`](trait.ExprParser.html)  | *currently unused*          |
+//!
+//! You can choose the kind of input you want to parse, between
+//!
+//! - `& [u8]`, *e.g.* for [`nom`][nom],
+//! - `& str`, *e.g.* for [`regex`][regex],
+//! - [`& mut SmtParser`][parser], `rmst2`'s internal parser which
+//!   provides simple helpers to parse s-expressions.
+//!
+//! [nom]: https://crates.io/crates/nom (nom crate on crates.io)
+//! [regex]: https://crates.io/crates/regex (regex crate on crates.io)
+//! [parser]: struct.SmtParser.html (rsmt2's internal parser)
 
 use errors::* ;
 
@@ -71,6 +84,40 @@ impl<R: BufRead> SmtParser<R> {
     Ok(())
   }
 
+  /// Returns the next s-expression and positions the cursor directly after it.
+  ///
+  /// An s-expression is an ident, a constant with no parens (`42`, `false`,
+  /// *etc.*), or something between (nested) parens. 
+  ///
+  /// ```
+  /// # extern crate rsmt2 ;
+  /// # use rsmt2::parse::SmtParser ;
+  /// # fn main() {
+  /// let txt = "\
+  ///   token  ; a comment\n\n next_token ; more comments\n\
+  ///   (+ |quoted ident, ; a comment\n parens don't count)| 7)42 false\
+  /// " ;
+  /// let mut parser = SmtParser::of_str(txt) ;
+  ///
+  /// assert_eq!( parser.get_sexpr().unwrap(), "token" ) ;
+  /// assert_eq!( parser.buff_rest(), "  ; a comment\n" ) ;
+  ///
+  /// assert_eq!( parser.get_sexpr().unwrap(), "next_token" ) ;
+  /// assert_eq!( parser.buff_rest(), " ; more comments\n" ) ;
+  ///
+  /// assert_eq!(
+  ///   parser.get_sexpr().unwrap(),
+  ///   "(+ |quoted ident, ; a comment\n parens don't count)| 7)"
+  /// ) ;
+  /// assert_eq!( parser.buff_rest(), "42 false" ) ;
+  ///
+  /// assert_eq!( parser.get_sexpr().unwrap(), "42" ) ;
+  /// assert_eq!( parser.buff_rest(), " false" ) ;
+  ///
+  /// assert_eq!( parser.get_sexpr().unwrap(), "false" ) ;
+  /// assert_eq!( parser.buff_rest(), "" ) ;
+  /// # }
+  /// ```
   pub fn get_sexpr(& mut self) -> Res<& str> {
     let end = self.load_sexpr() ? ;
     let start = self.cursor ;
@@ -167,7 +214,7 @@ impl<R: BufRead> SmtParser<R> {
     self.cursor = 0 ;
   }
 
-  /// Prints itself.
+  /// Prints itself, for debugging.
   pub fn print(& self, pref: & str) {
     let mut count = 0 ;
     let mut printed_cursor = false ;
@@ -282,9 +329,10 @@ impl<R: BufRead> SmtParser<R> {
   }
   /// Parses a tag or fails.
   ///
-  /// Returns `()` exactly when
-  /// [`try_tag`](struct.SmtParser.html@fn.try_tag.html) returns `true`, and an
+  /// Returns `()` exactly when [`try_tag`][try tag] returns `true`, and an
   /// error otherwise.
+  ///
+  /// [try tag]: struct.SmtParser.html#method.try_tag (try_tag function)
   pub fn tag(& mut self, tag: & str) -> Res<()> {
     if self.try_tag(tag) ? {
       Ok(())
@@ -499,7 +547,11 @@ impl<R: BufRead> SmtParser<R> {
 
 
 
-/// Can parse an ident.
+/// Can parse identifiers and types. Used for `get_model`.
+///
+/// For more information refer to the [module-level documentation].
+///
+/// [module-level documentation]: index.html
 pub trait IdentParser<'a, Ident, Type, Input = & 'a str>: Copy
 where Input: ?Sized {
   fn parse_ident(self, Input) -> Res<Ident> ;
@@ -526,7 +578,11 @@ where T: IdentParser<'a, Ident, Type, & 'a str>, Br: BufRead {
   }
 }
 
-/// Can parse a value.
+/// Can parse values. Used for `get-model` and `get-value`.
+///
+/// For more information refer to the [module-level documentation].
+///
+/// [module-level documentation]: index.html
 pub trait ValueParser<'a, Value, Input = & 'a str>: Copy
 where Input: ?Sized {
   fn parse_value(self, Input) -> Res<Value> ;
@@ -544,7 +600,11 @@ where T: ValueParser<'a, Value, & 'a str>, Br: BufRead {
   }
 }
 
-/// Can parse an expression.
+/// Can parse expressions. Used for `get_value`.
+///
+/// For more information refer to the [module-level documentation].
+///
+/// [module-level documentation]: index.html
 pub trait ExprParser<'a, Expr, Info, Input = & 'a str>: Copy
 where Input: ?Sized {
   fn parse_expr(self, Input, Info) -> Res<Expr> ;
@@ -564,7 +624,11 @@ where T: ExprParser<'a, Expr, Info, & 'a str>, Br: BufRead {
   }
 }
 
-/// Can parse a proof.
+/// Can parse proofs. Currenly unused.
+///
+/// For more information refer to the [module-level documentation].
+///
+/// [module-level documentation]: index.html
 pub trait ProofParser<'a, Proof, Input = & 'a str>: Copy
 where Input: ?Sized {
   fn parse_proof(self, Input) -> Res<Proof> ;
