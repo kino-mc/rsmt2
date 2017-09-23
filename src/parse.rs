@@ -62,12 +62,13 @@ named!{ pub success< Res<()> >,
   )
 }
 
-named!{ pub check_sat< Res<bool> >,
+named!{ pub check_sat< Res< Option<bool> > >,
   preceded!(
     opt!(multispace),
     alt!(
-      map!( tag!("sat"), |_| Ok(true) ) |
-      map!( tag!("unsat"), |_| Ok(false) ) |
+      map!( tag!("sat"), |_| Ok( Some(true) ) ) |
+      map!( tag!("unsat"), |_| Ok( Some(false) ) ) |
+      map!( tag!("unknown"), |_| Ok( None ) ) |
       map!( unexpected, |e| e )
     )
   )

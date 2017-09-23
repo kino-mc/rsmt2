@@ -920,16 +920,32 @@ SolverPrims<'kid, Parser> {
     )
   }
 
-  /// Parse the result of a check-sat.
+  /// Parse the result of a check-sat, turns `unknown` results into errors.
   #[inline(always)]
   fn parse_check_sat(& mut self) -> Res<bool> {
+    if let Some(res) = self.parse_check_sat_or_unknown() ? {
+      Ok(res)
+    } else {
+      Err( ErrorKind::Unknown.into() )
+    }
+  }
+
+  /// Parse the result of a check-sat, turns `unknown` results into `None`.
+  #[inline(always)]
+  fn parse_check_sat_or_unknown(& mut self) -> Res< Option<bool> > {
     self.parse( |bytes, _| wrap!( check_sat(bytes) ) )
   }
 
-  /// Check-sat command.
+  /// Check-sat command, turns `unknown` results into errors.
   fn check_sat(& mut self) -> Res<bool> {
     self.print_check_sat() ? ;
     self.parse_check_sat()
+  }
+
+  /// Check-sat command, turns `unknown` results in `None`.
+  fn check_sat_or_unknown(& mut self) -> Res< Option<bool> > {
+    self.print_check_sat() ? ;
+    self.parse_check_sat_or_unknown()
   }
 
   /// Get-model command.
@@ -1117,7 +1133,7 @@ SolverPrims<'kid, Parser> {
     }
   }
 
-  /// Check-sat assuming command.
+  /// Check-sat assuming command, turns `unknown` results into errors.
   fn check_sat_assuming<'a, Ident, IdentIter, Idents: ?Sized>(
     & mut self, idents: & 'a Idents, info: & Parser::I
   ) -> Res<bool>
@@ -1129,5 +1145,19 @@ SolverPrims<'kid, Parser> {
   > {
     self.print_check_sat_assuming(idents, info) ? ;
     self.parse_check_sat()
+  }
+
+  /// Check-sat assuming command, turns `unknown` results into `None`.
+  fn check_sat_assuming_or_unknown<'a, Ident, IdentIter, Idents: ?Sized>(
+    & mut self, idents: & 'a Idents, info: & Parser::I
+  ) -> Res<Option<bool>>
+  where
+  Ident: Sym2Smt<Parser::I> + 'a,
+  IdentIter: Iterator<Item = & 'a Ident>,
+  & 'a Idents: IntoIterator<
+    Item = & 'a Ident, IntoIter = IdentIter
+  > {
+    self.print_check_sat_assuming(idents, info) ? ;
+    self.parse_check_sat_or_unknown()
   }
 }

@@ -6,6 +6,7 @@
 - `Solver` commands are now much more generic ; all type parameters are
   separated and all collections are supported
 - much cleaner interface, all the commands are in the `Solver` trait now
+- support solvers returning `unknown` to check-sat queries
 
 # v0.6.0
 

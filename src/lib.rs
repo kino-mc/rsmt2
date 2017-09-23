@@ -752,6 +752,10 @@ pub mod errors {
     }
 
     errors {
+      #[doc = "The solver reported `unknown`."]
+      Unknown {
+        description("smt solver reported `unknown`")
+      }
       #[doc = "The solver reported `unsupported`."]
       Unsupported {
         description("unsupported command")
