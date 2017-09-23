@@ -182,6 +182,7 @@ extern crate rsmt2 ;
 use std::io::Write ;
 
 use rsmt2::* ;
+use rsmt2::parse::* ;
 use rsmt2::errors::* ;
 
 use Var::* ;
@@ -314,6 +315,7 @@ It is now easy to implement `Sym2Smt` and `Expr2Smt`:
 # use std::io::Write ;
 # 
 # use rsmt2::* ;
+# use rsmt2::parse::* ;
 # use rsmt2::errors::* ;
 # 
 # use Var::* ;
@@ -477,6 +479,7 @@ the case of [`check_sat`](trait.Solver.html#method.check_sat) for example.
 # use std::io::Write ;
 # 
 # use rsmt2::* ;
+# use rsmt2::parse::* ;
 # use rsmt2::errors::* ;
 # 
 # use Var::* ;
@@ -708,6 +711,7 @@ fact that it makes little sense.
 # use std::io::Write ;
 # 
 # use rsmt2::* ;
+# use rsmt2::parse::* ;
 # use rsmt2::errors::* ;
 # 
 # use Var::* ;
@@ -1064,21 +1068,18 @@ pub mod errors {
 #[macro_use]
 mod common ;
 pub mod conf ;
-mod parse ;
+pub mod parse ;
 mod solver ;
 
 pub use solver::{
   solver, Kid, Solver, PlainSolver, TeeSolver
 } ;
-pub use parse::{
-  IdentParser, ValueParser, ExprParser, ProofParser
-} ;
 
-/// Internal traits used to build solvers.
-pub mod internals {
-  pub use parse::SmtParser ;
-  pub use solver::SolverBasic ;
-}
+// /// Internal traits used to build solvers.
+// pub mod internals {
+//   pub use parse::SmtParser ;
+//   pub use solver::SolverBasic ;
+// }
 
 /// Traits your types must implement so that `rsmt2` can use them.
 pub mod to_smt {

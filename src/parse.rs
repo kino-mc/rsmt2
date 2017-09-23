@@ -19,7 +19,7 @@ macro_rules! tags {
   ) ;
 }
 
-use std::io::BufRead ;
+use std::io::{ BufRead, BufReader } ;
 
 /// SMT-LIB 2.0 parser.
 pub struct SmtParser<R: BufRead> {
@@ -34,6 +34,12 @@ pub struct SmtParser<R: BufRead> {
   /// Marked position, for backtracking.
   mark: Option<usize>,
 }
+impl<'a> SmtParser< BufReader<& 'a [u8]> > {
+  /// Constructor from a string, mostly for doc/test purposes.
+  pub fn of_str(s: & 'a str) -> Self {
+    SmtParser::new( BufReader::new( s.as_bytes() ) )
+  }
+}
 impl<R: BufRead> SmtParser<R> {
   /// Creates an smt parser.
   pub fn new(input: R) -> Self {
@@ -46,14 +52,23 @@ impl<R: BufRead> SmtParser<R> {
     }
   }
 
-  /// Reads a line from the input.
-  pub fn read_line(& mut self) -> Res<()> {
-    self.input.read_line(& mut self.buff) ? ;
-    Ok(())
+  /// Immutable access to the buffer.
+  pub fn buff(& self) -> & str {
+    & self.buff
+  }
+  /// Immutable access to the part of the buffer that's not been parsed yet.
+  pub fn buff_rest(& self) -> & str {
+    & self.buff[ self.cursor .. ]
+  }
+  /// Immutable access to the cursor.
+  pub fn cursor(& self) -> usize {
+    self.cursor
   }
 
-  pub fn get_sexpr_byte(& mut self) -> Res<& [u8]> {
-    Ok( self.get_sexpr()?.as_bytes() )
+  /// Reads a line from the input.
+  fn read_line(& mut self) -> Res<()> {
+    self.input.read_line(& mut self.buff) ? ;
+    Ok(())
   }
 
   pub fn get_sexpr(& mut self) -> Res<& str> {
@@ -67,7 +82,7 @@ impl<R: BufRead> SmtParser<R> {
   ///
   /// Returns the next position of the end of the sexpr. The cursor will be
   /// set at its beginning.
-  pub fn load_sexpr(& mut self) -> Res<usize> {
+  fn load_sexpr(& mut self) -> Res<usize> {
     self.spc_cmt() ;
     // self.print("") ;
     let (mut op_paren, mut cl_paren) = (0, 0) ;
@@ -173,6 +188,38 @@ impl<R: BufRead> SmtParser<R> {
   }
 
   /// Parses some spaces or some comments.
+  ///
+  /// Parsing a tag or loading an s-expression fetches new lines, this does
+  /// not.
+  ///
+  /// ```
+  /// # extern crate rsmt2 ;
+  /// # use rsmt2::parse::SmtParser ;
+  /// # fn main() {
+  /// let txt = "  token  ; a comment\n\n next token ; last comment" ;
+  /// let mut parser = SmtParser::of_str(txt) ;
+  ///
+  /// parser.spc_cmt() ;
+  /// assert_eq!( parser.buff_rest(), "" ) ;
+  /// assert_eq!( parser.buff(), "" ) ;
+  ///
+  /// assert!( parser.try_tag("token").expect("token") ) ;
+  /// assert_eq!( parser.buff_rest(), "  ; a comment\n" ) ;
+  /// assert_eq!( parser.buff(), "  token  ; a comment\n" ) ;
+  ///
+  /// parser.spc_cmt() ;
+  /// assert_eq!( parser.buff_rest(), "" ) ;
+  /// assert_eq!( parser.buff(), "  token  ; a comment\n" ) ;
+  ///
+  /// assert!( parser.try_tag("next token").expect("token") ) ;
+  /// assert_eq!( parser.buff_rest(), " ; last comment" ) ;
+  /// assert_eq!( parser.buff(), txt ) ;
+  ///
+  /// parser.spc_cmt() ;
+  /// assert_eq!( parser.buff_rest(), "" ) ;
+  /// assert_eq!( parser.buff(), txt ) ;
+  /// # }
+  /// ```
   pub fn spc_cmt(& mut self) {
     let mut chars = self.buff[self.cursor..].chars() ;
     'spc_cmt: while let Some(c) = chars.next() {
@@ -194,7 +241,30 @@ impl<R: BufRead> SmtParser<R> {
     }
   }
 
-  /// Tries to parse a tag, `true` if successful.
+  /// Tries to parse a tag, `true` if successful. Parse whitespaces and
+  /// comments if any before the token.
+  ///
+  /// If this function returns `false`, then the cursor is at the first
+  /// non-whitespace non-commented character.
+  ///
+  /// ```
+  /// # extern crate rsmt2 ;
+  /// # use rsmt2::parse::SmtParser ;
+  /// # fn main() {
+  /// let txt = "\
+  ///   a tag is anything  |(>_<)|  ; a comment\n\n next token ; last comment\
+  /// " ;
+  /// let mut parser = SmtParser::of_str(txt) ;
+  /// assert!( parser.try_tag("a tag is anything").expect("tag") ) ;
+  /// assert_eq!( parser.buff_rest(), "  |(>_<)|  ; a comment\n" ) ;
+  /// assert!( ! parser.try_tag("not the token").expect("tag") ) ;
+  /// assert_eq!( parser.buff_rest(), "|(>_<)|  ; a comment\n" ) ;
+  /// assert!( parser.try_tag("|(>_<)|").expect("tag") ) ;
+  /// assert!( ! parser.try_tag("not the next token").expect("tag") ) ;
+  /// assert_eq!( parser.buff_rest(), "next token ; last comment" ) ;
+  /// assert!( parser.try_tag("next token").expect("tag") ) ;
+  /// # }
+  /// ```
   pub fn try_tag(& mut self, tag: & str) -> Res<bool> {
     loop {
       self.spc_cmt() ;
@@ -211,6 +281,10 @@ impl<R: BufRead> SmtParser<R> {
     }
   }
   /// Parses a tag or fails.
+  ///
+  /// Returns `()` exactly when
+  /// [`try_tag`](struct.SmtParser.html@fn.try_tag.html) returns `true`, and an
+  /// error otherwise.
   pub fn tag(& mut self, tag: & str) -> Res<()> {
     if self.try_tag(tag) ? {
       Ok(())
@@ -220,20 +294,22 @@ impl<R: BufRead> SmtParser<R> {
   }
 
   /// Marks the current position.
-  pub fn mark(& mut self) {
+  #[inline]
+  fn mark(& mut self) {
     debug_assert!( self.mark.is_none() ) ;
     self.mark = Some(self.cursor)
   }
   /// Clears the marked position.
-  pub fn clear_mark(& mut self) {
+  #[inline]
+  fn clear_mark(& mut self) {
     debug_assert!( self.mark.is_some() ) ;
     self.mark = None
   }
   /// Backtracks to the marked position.
-  pub fn backtrack(& mut self) {
+  fn backtrack(& mut self) {
     if let Some(position) = self.mark {
       self.cursor = position ;
-      self.mark = None
+      self.clear_mark() ;
     } else {
       panic!("cannot backtrack, no marked position")
     }
@@ -264,7 +340,7 @@ impl<R: BufRead> SmtParser<R> {
   }
 
 
-  /// Generates a failure.
+  /// Generates a failure at the current position.
   pub fn fail_with<T, Str: Into<String>>(& mut self, msg: Str) -> Res<T> {
     let sexpr = self.get_sexpr().chain_err(
       || "while retrieving sexpression for parse error"
@@ -276,6 +352,55 @@ impl<R: BufRead> SmtParser<R> {
         ErrorKind::ParseError(msg.into(), sexpr)
       )
     }
+  }
+
+  /// Tries to parse a boolean.
+  pub fn try_bool(& mut self) -> Res< Option<bool> > {
+    if self.try_tag("true") ? {
+      Ok( Some(true) )
+    } else if self.try_tag("false") ? {
+      Ok( Some(false) )
+    } else {
+      Ok( None )
+    }
+  }
+
+  /// Tries to parse an unsigned integer. Does **not** backtrack (or mark).
+  fn try_uint(& mut self) -> Res< Option<& str> > {
+    let res = self.get_sexpr() ? ;
+    for c in res.chars() {
+      if ! c.is_numeric() { return Ok(None) }
+    }
+    Ok( Some(res) )
+  }
+
+  /// Tries to parses an integer. The boolean is `true` iff the integer is
+  /// positive.
+  pub fn try_int<F, T>(& mut self, f: F) -> Res< Option<T> >
+  where F: FnOnce(& str, bool) -> T {
+    self.spc_cmt() ;
+    self.mark() ;
+    let mut res = None ;
+    if self.try_tag("(") ? {
+      let pos = if self.try_tag("+") ? {
+        true
+      } else if self.try_tag("-") ? {
+        false
+      } else {
+        self.backtrack() ;
+        return Ok(None)
+      } ;
+      if let Some(uint) = self.try_uint() ? {
+        res = Some( f(uint, pos) )
+      }
+      self.tag(")") ? ;
+    } else {
+      if let Some(uint) = self.try_uint() ? {
+        res = Some( f(uint, true) )
+      }
+    }
+    if res.is_none() { self.backtrack() }
+    Ok(res)
   }
 
   /// Parses `success`.
@@ -304,19 +429,20 @@ impl<R: BufRead> SmtParser<R> {
     & mut self, parser: Parser
   ) -> Res< Vec<(Ident, Type, Value)> >
   where
-  Parser: for<'a> IdentParser<'a, Ident, Type> +
-          for<'a> ValueParser<'a, Value> {
+  Parser: for<'a> IdentParser<'a, Ident, Type, & 'a mut Self> +
+          for<'a> ValueParser<'a, Value, & 'a mut Self> {
     let mut model = Vec::new() ;
     tags!{ self => "(", "model" }
     while ! self.try_tag(")") ? {
       tags!{ self => "(", "define-fun" }
-      let id = parser.parse_ident( self.get_sexpr() ? ) ? ;
+      let id = parser.parse_ident(self) ? ;
       tags!{ self => "(", ")" }
-      let typ = parser.parse_type( self.get_sexpr() ? ) ? ;
-      let value = parser.parse_value( self.get_sexpr() ? ) ? ;
+      let typ = parser.parse_type(self) ? ;
+      let value = parser.parse_value(self) ? ;
       model.push( (id, typ, value) ) ;
       tags!{ self => ")" }
     }
+    self.clear() ;
     Ok(model)
   }
 
@@ -326,24 +452,25 @@ impl<R: BufRead> SmtParser<R> {
     & mut self, parser: Parser
   ) -> Res< Vec<(Ident, Vec<Type>, Type, Value)> >
   where
-  Parser: for<'a> IdentParser<'a, Ident, Type> +
-          for<'a> ValueParser<'a, Value> {
+  Parser: for<'a> IdentParser<'a, Ident, Type, & 'a mut Self> +
+          for<'a> ValueParser<'a, Value, & 'a mut Self> {
     let mut model = Vec::new() ;
     tags!{ self => "(", "model" }
     while ! self.try_tag(")") ? {
       tags!{ self => "(", "define-fun" }
-      let id = parser.parse_ident( self.get_sexpr() ? ) ? ;
+      let id = parser.parse_ident(self) ? ;
       tags!{ self => "(" }
       let mut args = Vec::new() ;
       while ! self.try_tag(")") ? {
-        let typ = parser.parse_type(self.get_sexpr() ? ) ? ;
+        let typ = parser.parse_type(self) ? ;
         args.push(typ)
       }
-      let typ = parser.parse_type( self.get_sexpr() ? ) ? ;
-      let value = parser.parse_value( self.get_sexpr() ? ) ? ;
+      let typ = parser.parse_type(self) ? ;
+      let value = parser.parse_value(self) ? ;
       model.push( (id, args, typ, value) ) ;
       tags!{ self => ")" }
     }
+    self.clear() ;
     Ok(model)
   }
 
@@ -352,17 +479,18 @@ impl<R: BufRead> SmtParser<R> {
     & mut self, parser: Parser, info: Info
   ) -> Res< Vec<(Expr, Value)> >
   where
-  Parser: for<'a> ValueParser<'a, Value> +
-          for<'a> ExprParser<'a, Expr, Info> {
+  Parser: for<'a> ValueParser<'a, Value, & 'a mut Self> +
+          for<'a> ExprParser<'a, Expr, Info, & 'a mut Self> {
     let mut values = Vec::new() ;
     tags!{ self => "(" }
     while ! self.try_tag(")") ? {
       tags!{ self => "(" }
-      let expr = parser.parse_expr( self.get_sexpr() ?, info.clone() ) ? ;
-      let value = parser.parse_value( self.get_sexpr() ? ) ? ;
+      let expr = parser.parse_expr( self, info.clone() ) ? ;
+      let value = parser.parse_value(self) ? ;
       values.push( (expr, value) ) ;
       tags!{ self => ")" }
     }
+    self.clear() ;
     Ok(values)
   }
 
@@ -386,6 +514,17 @@ where T: IdentParser<'a, Ident, Type, & 'a [u8]> {
     self.parse_type( input.as_bytes() )
   }
 }
+impl<'a, Ident, Type, T, Br> IdentParser<
+  'a, Ident, Type, & 'a mut SmtParser<Br>
+> for T
+where T: IdentParser<'a, Ident, Type, & 'a str>, Br: BufRead {
+  fn parse_ident(self, input: & 'a mut SmtParser<Br>) -> Res<Ident> {
+    self.parse_ident( input.get_sexpr() ? )
+  }
+  fn parse_type(self, input: & 'a mut SmtParser<Br>) -> Res<Type> {
+    self.parse_type( input.get_sexpr() ? )
+  }
+}
 
 /// Can parse a value.
 pub trait ValueParser<'a, Value, Input = & 'a str>: Copy
@@ -396,6 +535,12 @@ impl<'a, Value, T> ValueParser<'a, Value> for T
 where T: ValueParser<'a, Value, & 'a [u8]> {
   fn parse_value(self, input: & 'a str) -> Res<Value> {
     self.parse_value( input.as_bytes() )
+  }
+}
+impl<'a, Value, T, Br> ValueParser<'a, Value, & 'a mut SmtParser<Br>> for T
+where T: ValueParser<'a, Value, & 'a str>, Br: BufRead {
+  fn parse_value(self, input: & 'a mut SmtParser<Br>) -> Res<Value> {
+    self.parse_value( input.get_sexpr() ? )
   }
 }
 
@@ -410,6 +555,14 @@ where T: ExprParser<'a, Expr, Info, & 'a [u8]> {
     self.parse_expr( input.as_bytes(), info )
   }
 }
+impl<'a, Expr, Info, T, Br> ExprParser<
+  'a, Expr, Info, & 'a mut SmtParser<Br>
+> for T
+where T: ExprParser<'a, Expr, Info, & 'a str>, Br: BufRead {
+  fn parse_expr(self, input: & 'a mut SmtParser<Br>, info: Info) -> Res<Expr> {
+    self.parse_expr( input.get_sexpr() ?, info )
+  }
+}
 
 /// Can parse a proof.
 pub trait ProofParser<'a, Proof, Input = & 'a str>: Copy
@@ -420,5 +573,11 @@ impl<'a, Proof, T> ProofParser<'a, Proof> for T
 where T: ProofParser<'a, Proof, & 'a [u8]> {
   fn parse_proof(self, input: & 'a str) -> Res<Proof> {
     self.parse_proof( input.as_bytes() )
+  }
+}
+impl<'a, Proof, T, Br> ProofParser<'a, Proof, & 'a mut SmtParser<Br>> for T
+where T: ProofParser<'a, Proof, & 'a str>, Br: BufRead {
+  fn parse_proof(self, input: & 'a mut SmtParser<Br>) -> Res<Proof> {
+    self.parse_proof( input.get_sexpr() ? )
   }
 }
