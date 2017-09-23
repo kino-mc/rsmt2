@@ -870,8 +870,8 @@ extern crate error_chain ;
 /// Parser structure.
 #[derive(Clone, Copy)]
 struct Parser ;
-impl IdentParser< (Var, Option<usize>), Type > for Parser {
-  fn parse_ident(self, s: & str) -> Res<(Var, Option<usize>)> {
+impl<'a> IdentParser< 'a, (Var, Option<usize>), Type > for Parser {
+  fn parse_ident(self, s: & 'a str) -> Res<(Var, Option<usize>)> {
     if s.len() <= 2 { bail!("not one of my idents...") }
     let s = & s[ 1 .. (s.len() - 1) ] ; // Removing surrounding pipes.
     let mut parts = s.split("@") ;
@@ -892,7 +892,7 @@ impl IdentParser< (Var, Option<usize>), Type > for Parser {
       Ok( (Var::NSVar(id), None) )
     }
   }
-  fn parse_type(self, s: & str) -> Res<Type> {
+  fn parse_type(self, s: & 'a str) -> Res<Type> {
     match s {
       "Int" => Ok( Type::Int ),
       "Bool" => Ok( Type::Bool ),
@@ -902,8 +902,8 @@ impl IdentParser< (Var, Option<usize>), Type > for Parser {
   }
 }
 
-impl ValueParser< Const > for Parser {
-  fn parse_value(self, s: & str) -> Res<Const> {
+impl<'a> ValueParser< 'a, Const > for Parser {
+  fn parse_value(self, s: & 'a str) -> Res<Const> {
     if s == "true" {
       return Ok( Const::BConst(true) )
     } else if s == "false" {

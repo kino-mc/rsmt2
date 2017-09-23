@@ -303,7 +303,9 @@ impl<R: BufRead> SmtParser<R> {
   pub fn get_model_const<Ident, Value, Type, Parser>(
     & mut self, parser: Parser
   ) -> Res< Vec<(Ident, Type, Value)> >
-  where Parser: IdentParser<Ident, Type> + ValueParser<Value> {
+  where
+  Parser: for<'a> IdentParser<'a, Ident, Type> +
+          for<'a> ValueParser<'a, Value> {
     let mut model = Vec::new() ;
     tags!{ self => "(", "model" }
     while ! self.try_tag(")") ? {
@@ -323,7 +325,9 @@ impl<R: BufRead> SmtParser<R> {
   pub fn get_model<Ident, Value, Type, Parser>(
     & mut self, parser: Parser
   ) -> Res< Vec<(Ident, Vec<Type>, Type, Value)> >
-  where Parser: IdentParser<Ident, Type> + ValueParser<Value> {
+  where
+  Parser: for<'a> IdentParser<'a, Ident, Type> +
+          for<'a> ValueParser<'a, Value> {
     let mut model = Vec::new() ;
     tags!{ self => "(", "model" }
     while ! self.try_tag(")") ? {
@@ -347,7 +351,9 @@ impl<R: BufRead> SmtParser<R> {
   pub fn get_values<Value, Info: Clone, Expr, Parser>(
     & mut self, parser: Parser, info: Info
   ) -> Res< Vec<(Expr, Value)> >
-  where Parser: ValueParser<Value> + ExprParser<Expr, Info> {
+  where
+  Parser: for<'a> ValueParser<'a, Value> +
+          for<'a> ExprParser<'a, Expr, Info> {
     let mut values = Vec::new() ;
     tags!{ self => "(" }
     while ! self.try_tag(")") ? {
@@ -366,53 +372,53 @@ impl<R: BufRead> SmtParser<R> {
 
 
 /// Can parse an ident.
-pub trait IdentParser<Ident, Type, Input = str>: Copy
+pub trait IdentParser<'a, Ident, Type, Input = & 'a str>: Copy
 where Input: ?Sized {
-  fn parse_ident(self, & Input) -> Res<Ident> ;
-  fn parse_type(self, & Input) -> Res<Type> ;
+  fn parse_ident(self, Input) -> Res<Ident> ;
+  fn parse_type(self, Input) -> Res<Type> ;
 }
-impl<Ident, Type, T> IdentParser<Ident, Type> for T
-where T: IdentParser<Ident, Type, [u8]> {
-  fn parse_ident(self, input: & str) -> Res<Ident> {
+impl<'a, Ident, Type, T> IdentParser<'a, Ident, Type> for T
+where T: IdentParser<'a, Ident, Type, & 'a [u8]> {
+  fn parse_ident(self, input: & 'a str) -> Res<Ident> {
     self.parse_ident( input.as_bytes() )
   }
-  fn parse_type(self, input: & str) -> Res<Type> {
+  fn parse_type(self, input: & 'a str) -> Res<Type> {
     self.parse_type( input.as_bytes() )
   }
 }
 
 /// Can parse a value.
-pub trait ValueParser<Value, Input = str>: Copy
+pub trait ValueParser<'a, Value, Input = & 'a str>: Copy
 where Input: ?Sized {
-  fn parse_value(self, & Input) -> Res<Value> ;
+  fn parse_value(self, Input) -> Res<Value> ;
 }
-impl<Value, T> ValueParser<Value> for T
-where T: ValueParser<Value, [u8]> {
-  fn parse_value(self, input: & str) -> Res<Value> {
+impl<'a, Value, T> ValueParser<'a, Value> for T
+where T: ValueParser<'a, Value, & 'a [u8]> {
+  fn parse_value(self, input: & 'a str) -> Res<Value> {
     self.parse_value( input.as_bytes() )
   }
 }
 
 /// Can parse an expression.
-pub trait ExprParser<Expr, Info, Input = str>: Copy
+pub trait ExprParser<'a, Expr, Info, Input = & 'a str>: Copy
 where Input: ?Sized {
-  fn parse_expr(self, & Input, Info) -> Res<Expr> ;
+  fn parse_expr(self, Input, Info) -> Res<Expr> ;
 }
-impl<Expr, Info, T> ExprParser<Expr, Info> for T
-where T: ExprParser<Expr, Info, [u8]> {
-  fn parse_expr(self, input: & str, info: Info) -> Res<Expr> {
+impl<'a, Expr, Info, T> ExprParser<'a, Expr, Info> for T
+where T: ExprParser<'a, Expr, Info, & 'a [u8]> {
+  fn parse_expr(self, input: & 'a str, info: Info) -> Res<Expr> {
     self.parse_expr( input.as_bytes(), info )
   }
 }
 
 /// Can parse a proof.
-pub trait ProofParser<Proof, Input = str>: Copy
+pub trait ProofParser<'a, Proof, Input = & 'a str>: Copy
 where Input: ?Sized {
-  fn parse_proof(self, & Input) -> Res<Proof> ;
+  fn parse_proof(self, Input) -> Res<Proof> ;
 }
-impl<Proof, T> ProofParser<Proof> for T
-where T: ProofParser<Proof, [u8]> {
-  fn parse_proof(self, input: & str) -> Res<Proof> {
+impl<'a, Proof, T> ProofParser<'a, Proof> for T
+where T: ProofParser<'a, Proof, & 'a [u8]> {
+  fn parse_proof(self, input: & 'a str) -> Res<Proof> {
     self.parse_proof( input.as_bytes() )
   }
 }
