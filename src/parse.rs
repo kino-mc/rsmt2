@@ -23,15 +23,6 @@
 
 use errors::* ;
 
-/// Parses a sequence of tags.
-macro_rules! tags {
-  ( $p:expr => $($e:expr),+ ) => (
-    $(
-      $p.tag($e) ? ;
-    )+
-  ) ;
-}
-
 use std::io::{ BufRead, BufReader } ;
 
 /// SMT-LIB 2.0 parser.
@@ -78,10 +69,10 @@ impl<R: BufRead> SmtParser<R> {
     self.cursor
   }
 
-  /// Reads a line from the input.
-  fn read_line(& mut self) -> Res<()> {
-    self.input.read_line(& mut self.buff) ? ;
-    Ok(())
+  /// Reads a line from the input. Returns `true` if something was read.
+  fn read_line(& mut self) -> Res<bool> {
+    let read = self.input.read_line(& mut self.buff) ? ;
+    Ok( read != 0 )
   }
 
   /// Returns the next s-expression and positions the cursor directly after it.
@@ -140,7 +131,8 @@ impl<R: BufRead> SmtParser<R> {
     // println!("  loading:") ;
     'load: loop {
       if start == self.buff.len() {
-        self.read_line() ?
+        let eof = ! self.read_line() ? ;
+        if eof { bail!("reached eof") }
       }
       debug_assert!(op_paren >= cl_paren) ;
 
@@ -292,7 +284,8 @@ impl<R: BufRead> SmtParser<R> {
   /// comments if any before the token.
   ///
   /// If this function returns `false`, then the cursor is at the first
-  /// non-whitespace non-commented character.
+  /// non-whitespace non-commented character after the original cursor
+  /// position.
   ///
   /// ```
   /// # extern crate rsmt2 ;
@@ -316,12 +309,16 @@ impl<R: BufRead> SmtParser<R> {
     loop {
       self.spc_cmt() ;
       if self.cursor + tag.len() >= self.buff.len() + 1 {
-        self.read_line() ?
+        // println!("reading ({})", tag) ;
+        let eof = ! self.read_line() ? ;
+        self.spc_cmt() ;
+        if eof { return Ok(false) }
       } else {
         if & self.buff[ self.cursor .. self.cursor + tag.len() ] == tag {
           self.cursor += tag.len() ;
           return Ok(true)
         } else {
+          self.spc_cmt() ;
           return Ok(false)
         }
       }
@@ -339,6 +336,59 @@ impl<R: BufRead> SmtParser<R> {
     } else {
       self.fail_with( format!("expected `{}`", tag) )
     }
+  }
+
+  /// Parses a tag followed by a whitespace, a paren or a comment.
+  ///
+  /// If this function returns `false`, then the cursor is at the first
+  /// non-whitespace non-commented character after the original cursor
+  /// position.
+  ///
+  /// ```
+  /// # extern crate rsmt2 ;
+  /// # use rsmt2::parse::SmtParser ;
+  /// # fn main() {
+  /// let txt = "\
+  ///   a word is anything  |(>_<)|  last; comment\
+  /// " ;
+  /// let mut parser = SmtParser::of_str(txt) ;
+  /// assert!( parser.try_word("a word is").expect("word") ) ;
+  /// assert_eq!( parser.buff_rest(), " anything  |(>_<)|  last; comment" ) ;
+  /// assert!( ! parser.try_word("a").expect("word") ) ;
+  /// assert_eq!( parser.buff_rest(), "anything  |(>_<)|  last; comment" ) ;
+  /// assert!( ! parser.try_word("any").expect("word") ) ;
+  /// assert_eq!( parser.buff_rest(), "anything  |(>_<)|  last; comment" ) ;
+  /// assert!( ! parser.try_word("anythin").expect("word") ) ;
+  /// assert_eq!( parser.buff_rest(), "anything  |(>_<)|  last; comment" ) ;
+  /// assert!( parser.try_word("anything").expect("word") ) ;
+  /// assert_eq!( parser.buff_rest(), "  |(>_<)|  last; comment" ) ;
+  /// assert!( parser.try_word("|").expect("word") ) ;
+  /// assert_eq!( parser.buff_rest(), "(>_<)|  last; comment" ) ;
+  /// assert!( parser.try_tag("(").expect("tag") ) ;
+  /// assert_eq!( parser.buff_rest(), ">_<)|  last; comment" ) ;
+  /// assert!( parser.try_word(">_<").expect("word") ) ;
+  /// assert_eq!( parser.buff_rest(), ")|  last; comment" ) ;
+  /// assert!( parser.try_tag(")").expect("tag") ) ;
+  /// assert_eq!( parser.buff_rest(), "|  last; comment" ) ;
+  /// assert!( parser.try_word("|").expect("word") ) ;
+  /// assert_eq!( parser.buff_rest(), "  last; comment" ) ;
+  /// assert!( parser.try_word("last").expect("word") ) ;
+  /// assert_eq!( parser.buff_rest(), "; comment" ) ;
+  /// # }
+  /// ```
+  pub fn try_word(& mut self, word: & str) -> Res<bool> {
+    self.mark() ;
+    if self.try_tag(word) ? {
+      if let Some(c) = self.buff[ self.cursor .. ].chars().next() {
+        if c.is_whitespace() || c == ')' || c == '(' || c == ';' {
+          self.clear_mark() ;
+          return Ok(true)
+        }
+      }
+    }
+    self.backtrack() ;
+    self.spc_cmt() ;
+    Ok(false)
   }
 
   /// Marks the current position.
@@ -365,25 +415,57 @@ impl<R: BufRead> SmtParser<R> {
 
   /// Tries to parse a sequence of things potentially separated by whitespaces
   /// and/or comments.
-  pub fn try_seq<
-    'a, Tags: IntoIterator<Item = & 'a str>
-  >(& mut self, tags: Tags) -> Res<bool> {
+  ///
+  /// If this function returns `false`, then the cursor is at the first
+  /// non-whitespace non-commented character after the original cursor
+  /// position.
+  ///
+  /// ```
+  /// # extern crate rsmt2 ;
+  /// # use rsmt2::parse::SmtParser ;
+  /// # fn main() {
+  /// let txt = "\
+  ///   a tag is anything  |(>_<)|  ; a comment\n\n next token ; last comment\
+  /// " ;
+  /// let mut parser = SmtParser::of_str(txt) ;
+  /// assert!(
+  ///   parser.try_tags(
+  ///      &[ "a", "tag", "is anything", "|", "(", ">_<", ")", "|" ]
+  ///   ).expect("tags")
+  /// ) ;
+  /// assert_eq!( parser.buff_rest(), "  ; a comment\n" ) ;
+  /// assert!(
+  ///   ! parser.try_tags(
+  ///     & [ "next", "token", "something else?" ]
+  ///   ).expect("tags")
+  /// ) ;
+  /// assert_eq!( parser.buff_rest(), "next token ; last comment" )
+  /// # }
+  /// ```
+  pub fn try_tags<'a, Tags, S>(& mut self, tags: & 'a Tags) -> Res<bool>
+  where & 'a Tags: IntoIterator<Item = S>, S: AsRef<str> {
     self.mark() ;
     for tag in tags {
-      if ! self.try_tag(tag) ? {
+      if ! self.try_tag( tag.as_ref() ) ? {
         self.backtrack() ;
+        self.spc_cmt() ;
         return Ok(false)
       }
     }
+    self.clear_mark() ;
     Ok(true)
   }
 
   /// Parses a sequence of things potentially separated by whitespaces and/or
   /// comments.
-  pub fn seq<
-    'a, Tags: IntoIterator<Item = & 'a str>
-  >(& mut self, tags: Tags) -> Res<()> {
-    for tag in tags { self.tag(tag) ? }
+  ///
+  /// Returns `()` exactly when [`try_tags`][try tags] returns `true`, and an
+  /// error otherwise.
+  ///
+  /// [try tags]: struct.SmtParser.html#method.try_tag (try_tag function)
+  pub fn tags<'a, Tags, S>(& mut self, tags: & 'a Tags) -> Res<()>
+  where & 'a Tags: IntoIterator<Item = S>, S: AsRef<str> {
+    for tag in tags { self.tag( tag.as_ref() ) ? }
     Ok(())
   }
 
@@ -403,10 +485,39 @@ impl<R: BufRead> SmtParser<R> {
   }
 
   /// Tries to parse a boolean.
+  ///
+  /// ```
+  /// # extern crate rsmt2 ;
+  /// # use rsmt2::parse::SmtParser ;
+  /// # fn main() {
+  /// let txt = "\
+  ///   true fls  true_ly_bad_ident false; comment\
+  /// " ;
+  /// let mut parser = SmtParser::of_str(txt) ;
+  /// assert_eq!( parser.try_bool().expect("bool"), Some(true) ) ;
+  /// assert_eq!(
+  ///   parser.buff_rest(), " fls  true_ly_bad_ident false; comment"
+  /// ) ;
+  /// assert_eq!( parser.try_bool().expect("bool"), None ) ;
+  /// assert_eq!(
+  ///   parser.buff_rest(), "fls  true_ly_bad_ident false; comment"
+  /// ) ;
+  /// parser.tag("fls").expect("tag") ;
+  /// assert_eq!( parser.try_bool().expect("bool"), None ) ;
+  /// assert_eq!(
+  ///   parser.buff_rest(), "true_ly_bad_ident false; comment"
+  /// ) ;
+  /// parser.tag("true_ly_bad_ident").expect("tag") ;
+  /// assert_eq!( parser.try_bool().expect("bool"), Some(false) ) ;
+  /// assert_eq!(
+  ///   parser.buff_rest(), "; comment"
+  /// ) ;
+  /// # }
+  /// ```
   pub fn try_bool(& mut self) -> Res< Option<bool> > {
-    if self.try_tag("true") ? {
+    if self.try_word("true") ? {
       Ok( Some(true) )
-    } else if self.try_tag("false") ? {
+    } else if self.try_word("false") ? {
       Ok( Some(false) )
     } else {
       Ok( None )
@@ -424,8 +535,42 @@ impl<R: BufRead> SmtParser<R> {
 
   /// Tries to parses an integer. The boolean is `true` iff the integer is
   /// positive.
-  pub fn try_int<F, T>(& mut self, f: F) -> Res< Option<T> >
-  where F: FnOnce(& str, bool) -> T {
+  ///
+  /// ```
+  /// # extern crate rsmt2 ;
+  /// # use rsmt2::parse::SmtParser ;
+  /// # fn main() {
+  /// use std::str::FromStr ;
+  /// fn to_int(
+  ///   input: & str, positive: bool
+  /// ) -> Result<isize, <isize as FromStr>::Err> {
+  ///   isize::from_str(input).map(
+  ///     |num| if positive { num } else { - num }
+  ///   )
+  /// }
+  /// let txt = "\
+  ///   666 (- 11) false; comment\n(+ 31) (= tru)\
+  /// " ;
+  /// let mut parser = SmtParser::of_str(txt) ;
+  /// assert_eq!( parser.try_int(to_int).expect("int"), Some(666) ) ;
+  /// assert_eq!(
+  ///   parser.buff_rest(), " (- 11) false; comment\n"
+  /// ) ;
+  /// assert_eq!( parser.try_int(to_int).expect("int"), Some(- 11) ) ;
+  /// assert_eq!(
+  ///   parser.buff_rest(), " false; comment\n"
+  /// ) ;
+  /// assert_eq!( parser.try_int(to_int).expect("int"), None ) ;
+  /// parser.tag("false").expect("tag") ;
+  /// assert_eq!( parser.try_int(to_int).expect("int"), Some(31) ) ;
+  /// assert_eq!(
+  ///   parser.buff_rest(), " (= tru)"
+  /// ) ;
+  /// assert_eq!( parser.try_int(to_int).expect("int"), None ) ;
+  /// # }
+  /// ```
+  pub fn try_int<F, T, Err>(& mut self, f: F) -> Res< Option<T> >
+  where F: FnOnce(& str, bool) -> Result<T, Err>, Err: ::std::error::Error {
     self.spc_cmt() ;
     self.mark() ;
     let mut res = None ;
@@ -439,15 +584,26 @@ impl<R: BufRead> SmtParser<R> {
         return Ok(None)
       } ;
       if let Some(uint) = self.try_uint() ? {
-        res = Some( f(uint, pos) )
+        match f(uint, pos) {
+          Ok(int) => res = Some(int),
+          Err(e) => {
+            let uint = if ! pos {
+              format!("(- {})", uint)
+            } else { uint.into() } ;
+            bail!("error parsing integer `{}`: {}", uint, e)
+          },
+        }
       }
-      self.tag(")") ? ;
+      self.tag(")") ?
     } else {
       if let Some(uint) = self.try_uint() ? {
-        res = Some( f(uint, true) )
+        match f(uint, true) {
+          Ok(int) => res = Some(int),
+          Err(e) => bail!("error parsing integer `{}`: {}", uint, e),
+        }
       }
     }
-    if res.is_none() { self.backtrack() }
+    if res.is_none() { self.backtrack() } else { self.clear_mark() }
     Ok(res)
   }
 
@@ -480,15 +636,15 @@ impl<R: BufRead> SmtParser<R> {
   Parser: for<'a> IdentParser<'a, Ident, Type, & 'a mut Self> +
           for<'a> ValueParser<'a, Value, & 'a mut Self> {
     let mut model = Vec::new() ;
-    tags!{ self => "(", "model" }
+    self.tags( & ["(", "model"] ) ? ;
     while ! self.try_tag(")") ? {
-      tags!{ self => "(", "define-fun" }
+      self.tags( &["(", "define-fun"] ) ? ;
       let id = parser.parse_ident(self) ? ;
-      tags!{ self => "(", ")" }
+      self.tags( & ["(", ")"] ) ? ;
       let typ = parser.parse_type(self) ? ;
       let value = parser.parse_value(self) ? ;
       model.push( (id, typ, value) ) ;
-      tags!{ self => ")" }
+      self.tag(")") ? ;
     }
     self.clear() ;
     Ok(model)
@@ -503,11 +659,11 @@ impl<R: BufRead> SmtParser<R> {
   Parser: for<'a> IdentParser<'a, Ident, Type, & 'a mut Self> +
           for<'a> ValueParser<'a, Value, & 'a mut Self> {
     let mut model = Vec::new() ;
-    tags!{ self => "(", "model" }
+    self.tags( &["(", "model"] ) ? ;
     while ! self.try_tag(")") ? {
-      tags!{ self => "(", "define-fun" }
+      self.tags( &["(", "define-fun"] ) ? ;
       let id = parser.parse_ident(self) ? ;
-      tags!{ self => "(" }
+      self.tag("(") ? ;
       let mut args = Vec::new() ;
       while ! self.try_tag(")") ? {
         let typ = parser.parse_type(self) ? ;
@@ -516,7 +672,7 @@ impl<R: BufRead> SmtParser<R> {
       let typ = parser.parse_type(self) ? ;
       let value = parser.parse_value(self) ? ;
       model.push( (id, args, typ, value) ) ;
-      tags!{ self => ")" }
+      self.tag(")") ? ;
     }
     self.clear() ;
     Ok(model)
@@ -530,13 +686,13 @@ impl<R: BufRead> SmtParser<R> {
   Parser: for<'a> ValueParser<'a, Value, & 'a mut Self> +
           for<'a> ExprParser<'a, Expr, Info, & 'a mut Self> {
     let mut values = Vec::new() ;
-    tags!{ self => "(" }
+    self.tag("(") ? ;
     while ! self.try_tag(")") ? {
-      tags!{ self => "(" }
+      self.tag("(") ? ;
       let expr = parser.parse_expr( self, info.clone() ) ? ;
       let value = parser.parse_value(self) ? ;
       values.push( (expr, value) ) ;
-      tags!{ self => ")" }
+      self.tag(")") ? ;
     }
     self.clear() ;
     Ok(values)
