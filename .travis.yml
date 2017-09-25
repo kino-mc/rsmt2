@@ -35,7 +35,5 @@ before_script:
     fi
 
 script:
-  - |
-      cargo install cargo-travis &&
-      export PATH=$HOME/.cargo/bin:$PATH &&
-      cargo-make make ci-flow
+  - cargo install --debug cargo-make
+  - cargo make ci-flow
