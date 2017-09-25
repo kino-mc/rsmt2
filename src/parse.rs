@@ -768,7 +768,6 @@ impl<R: BufRead> SmtParser<R> {
   where F: FnOnce(& str) -> Result<T, Err>, Err: ::std::fmt::Display {
     self.spc_cmt() ;
     let end = self.load_sexpr() ? ;
-    println!("try_sym: {}", & self.buff[ self.cursor .. end ]) ;
     let is_sym = if let Some(c) = self.buff[ self.cursor .. ].chars().next() {
       match c {
         '|' | '~' | '!' | '@' | '$' | '%' | '^' | '&' | '*' | '_' | '-' | '+' |
@@ -832,7 +831,6 @@ impl<R: BufRead> SmtParser<R> {
       let typ = parser.parse_type(self) ? ;
       let value = parser.parse_value(self) ? ;
       model.push( (id, typ, value) ) ;
-      println!("parsing `)`...") ;
       self.tag(")") ?
     }
     self.clear() ;
