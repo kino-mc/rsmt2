@@ -6,46 +6,35 @@ os:
 
 rust:
   - stable
-  # - beta
+  - beta
 
-sudo: false
+sudo: true
 
 addons:
   apt:
     packages:
       - libgmp3-dev
-      - libelf-dev
-      - libdw-dev
-      - binutils-dev
-      - cmake
-    sources:
-      - kalakris-cmake
-
 env:
   global:
-  - RUSTFLAGS="-C link-dead-code"
+    - RUST_BACKTRACE=1
+    - RUSTFLAGS="-C link-dead-code"
+    - CARGO_MAKE_RUN_CODECOV=true
+    - RUST_TEST_THREADS=1
 
 before_script:
   - |
-      cargo install cargo-travis &&
-      export PATH=$HOME/.cargo/bin:$PATH
-  - |
-    if [ "$TRAVIS_OS_NAME" == "linux" ] ; then
+    export PATH=`pwd`:$PATH && if [ "$TRAVIS_OS_NAME" == "linux" ] ; then
       wget https://github.com/Z3Prover/z3/releases/download/z3-4.5.0/z3-4.5.0-x64-ubuntu-14.04.zip &&
       unzip z3-4.5.0-x64-ubuntu-14.04.zip &&
-      mv z3-4.5.0-x64-ubuntu-14.04/bin/z3 $HOME/.local/bin/.
+      mv z3-4.5.0-x64-ubuntu-14.04/bin/z3 .
     elif [ "$TRAVIS_OS_NAME" == "osx" ] ; then
       wget https://github.com/Z3Prover/z3/releases/download/z3-4.5.0/z3-4.5.0-x64-osx-10.11.6.zip &&
       unzip z3-4.5.0-x64-osx-10.11.6.zip &&
-      mv z3-4.5.0-x64-osx-10.11.6/bin/z3 $HOME/.local/bin/. &&
+      mv z3-4.5.0-x64-osx-10.11.6/bin/z3 . &&
       z3 -h
     fi
 
 script:
-  - cargo build
-  - cargo build --release
-  - cargo test
-  - cargo doc
-
-after_success: |
-  - cargo coveralls
+  - wget -O ~/.cargo/bin/cargo-make https://bintray.com/sagiegurari/cargo-make/download_file?file_path=cargo-make_v0.5.2
+  - chmod 777 ~/.cargo/bin/cargo-make
+  - cargo-make make ci-flow
