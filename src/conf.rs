@@ -72,9 +72,17 @@ impl SolverStyle {
     vec![ "z3", "Z3", "cvc4", "CVC4" ]
   }
   /// Default command for a solver style.
+  #[cfg( not(windows) )]
   pub fn cmd(& self) -> String {
     match * self {
       Z3 => "z3".to_string(), CVC4 => "cvc4".to_string(),
+    }
+  }
+  /// Default command for a solver style.
+  #[cfg( windows )]
+  pub fn cmd(& self) -> String {
+    match * self {
+      Z3 => "z3.exe".to_string(), CVC4 => "cvc4.exe".to_string(),
     }
   }
 }
