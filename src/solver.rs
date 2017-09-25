@@ -21,7 +21,13 @@ use errors::* ;
 
 use common::* ;
 use conf::SolverConf ;
-use parse::{ SmtParser, IdentParser, ValueParser, ExprParser } ;
+use parse::{ IdentParser, ValueParser, ExprParser } ;
+
+
+/// Alias for the underlying parser.
+pub type SmtParser<'kid> = ::parse::SmtParser<
+  BufReader<& 'kid mut ChildStdout>
+> ;
 
 
 macro_rules! stutter_arg {
@@ -109,7 +115,7 @@ pub struct PlainSolver<'kid, Parser: Copy> {
   /// Kid's stdin.
   stdin: BufWriter<& 'kid mut ChildStdin>,
   /// Stdout parser.
-  smt_parser: SmtParser< BufReader<& 'kid mut ChildStdout> >,
+  smt_parser: SmtParser<'kid>,
   // /// Kid's stderr.
   // stderr: BufReader<& 'kid mut ChildStderr>,
   /// User-provided parser.
@@ -166,10 +172,7 @@ impl<'kid, Parser: Copy> PlainSolver<'kid, Parser> {
 impl<
   'kid, Parser: Copy
 > SolverBasic<'kid, Parser> for PlainSolver<'kid, Parser> {
-  fn parsers(& mut self) -> (
-    & mut SmtParser< BufReader<& 'kid mut ChildStdout> >,
-    Parser
-  ) {
+  fn parsers(& mut self) -> (& mut SmtParser<'kid>, Parser) {
     (& mut self.smt_parser, self.parser)
   }
   // fn fetch(& mut self) -> Res<()> {
@@ -223,10 +226,7 @@ impl<'kid, Parser: Copy> TeeSolver<'kid, Parser> {
 impl<
   'kid, Parser: Copy
 > SolverBasic<'kid, Parser> for TeeSolver<'kid, Parser> {
-  fn parsers(& mut self) -> (
-    & mut SmtParser< BufReader<& 'kid mut ChildStdout> >,
-    Parser
-  ) {
+  fn parsers(& mut self) -> (& mut SmtParser<'kid>, Parser) {
     self.solver.parsers()
   }
   fn write<
@@ -275,10 +275,7 @@ impl<
 pub trait SolverBasic<'kid, Parser: Copy> {
   /// Accessor to the parser.
   #[inline]
-  fn parsers(& mut self) -> (
-    & mut SmtParser< BufReader<& 'kid mut ChildStdout> >,
-    Parser
-  ) ;
+  fn parsers(& mut self) -> (& mut SmtParser<'kid>, Parser) ;
   /// Applies a function to the writer on the solver's stdin.
   fn write<
     F: Fn(& mut BufWriter<& mut ChildStdin>) -> Res<()>,
@@ -789,8 +786,8 @@ pub trait Solver<
     & mut self
   ) -> Res<Vec<(Ident, Vec<Type>, Type, Value)>>
   where
-  Parser: for<'a> IdentParser<'a, Ident, Type> +
-          for<'a> ValueParser<'a, Value> {
+  Parser: for<'a> IdentParser<'a, Ident, Type, & 'a mut SmtParser<'kid>> +
+          for<'a> ValueParser<'a, Value, & 'a mut SmtParser<'kid>> {
     let (smt_parser, parser) = self.parsers() ;
     smt_parser.get_model(parser)
   }
@@ -800,8 +797,8 @@ pub trait Solver<
     & mut self
   ) -> Res<Vec<(Ident, Vec<Type>, Type, Value)>>
   where
-  Parser: for<'a> IdentParser<'a, Ident, Type> +
-          for<'a> ValueParser<'a, Value> {
+  Parser: for<'a> IdentParser<'a, Ident, Type, & 'a mut SmtParser<'kid>> +
+          for<'a> ValueParser<'a, Value, & 'a mut SmtParser<'kid>> {
     self.print_get_model() ? ;
     self.parse_get_model()
   }
@@ -811,8 +808,8 @@ pub trait Solver<
     & mut self
   ) -> Res<Vec<(Ident, Type, Value)>>
   where
-  Parser: for<'a> IdentParser<'a, Ident, Type> +
-          for<'a> ValueParser<'a, Value> {
+  Parser: for<'a> IdentParser<'a, Ident, Type, & 'a mut SmtParser<'kid>> +
+          for<'a> ValueParser<'a, Value, & 'a mut SmtParser<'kid>> {
     let (smt_parser, parser) = self.parsers() ;
     smt_parser.get_model_const(parser)
   }
@@ -822,8 +819,8 @@ pub trait Solver<
     & mut self
   ) -> Res<Vec<(Ident, Type, Value)>>
   where
-  Parser: for<'a> IdentParser<'a, Ident, Type> +
-          for<'a> ValueParser<'a, Value> {
+  Parser: for<'a> IdentParser<'a, Ident, Type, & 'a mut SmtParser<'kid>> +
+          for<'a> ValueParser<'a, Value, & 'a mut SmtParser<'kid>> {
     self.print_get_model() ? ;
     self.parse_get_model_const()
   }
@@ -919,19 +916,21 @@ pub trait Solver<
     & mut self, info: Info
   ) -> Res<Vec<(Expr, Value)>>
   where
-  Parser: for<'a> ExprParser<'a, Expr, Info> +
-          for<'a> ValueParser<'a, Value> {
+  Parser: for<'a> ExprParser<'a, Expr, Info, & 'a mut SmtParser<'kid>> +
+          for<'a> ValueParser<'a, Value, & 'a mut SmtParser<'kid>> {
     let (smt_parser, parser) = self.parsers() ;
     smt_parser.get_values(parser, info)
   }
 
   /// Get-values command.
-  fn get_values<'a, Info: Clone, Expr, Exprs: ?Sized, Value>(
+  fn get_values<
+    'a, Info: Clone, Expr, Exprs: ?Sized, Value
+  >(
     & mut self, exprs: & 'a Exprs, info: Info
   ) -> Res<Vec<(Expr, Value)>>
   where
-  Parser: for<'b> ExprParser<'b, Expr, Info> +
-          for<'b> ValueParser<'b, Value>,
+  Parser: for<'b> ExprParser<'b, Expr, Info, & 'b mut SmtParser<'kid>> +
+          for<'b> ValueParser<'b, Value, & 'b mut SmtParser<'kid>>,
   Expr: Expr2Smt<Info> + 'a,
   & 'a Exprs: IntoIterator< Item = & 'a Expr > {
     self.print_get_values(exprs, & info) ? ;

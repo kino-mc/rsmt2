@@ -17,13 +17,100 @@
 //! - [`& mut SmtParser`][parser], `rmst2`'s internal parser which
 //!   provides simple helpers to parse s-expressions.
 //!
+//! The first two are safe in that your parsers will be called on the tokens
+//! they are supposed to parse and nothing else.
+//!
+//! ```
+//! # extern crate rsmt2 ;
+//! # use rsmt2::parse::SmtParser ;
+//! # fn main() {
+//! use rsmt2::parse::{ IdentParser, ValueParser } ;
+//! use rsmt2::errors::Res ;
+//! let txt = "\
+//!   ( model (define-fun a () Int (- 17)) )
+//! " ;
+//! let mut parser = SmtParser::of_str(txt) ;
+//!
+//! struct Parser ;
+//! impl<'a, 'b> ValueParser<'a, String, & 'a str> for & 'b Parser {
+//!   fn parse_value(self, input: & 'a str) -> Res<String> {
+//!     Ok(input.into())
+//!   }
+//! }
+//! impl<'a, 'b> IdentParser<'a, String, String, & 'a str> for & 'b Parser {
+//!   fn parse_ident(self, input: & 'a str) -> Res<String> {
+//!     Ok(input.into())
+//!   }
+//!   fn parse_type(self, input: & 'a str) -> Res<String> {
+//!     Ok(input.into())
+//!   }
+//! }
+//!
+//! let model = parser.get_model_const( & Parser ).expect("model") ;
+//! assert_eq!( model, vec![ ("a".into(), "Int".into(), "(- 17)".into()) ] )
+//! # }
+//! ```
+//!
+//! But a parser taking `SmtParser` as input is "unsafe" in the sense that it
+//! has access to the whole input. Note that `SmtParser` provides helper
+//! parsing functions such as [`try_int`][try int] and [`try_sym`][try sym].
+//!
+//! ```
+//! # extern crate rsmt2 ;
+//! # use rsmt2::parse::SmtParser ;
+//! # fn main() {
+//! use rsmt2::parse::{ IdentParser, ValueParser } ;
+//! use rsmt2::errors::Res ;
+//! let txt = "\
+//!   ( model (define-fun a () Int (- 17)) )
+//! " ;
+//! let mut parser = SmtParser::of_str(txt) ;
+//!
+//! struct Parser ;
+//! impl<'a, 'b, Br: ::std::io::BufRead> ValueParser<
+//!   'a, String, & 'a mut SmtParser<Br>
+//! > for & 'b Parser {
+//!   fn parse_value(self, input: & 'a mut SmtParser<Br>) -> Res<String> {
+//!     input.tag("(- 17))") ? ; Ok( "-17".into() )
+//!     //               ^~~~~ eating more input than we should...
+//!   }
+//! }
+//! impl<'a, 'b, Br: ::std::io::BufRead> IdentParser<
+//!   'a, String, String, & 'a mut SmtParser<Br>
+//! > for & 'b Parser {
+//!   fn parse_ident(self, input: & 'a mut SmtParser<Br>) -> Res<String> {
+//!     input.tag("a") ? ; Ok( "a".into() )
+//!   }
+//!   fn parse_type(self, input: & 'a mut SmtParser<Br>) -> Res<String> {
+//!     input.tag("Int") ? ; Ok( "Int".into() )
+//!   }
+//! }
+//!
+//! use rsmt2::errors::ErrorKind ;
+//! match * parser.get_model_const( & Parser ).unwrap_err().kind() {
+//!   ErrorKind::ParseError(ref msg, ref token) => {
+//!     assert_eq!(
+//!       msg, "expected `(` opening define-fun or `)` closing model"
+//!     ) ;
+//!     assert_eq!(token, "eof")
+//!   },
+//!   ref error => panic!("unexpected error: {}", error)
+//! }
+//! # }
+//! ```
+//!
 //! [nom]: https://crates.io/crates/nom (nom crate on crates.io)
 //! [regex]: https://crates.io/crates/regex (regex crate on crates.io)
 //! [parser]: struct.SmtParser.html (rsmt2's internal parser)
+//! [try int]: struct.SmtParser.html#method.try_int (try_int function)
+//! [try sym]: struct.SmtParser.html#method.try_sym (try_sym function)
 
 use errors::* ;
 
 use std::io::{ BufRead, BufReader } ;
+
+
+
 
 /// SMT-LIB 2.0 parser.
 pub struct SmtParser<R: BufRead> {
@@ -64,7 +151,7 @@ impl<R: BufRead> SmtParser<R> {
   pub fn buff_rest(& self) -> & str {
     & self.buff[ self.cursor .. ]
   }
-  /// Immutable access to the cursor.
+  /// The current position in the buffer.
   pub fn cursor(& self) -> usize {
     self.cursor
   }
@@ -169,7 +256,7 @@ impl<R: BufRead> SmtParser<R> {
                 'token: for c in chars {
                   if c.is_whitespace() { break 'token }
                   match c {
-                    ')' | '(' | '|' => {
+                    ')' | '(' | '|' | ';' => {
                       // println!("` | {}", this_end) ;
                       break 'token
                     },
@@ -197,7 +284,7 @@ impl<R: BufRead> SmtParser<R> {
     Ok(end)
   }
 
-  /// Clears the buffer up to the cursor position.
+  /// Clears the buffer up to the current position.
   pub fn clear(& mut self) {
     debug_assert!( self.buff_2.is_empty() ) ;
     self.buff_2.push_str( & self.buff[self.cursor..] ) ;
@@ -337,6 +424,19 @@ impl<R: BufRead> SmtParser<R> {
       self.fail_with( format!("expected `{}`", tag) )
     }
   }
+  /// Parses a tag or fails, appends `err_msg` at the end of the error message.
+  ///
+  /// Returns `()` exactly when [`try_tag`][try tag] returns `true`, and an
+  /// error otherwise.
+  ///
+  /// [try tag]: struct.SmtParser.html#method.try_tag (try_tag function)
+  pub fn tag_info(& mut self, tag: & str, err_msg: & str) -> Res<()> {
+    if self.try_tag(tag) ? {
+      Ok(())
+    } else {
+      self.fail_with( format!("expected `{}` {}", tag, err_msg) )
+    }
+  }
 
   /// Parses a tag followed by a whitespace, a paren or a comment.
   ///
@@ -472,9 +572,23 @@ impl<R: BufRead> SmtParser<R> {
 
   /// Generates a failure at the current position.
   pub fn fail_with<T, Str: Into<String>>(& mut self, msg: Str) -> Res<T> {
-    let sexpr = self.get_sexpr().chain_err(
-      || "while retrieving sexpression for parse error"
-    )?.to_string() ;
+    self.print("") ;
+    let sexpr = match self.get_sexpr() {
+      Ok(e) => Some( e.to_string() ),
+      _ => None,
+    } ;
+    let sexpr = if let Some(e) = sexpr { e } else {
+      if self.cursor < self.buff.len() {
+        let mut stuff = self.buff[ self.cursor .. ].trim().split_whitespace() ;
+        if let Some(stuff) = stuff.next() {
+          stuff.to_string()
+        } else {
+          " ".to_string()
+        }
+      } else {
+        "eof".to_string()
+      }
+    } ;
     if sexpr == "unsupported" {
       bail!(ErrorKind::Unsupported)
     } else {
@@ -536,6 +650,10 @@ impl<R: BufRead> SmtParser<R> {
   /// Tries to parses an integer. The boolean is `true` iff the integer is
   /// positive.
   ///
+  /// **NB**: input function `f` cannot return the input string in any way.
+  /// Doing so will not borrow-check and is completely unsafe as the parser can
+  /// and in general will discard what's in its buffer once it's parsed.
+  ///
   /// ```
   /// # extern crate rsmt2 ;
   /// # use rsmt2::parse::SmtParser ;
@@ -570,7 +688,7 @@ impl<R: BufRead> SmtParser<R> {
   /// # }
   /// ```
   pub fn try_int<F, T, Err>(& mut self, f: F) -> Res< Option<T> >
-  where F: FnOnce(& str, bool) -> Result<T, Err>, Err: ::std::error::Error {
+  where F: FnOnce(& str, bool) -> Result<T, Err>, Err: ::std::fmt::Display {
     self.spc_cmt() ;
     self.mark() ;
     let mut res = None ;
@@ -607,6 +725,75 @@ impl<R: BufRead> SmtParser<R> {
     Ok(res)
   }
 
+  /// Tries to parse a symbol.
+  ///
+  /// Quoted symbols (anything but `|` surrounded by `|`) are passed **with**
+  /// the surrounding `|`.
+  ///
+  /// **NB**: input function `f` cannot return the input string in any way.
+  /// Doing so will not borrow-check and is completely unsafe as the parser can
+  /// and in general will discard what's in its buffer once it's parsed.
+  ///
+  /// ```
+  /// # extern crate rsmt2 ;
+  /// # use rsmt2::parse::SmtParser ;
+  /// # fn main() {
+  /// fn sym(input: & str) -> Result<String, String> {
+  ///   Ok( input.into() )
+  /// }
+  /// let txt = "\
+  ///   ident (- 11) +~stuff; comment\n |some stuff \n [{}!+)(}|\
+  /// " ;
+  /// let mut parser = SmtParser::of_str(txt) ;
+  /// assert_eq!( parser.try_sym(sym).expect("sym"), Some("ident".into()) ) ;
+  /// assert_eq!(
+  ///   parser.buff_rest(), " (- 11) +~stuff; comment\n"
+  /// ) ;
+  /// assert_eq!( parser.try_sym(sym).expect("sym"), None ) ;
+  /// assert_eq!(
+  ///   parser.buff_rest(), "(- 11) +~stuff; comment\n"
+  /// ) ;
+  /// parser.tag("(- 11)").expect("tag") ;
+  /// assert_eq!( parser.try_sym(sym).expect("sym"), Some("+~stuff".into()) ) ;
+  /// assert_eq!(
+  ///   parser.buff_rest(), "; comment\n"
+  /// ) ;
+  /// assert_eq!(
+  ///   parser.try_sym(sym).expect("sym"),
+  ///   Some("|some stuff \n [{}!+)(}|".into())
+  /// ) ;
+  /// # }
+  /// ```
+  pub fn try_sym<F, T, Err>(& mut self, f: F) -> Res<Option<T>>
+  where F: FnOnce(& str) -> Result<T, Err>, Err: ::std::fmt::Display {
+    self.spc_cmt() ;
+    let end = self.load_sexpr() ? ;
+    println!("try_sym: {}", & self.buff[ self.cursor .. end ]) ;
+    let is_sym = if let Some(c) = self.buff[ self.cursor .. ].chars().next() {
+      match c {
+        '|' | '~' | '!' | '@' | '$' | '%' | '^' | '&' | '*' | '_' | '-' | '+' |
+        '=' | '<' | '>' | '.' | '?' => true,
+        _ if c.is_alphabetic() => true,
+        _ => false,
+      }
+    } else {
+      false
+    } ;
+    if is_sym {
+      let ident = & self.buff[ self.cursor .. end ] ;
+      self.cursor = end ;
+      match f(ident) {
+        Ok(res) => Ok( Some(res) ),
+        Err(e) => bail!(
+          "error parsing symbol `{}`: {}",
+          & self.buff[ self.cursor .. end ], e
+        ),
+      }
+    } else {
+      Ok(None)
+    }
+  }
+
   /// Parses `success`.
   pub fn success(& mut self) -> Res<()> {
     self.tag("success")
@@ -638,13 +825,15 @@ impl<R: BufRead> SmtParser<R> {
     let mut model = Vec::new() ;
     self.tags( & ["(", "model"] ) ? ;
     while ! self.try_tag(")") ? {
-      self.tags( &["(", "define-fun"] ) ? ;
+      self.tag_info("(", "opening define-fun or `)` closing model") ? ;
+      self.tag( "define-fun" ) ? ;
       let id = parser.parse_ident(self) ? ;
       self.tags( & ["(", ")"] ) ? ;
       let typ = parser.parse_type(self) ? ;
       let value = parser.parse_value(self) ? ;
       model.push( (id, typ, value) ) ;
-      self.tag(")") ? ;
+      println!("parsing `)`...") ;
+      self.tag(")") ?
     }
     self.clear() ;
     Ok(model)
@@ -661,7 +850,8 @@ impl<R: BufRead> SmtParser<R> {
     let mut model = Vec::new() ;
     self.tags( &["(", "model"] ) ? ;
     while ! self.try_tag(")") ? {
-      self.tags( &["(", "define-fun"] ) ? ;
+      self.tag_info("(", "opening define-fun or `)` closing model") ? ;
+      self.tag( "define-fun" ) ? ;
       let id = parser.parse_ident(self) ? ;
       self.tag("(") ? ;
       let mut args = Vec::new() ;
@@ -688,7 +878,10 @@ impl<R: BufRead> SmtParser<R> {
     let mut values = Vec::new() ;
     self.tag("(") ? ;
     while ! self.try_tag(")") ? {
-      self.tag("(") ? ;
+      self.tag_info(
+        "(", "opening expr/value pair or `)` closing value list"
+      ) ? ;
+      self.tag( "define-fun" ) ? ;
       let expr = parser.parse_expr( self, info.clone() ) ? ;
       let value = parser.parse_value(self) ? ;
       values.push( (expr, value) ) ;
@@ -701,19 +894,17 @@ impl<R: BufRead> SmtParser<R> {
 }
 
 
-
-
 /// Can parse identifiers and types. Used for `get_model`.
 ///
 /// For more information refer to the [module-level documentation].
 ///
 /// [module-level documentation]: index.html
-pub trait IdentParser<'a, Ident, Type, Input = & 'a str>: Copy
+pub trait IdentParser<'a, Ident, Type, Input>: Copy
 where Input: ?Sized {
   fn parse_ident(self, Input) -> Res<Ident> ;
   fn parse_type(self, Input) -> Res<Type> ;
 }
-impl<'a, Ident, Type, T> IdentParser<'a, Ident, Type> for T
+impl<'a, Ident, Type, T> IdentParser<'a, Ident, Type, & 'a str> for T
 where T: IdentParser<'a, Ident, Type, & 'a [u8]> {
   fn parse_ident(self, input: & 'a str) -> Res<Ident> {
     self.parse_ident( input.as_bytes() )
@@ -725,7 +916,8 @@ where T: IdentParser<'a, Ident, Type, & 'a [u8]> {
 impl<'a, Ident, Type, T, Br> IdentParser<
   'a, Ident, Type, & 'a mut SmtParser<Br>
 > for T
-where T: IdentParser<'a, Ident, Type, & 'a str>, Br: BufRead {
+where
+T: IdentParser<'a, Ident, Type, & 'a str>, Br: BufRead {
   fn parse_ident(self, input: & 'a mut SmtParser<Br>) -> Res<Ident> {
     self.parse_ident( input.get_sexpr() ? )
   }
@@ -739,18 +931,20 @@ where T: IdentParser<'a, Ident, Type, & 'a str>, Br: BufRead {
 /// For more information refer to the [module-level documentation].
 ///
 /// [module-level documentation]: index.html
-pub trait ValueParser<'a, Value, Input = & 'a str>: Copy
+pub trait ValueParser<'a, Value, Input>: Copy
 where Input: ?Sized {
   fn parse_value(self, Input) -> Res<Value> ;
 }
-impl<'a, Value, T> ValueParser<'a, Value> for T
+impl<'a, Value, T> ValueParser<'a, Value, & 'a str> for T
 where T: ValueParser<'a, Value, & 'a [u8]> {
   fn parse_value(self, input: & 'a str) -> Res<Value> {
     self.parse_value( input.as_bytes() )
   }
 }
-impl<'a, Value, T, Br> ValueParser<'a, Value, & 'a mut SmtParser<Br>> for T
-where T: ValueParser<'a, Value, & 'a str>, Br: BufRead {
+impl<'a, Value, T, Br> ValueParser<
+  'a, Value, & 'a mut SmtParser<Br>
+> for T where
+T: ValueParser<'a, Value, & 'a str>, Br: BufRead {
   fn parse_value(self, input: & 'a mut SmtParser<Br>) -> Res<Value> {
     self.parse_value( input.get_sexpr() ? )
   }
@@ -761,11 +955,11 @@ where T: ValueParser<'a, Value, & 'a str>, Br: BufRead {
 /// For more information refer to the [module-level documentation].
 ///
 /// [module-level documentation]: index.html
-pub trait ExprParser<'a, Expr, Info, Input = & 'a str>: Copy
+pub trait ExprParser<'a, Expr, Info, Input>: Copy
 where Input: ?Sized {
   fn parse_expr(self, Input, Info) -> Res<Expr> ;
 }
-impl<'a, Expr, Info, T> ExprParser<'a, Expr, Info> for T
+impl<'a, Expr, Info, T> ExprParser<'a, Expr, Info, & 'a str> for T
 where T: ExprParser<'a, Expr, Info, & 'a [u8]> {
   fn parse_expr(self, input: & 'a str, info: Info) -> Res<Expr> {
     self.parse_expr( input.as_bytes(), info )
@@ -775,7 +969,9 @@ impl<'a, Expr, Info, T, Br> ExprParser<
   'a, Expr, Info, & 'a mut SmtParser<Br>
 > for T
 where T: ExprParser<'a, Expr, Info, & 'a str>, Br: BufRead {
-  fn parse_expr(self, input: & 'a mut SmtParser<Br>, info: Info) -> Res<Expr> {
+  fn parse_expr(
+    self, input: & 'a mut SmtParser<Br>, info: Info
+  ) -> Res<Expr> {
     self.parse_expr( input.get_sexpr() ?, info )
   }
 }
@@ -785,17 +981,19 @@ where T: ExprParser<'a, Expr, Info, & 'a str>, Br: BufRead {
 /// For more information refer to the [module-level documentation].
 ///
 /// [module-level documentation]: index.html
-pub trait ProofParser<'a, Proof, Input = & 'a str>: Copy
+pub trait ProofParser<'a, Proof, Input>: Copy
 where Input: ?Sized {
   fn parse_proof(self, Input) -> Res<Proof> ;
 }
-impl<'a, Proof, T> ProofParser<'a, Proof> for T
+impl<'a, Proof, T> ProofParser<'a, Proof, & 'a str> for T
 where T: ProofParser<'a, Proof, & 'a [u8]> {
   fn parse_proof(self, input: & 'a str) -> Res<Proof> {
     self.parse_proof( input.as_bytes() )
   }
 }
-impl<'a, Proof, T, Br> ProofParser<'a, Proof, & 'a mut SmtParser<Br>> for T
+impl<'a, Proof, T, Br> ProofParser<
+  'a, Proof, & 'a mut SmtParser<Br>
+> for T
 where T: ProofParser<'a, Proof, & 'a str>, Br: BufRead {
   fn parse_proof(self, input: & 'a mut SmtParser<Br>) -> Res<Proof> {
     self.parse_proof( input.get_sexpr() ? )
