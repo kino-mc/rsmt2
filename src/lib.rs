@@ -1426,6 +1426,7 @@ mod solver ;
 
 pub use errors::SmtRes ;
 
+pub use common::Logic ;
 pub use solver::{
   solver, Kid, Solver, PlainSolver, TeeSolver
 } ;

@@ -329,7 +329,7 @@ pub trait Solver<
   /// Sets the logic.
   #[inline]
   fn set_logic(
-    & mut self, logic: & Logic
+    & mut self, logic: Logic
   ) -> SmtRes<()> {
     parse_success!(
       self for {

@@ -85,6 +85,7 @@ impl Sort2Smt for String {
 
 /// SMT Lib 2 logics.
 #[allow(non_camel_case_types)]
+#[derive(Clone, Copy)]
 pub enum Logic {
   /// Quantifier-free uninterpreted functions.
   QF_UF,
@@ -133,6 +134,8 @@ impl Logic {
 
 #[test]
 fn logic() {
+  use conf::SolverConf ;
+  use { Logic, Kid, solver, Solver } ;
 
   let conf = SolverConf::z3() ;
 
@@ -141,10 +144,7 @@ fn logic() {
     Err(e) => panic!("Could not spawn solver kid: {:?}", e)
   } ;
 
-  let mut solver = smtry!(
-    solver(& mut kid, ()),
-    failwith "could not create solver: {:?}"
-  ) ;
+  let mut solver = solver(& mut kid, ()).expect("solver") ;
 
   solver.set_logic(Logic::QF_UF).expect("QF_UF") ;
   solver.reset().expect("reset") ;
@@ -155,7 +155,7 @@ fn logic() {
   solver.set_logic(Logic::QF_LRA).expect("QF_LRA") ;
   solver.reset().expect("reset") ;
   solver.set_logic(Logic::QF_AUFLIA).expect("QF_AUFLIA") ;
-  olver.reset().expect("reset") ;
+  solver.reset().expect("reset") ;
   solver.set_logic(Logic::AUFLIA).expect("AUFLIA") ;
   solver.reset().expect("reset") ;
   solver.set_logic(Logic::AUFLIRA).expect("AUFLIRA") ;
