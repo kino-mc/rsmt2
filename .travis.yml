@@ -14,54 +14,38 @@ addons:
   apt:
     packages:
       - libgmp3-dev
-      - libcurl4-openssl-dev
       - libelf-dev
       - libdw-dev
-      - cmake
-      - gcc
       - binutils-dev
-      - libiberty-dev
+      - cmake
+    sources:
+      - kalakris-cmake
 
 env:
   global:
   - RUSTFLAGS="-C link-dead-code"
 
 before_script:
-- |
-  mkdir -p $HOME/.local/bin &&
-  export PATH=$HOME/.local/bin:$PATH
-- |
-  pip install 'travis-cargo<0.2' --user
-- |
-  if [ "$TRAVIS_OS_NAME" == "linux" ] ; then
-    wget https://github.com/Z3Prover/z3/releases/download/z3-4.5.0/z3-4.5.0-x64-ubuntu-14.04.zip &&
-    unzip z3-4.5.0-x64-ubuntu-14.04.zip &&
-    mv z3-4.5.0-x64-ubuntu-14.04/bin/z3 $HOME/.local/bin/.
-  elif [ "$TRAVIS_OS_NAME" == "osx" ] ; then
-    wget https://github.com/Z3Prover/z3/releases/download/z3-4.5.0/z3-4.5.0-x64-osx-10.11.6.zip &&
-    unzip z3-4.5.0-x64-osx-10.11.6.zip &&
-    mv z3-4.5.0-x64-osx-10.11.6/bin/z3 $HOME/.local/bin/. &&
-    z3 -h
-  fi
+  - |
+      cargo install cargo-travis &&
+      export PATH=$HOME/.cargo/bin:$PATH
+  - |
+    if [ "$TRAVIS_OS_NAME" == "linux" ] ; then
+      wget https://github.com/Z3Prover/z3/releases/download/z3-4.5.0/z3-4.5.0-x64-ubuntu-14.04.zip &&
+      unzip z3-4.5.0-x64-ubuntu-14.04.zip &&
+      mv z3-4.5.0-x64-ubuntu-14.04/bin/z3 $HOME/.local/bin/.
+    elif [ "$TRAVIS_OS_NAME" == "osx" ] ; then
+      wget https://github.com/Z3Prover/z3/releases/download/z3-4.5.0/z3-4.5.0-x64-osx-10.11.6.zip &&
+      unzip z3-4.5.0-x64-osx-10.11.6.zip &&
+      mv z3-4.5.0-x64-osx-10.11.6/bin/z3 $HOME/.local/bin/. &&
+      z3 -h
+    fi
 
 script:
-  - travis-cargo build
-  - travis-cargo build -- --release
-  - travis-cargo test
+  - cargo build
+  - cargo build --release
+  - cargo test
+  - cargo doc
 
 after_success: |
-  wget https://github.com/SimonKagstrom/kcov/archive/master.tar.gz &&
-  tar xzf master.tar.gz &&
-  cd kcov-master &&
-  mkdir build &&
-  cd build &&
-  cmake .. &&
-  make &&
-  make install DESTDIR=../../kcov-build &&
-  cd ../.. &&
-  rm -rf kcov-master &&
-  cargo clean &&
-  cargo test --no-run &&
-  for file in target/debug/rsmt2-*[^\(\.d\)]; do mkdir -p "target/cov/$(basename $file)"; ./kcov-build/usr/local/bin/kcov --exclude-pattern=/.cargo,/usr/lib --verify "target/cov/$(basename $file)" "$file"; done &&
-  ./kcov-build/usr/local/bin/kcov --coveralls-id=$TRAVIS_JOB_ID --merge target/cov target/cov/* &&
-  echo "Uploaded code coverage"
+  - cargo coveralls
