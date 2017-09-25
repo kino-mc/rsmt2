@@ -71,7 +71,7 @@ pub struct Kid {
 }
 impl Kid {
   /// Creates a new solver kid.
-  pub fn new(conf: SolverConf) -> Res<Self> {
+  pub fn new(conf: SolverConf) -> SmtRes<Self> {
     // Constructing command and spawning kid.
     Command::new(
       // Command.
@@ -95,7 +95,7 @@ impl Kid {
     )
   }
   /// Kills the solver kid.
-  pub fn kill(mut self) -> Res<()> {
+  pub fn kill(mut self) -> SmtRes<()> {
     self.kid.kill().chain_err::<_, ErrorKind>(
       || "while killing child process".into()
     )
@@ -123,7 +123,7 @@ pub struct PlainSolver<'kid, Parser: Copy> {
 }
 impl<'kid, Parser: Copy> PlainSolver<'kid, Parser> {
   /// Creates a plain solver.
-  pub fn new(kid: & 'kid mut Kid, parser: Parser) -> Res<Self> {
+  pub fn new(kid: & 'kid mut Kid, parser: Parser) -> SmtRes<Self> {
     let stdin = match kid.kid.stdin.as_mut() {
       Some(stdin) => BufWriter::with_capacity(1000, stdin),
       None => bail!(
@@ -175,18 +175,18 @@ impl<
   fn parsers(& mut self) -> (& mut SmtParser<'kid>, Parser) {
     (& mut self.smt_parser, self.parser)
   }
-  // fn fetch(& mut self) -> Res<()> {
+  // fn fetch(& mut self) -> SmtRes<()> {
   //   fetch!(self)
   // }
   fn write<
-    F: Fn(& mut BufWriter<& mut ChildStdin>) -> Res<()>,
-    FTee: Fn(& mut BufWriter<File>) -> Res<()>,
-  >(& mut self, f: F, _: FTee) -> Res<()> {
+    F: Fn(& mut BufWriter<& mut ChildStdin>) -> SmtRes<()>,
+    FTee: Fn(& mut BufWriter<File>) -> SmtRes<()>,
+  >(& mut self, f: F, _: FTee) -> SmtRes<()> {
     try!( f(& mut self.stdin) ) ;
     self.stdin.flush() ? ;
     Ok(())
   }
-  fn comment(& mut self, _: & str) -> Res<()> {
+  fn comment(& mut self, _: & str) -> SmtRes<()> {
     Ok(())
   }
   fn solver(& mut self) -> & mut PlainSolver<'kid, Parser> {
@@ -230,9 +230,9 @@ impl<
     self.solver.parsers()
   }
   fn write<
-    F: Fn(& mut BufWriter<& mut ChildStdin>) -> Res<()>,
-    FTee: Fn(& mut BufWriter<File>) -> Res<()>,
-  >(& mut self, f: F, f_tee: FTee) -> Res<()> {
+    F: Fn(& mut BufWriter<& mut ChildStdin>) -> SmtRes<()>,
+    FTee: Fn(& mut BufWriter<File>) -> SmtRes<()>,
+  >(& mut self, f: F, f_tee: FTee) -> SmtRes<()> {
     try!( f(& mut self.solver.stdin) ) ;
     self.solver.stdin.flush() ? ;
     write_str(& mut self.file, "\n") ? ;
@@ -240,7 +240,7 @@ impl<
     self.file.flush() ? ;
     Ok(())
   }
-  fn comment(& mut self, txt: & str) -> Res<()> {
+  fn comment(& mut self, txt: & str) -> SmtRes<()> {
     for line in txt.lines() {
       write!(self.file, "\n;; {}", line) ?
     }
@@ -278,11 +278,11 @@ pub trait SolverBasic<'kid, Parser: Copy> {
   fn parsers(& mut self) -> (& mut SmtParser<'kid>, Parser) ;
   /// Applies a function to the writer on the solver's stdin.
   fn write<
-    F: Fn(& mut BufWriter<& mut ChildStdin>) -> Res<()>,
-    FTee: Fn(& mut BufWriter<File>) -> Res<()>,
-  >(& mut self, f: F, f_tee: FTee) -> Res<()> ;
+    F: Fn(& mut BufWriter<& mut ChildStdin>) -> SmtRes<()>,
+    FTee: Fn(& mut BufWriter<File>) -> SmtRes<()>,
+  >(& mut self, f: F, f_tee: FTee) -> SmtRes<()> ;
   /// Writes comments. Ignored for `PlainSolver`.
-  fn comment(& mut self, txt: & str) -> Res<()> ;
+  fn comment(& mut self, txt: & str) -> SmtRes<()> ;
   /// The plain solver.
   fn solver(& mut self) -> & mut PlainSolver<'kid, Parser> ;
 }
@@ -298,7 +298,7 @@ pub trait SolverBasic<'kid, Parser: Copy> {
 /// Creates a solver from a kid.
 pub fn solver<'kid, Parser: Copy>(
   kid: & 'kid mut Kid, parser: Parser
-) -> Res< PlainSolver<'kid, Parser> > {
+) -> SmtRes< PlainSolver<'kid, Parser> > {
   PlainSolver::new(kid, parser)
 }
 
@@ -321,7 +321,7 @@ pub trait Solver<
   #[inline(always)]
   fn reset(
     & mut self
-  ) -> Res<()> {
+  ) -> SmtRes<()> {
     parse_success!(
       self for {
         stutter_arg!(
@@ -337,7 +337,7 @@ pub trait Solver<
   #[inline]
   fn set_logic(
     & mut self, logic: & Logic
-  ) -> Res<()> {
+  ) -> SmtRes<()> {
     parse_success!(
       self for {
         stutter_arg!(
@@ -354,7 +354,7 @@ pub trait Solver<
   #[inline]
   fn set_option<Value: ::std::fmt::Display>(
     & mut self, option: & str, value: Value
-  ) -> Res<()> {
+  ) -> SmtRes<()> {
     match option {
       ":interactive_mode" => return Err(
         "illegal set-option on interactive mode".into()
@@ -378,7 +378,7 @@ pub trait Solver<
   }
   /// Activates interactive mode.
   #[inline(always)]
-  fn interactive_mode(& mut self) -> Res<()> {
+  fn interactive_mode(& mut self) -> SmtRes<()> {
     parse_success!(
       self for {
         stutter_arg!(self.write ;
@@ -389,7 +389,7 @@ pub trait Solver<
   }
   /// Activates print success.
   #[inline(always)]
-  fn print_success(& mut self) -> Res<()> {
+  fn print_success(& mut self) -> SmtRes<()> {
     parse_success!(
       self for {
         stutter_arg!(self.write ;
@@ -400,7 +400,7 @@ pub trait Solver<
   }
   /// Activates unsat core production.
   #[inline(always)]
-  fn produce_unsat_core(& mut self) -> Res<()> {
+  fn produce_unsat_core(& mut self) -> SmtRes<()> {
     parse_success!(
       self for {
         stutter_arg!(self.write ;
@@ -411,7 +411,7 @@ pub trait Solver<
   }
   /// Shuts the solver down.
   #[inline(always)]
-  fn exit(& mut self) -> Res<()> {
+  fn exit(& mut self) -> SmtRes<()> {
     parse_success!(
       self for {
         stutter_arg!(self.write ;
@@ -426,7 +426,7 @@ pub trait Solver<
 
   /// Pushes `n` layers on the assertion stack.
   #[inline(always)]
-  fn push(& mut self, n: u8) -> Res<()> {
+  fn push(& mut self, n: u8) -> SmtRes<()> {
     parse_success!(
       self for {
         stutter_arg!(self.write ;
@@ -440,7 +440,7 @@ pub trait Solver<
   }
   /// Pops `n` layers off the assertion stack.
   #[inline(always)]
-  fn pop(& mut self, n: u8) -> Res<()> {
+  fn pop(& mut self, n: u8) -> SmtRes<()> {
     parse_success!(
       self for {
         stutter_arg!(self.write ;
@@ -454,7 +454,7 @@ pub trait Solver<
   }
   /// Resets the assertions in the solver.
   #[inline(always)]
-  fn reset_assertions(& mut self) -> Res<()> {
+  fn reset_assertions(& mut self) -> SmtRes<()> {
     parse_success!(
       self for {
         stutter_arg!(self.write ;
@@ -471,7 +471,7 @@ pub trait Solver<
   #[inline]
   fn declare_sort<Sort: Sort2Smt>(
     & mut self, sort: & Sort, arity: & u8
-  ) -> Res<()> {
+  ) -> SmtRes<()> {
     parse_success!(
       self for {
         stutter_arg!(self.write ;
@@ -491,7 +491,7 @@ pub trait Solver<
     'a, Sort, I, Arg, Args: ?Sized, Body
   >(
     & mut self, sort: & Sort, args: & 'a Args, body: & Body, info: & I
-  ) -> Res<()>
+  ) -> SmtRes<()>
   where
   Sort: Sort2Smt,
   Arg: Expr2Smt<I> + 'a,
@@ -522,7 +522,7 @@ pub trait Solver<
     'a, FunSym, ArgSort, Args: ?Sized, I, OutSort
   > (
     & mut self, symbol: & FunSym, args: & 'a Args, out: & OutSort, info: & I
-  ) -> Res<()>
+  ) -> SmtRes<()>
   where
   FunSym: Sym2Smt<I>,
   ArgSort: Sort2Smt + 'a,
@@ -551,7 +551,7 @@ pub trait Solver<
   #[inline]
   fn declare_const<Sym: Sym2Smt<I>, Sort: Sort2Smt, I> (
     & mut self, symbol: & Sym, out_sort: & Sort, info: & I
-  ) -> Res<()> {
+  ) -> SmtRes<()> {
     parse_success!(
       self for {
         stutter_arg!(self.write ;
@@ -573,7 +573,7 @@ pub trait Solver<
   >(
     & mut self, symbol: & FunSym, args: & 'a Args,
     out: & OutSort, body: & Body, info: & I
-  ) -> Res<()>
+  ) -> SmtRes<()>
   where
   ArgSort: Sort2Smt + 'a,
   OutSort: Sort2Smt,
@@ -612,7 +612,7 @@ pub trait Solver<
     'a, FunSym, ArgSym, ArgSort, Args, OutSort, Body, Funs: ?Sized, I
   >(
     & mut self, funs: & 'a Funs, info: & I
-  ) -> Res<()>
+  ) -> SmtRes<()>
   where
   FunSym: Sym2Smt<I> + 'a,
   ArgSym: Sym2Smt<I> + 'a,
@@ -667,7 +667,7 @@ pub trait Solver<
   >(
     & mut self,  symbol: & FunSym, args: & 'a Args,
     out: & OutSort, body: & Body, info: & I
-  ) -> Res<()>
+  ) -> SmtRes<()>
   where
   ArgSort: Sort2Smt + 'a,
   OutSort: Sort2Smt,
@@ -716,7 +716,7 @@ pub trait Solver<
   #[inline]
   fn assert<I, Expr: Expr2Smt<I>>(
     & mut self, expr: & Expr, info: & I
-  ) -> Res<()> {
+  ) -> SmtRes<()> {
     parse_success!(
       self for {
         stutter_arg!(self.write ;
@@ -734,14 +734,14 @@ pub trait Solver<
 
   /// Get info command.
   #[inline(always)]
-  fn get_info(& mut self, flag: & str) -> Res<()> {
+  fn get_info(& mut self, flag: & str) -> SmtRes<()> {
     stutter_arg!(self.write ;
       |w| { write!(w, "(get-info {})\n", flag) ? ; Ok(()) }
     )
   }
   /// Get option command.
   #[inline(always)]
-  fn get_option(& mut self, option: & str) -> Res<()> {
+  fn get_option(& mut self, option: & str) -> SmtRes<()> {
     stutter_arg!(self.write ;
       |w| { write!(w, "(get-option {})\n", option) ? ; Ok(()) }
     )
@@ -751,14 +751,14 @@ pub trait Solver<
 
   /// Set info command.
   #[inline(always)]
-  fn set_info(& mut self, attribute: & str) -> Res<()> {
+  fn set_info(& mut self, attribute: & str) -> SmtRes<()> {
     stutter_arg!(self.write ;
       |w| { write!(w, "(set-info {})\n", attribute) ? ; Ok(()) }
     )
   }
   /// Echo command.
   #[inline(always)]
-  fn echo(& mut self, text: & str) -> Res<()> {
+  fn echo(& mut self, text: & str) -> SmtRes<()> {
     stutter_arg!(self.write ;
       |w| { write!(w, "(echo \"{}\")\n", text) ? ; Ok(()) }
     )
@@ -767,7 +767,7 @@ pub trait Solver<
 
   /// Check-sat command.
   #[inline(always)]
-  fn print_check_sat(& mut self) -> Res<()> {
+  fn print_check_sat(& mut self) -> SmtRes<()> {
     stutter_arg!(self.write ;
       |w| write_str(w, "(check-sat)\n")
     )
@@ -775,7 +775,7 @@ pub trait Solver<
 
   /// Get-model command.
   #[inline(always)]
-  fn print_get_model(& mut self) -> Res<()> {
+  fn print_get_model(& mut self) -> SmtRes<()> {
     stutter_arg!(self.write ;
       |w| write_str(w, "(get-model)\n")
     )
@@ -784,7 +784,7 @@ pub trait Solver<
   /// Parse the result of a get-model.
   fn parse_get_model<Ident, Type, Value>(
     & mut self
-  ) -> Res<Vec<(Ident, Vec<Type>, Type, Value)>>
+  ) -> SmtRes<Vec<(Ident, Vec<Type>, Type, Value)>>
   where
   Parser: for<'a> IdentParser<'a, Ident, Type, & 'a mut SmtParser<'kid>> +
           for<'a> ValueParser<'a, Value, & 'a mut SmtParser<'kid>> {
@@ -795,7 +795,7 @@ pub trait Solver<
   /// Get-model command.
   fn get_model<Ident, Type, Value>(
     & mut self
-  ) -> Res<Vec<(Ident, Vec<Type>, Type, Value)>>
+  ) -> SmtRes<Vec<(Ident, Vec<Type>, Type, Value)>>
   where
   Parser: for<'a> IdentParser<'a, Ident, Type, & 'a mut SmtParser<'kid>> +
           for<'a> ValueParser<'a, Value, & 'a mut SmtParser<'kid>> {
@@ -806,7 +806,7 @@ pub trait Solver<
   /// Parse the result of a get-model where all the symbols are nullary.
   fn parse_get_model_const<Ident, Type, Value>(
     & mut self
-  ) -> Res<Vec<(Ident, Type, Value)>>
+  ) -> SmtRes<Vec<(Ident, Type, Value)>>
   where
   Parser: for<'a> IdentParser<'a, Ident, Type, & 'a mut SmtParser<'kid>> +
           for<'a> ValueParser<'a, Value, & 'a mut SmtParser<'kid>> {
@@ -817,7 +817,7 @@ pub trait Solver<
   /// Get-model command when all the symbols are nullary.
   fn get_model_const<Ident, Type, Value>(
     & mut self
-  ) -> Res<Vec<(Ident, Type, Value)>>
+  ) -> SmtRes<Vec<(Ident, Type, Value)>>
   where
   Parser: for<'a> IdentParser<'a, Ident, Type, & 'a mut SmtParser<'kid>> +
           for<'a> ValueParser<'a, Value, & 'a mut SmtParser<'kid>> {
@@ -829,13 +829,13 @@ pub trait Solver<
 
   /// Parse success.
   #[inline]
-  fn parse_success(& mut self) -> Res<()> {
+  fn parse_success(& mut self) -> SmtRes<()> {
     self.parsers().0.success()
   }
 
   /// Parse the result of a check-sat, turns `unknown` results into errors.
   #[inline(always)]
-  fn parse_check_sat(& mut self) -> Res<bool> {
+  fn parse_check_sat(& mut self) -> SmtRes<bool> {
     if let Some(res) = self.parsers().0.check_sat() ? {
       Ok(res)
     } else {
@@ -845,48 +845,48 @@ pub trait Solver<
 
   /// Parse the result of a check-sat, turns `unknown` results into `None`.
   #[inline(always)]
-  fn parse_check_sat_or_unknown(& mut self) -> Res< Option<bool> > {
+  fn parse_check_sat_or_unknown(& mut self) -> SmtRes< Option<bool> > {
     self.parsers().0.check_sat()
   }
 
   /// Check-sat command, turns `unknown` results into errors.
-  fn check_sat(& mut self) -> Res<bool> {
+  fn check_sat(& mut self) -> SmtRes<bool> {
     self.print_check_sat() ? ;
     self.parse_check_sat()
   }
 
   /// Check-sat command, turns `unknown` results in `None`.
-  fn check_sat_or_unknown(& mut self) -> Res< Option<bool> > {
+  fn check_sat_or_unknown(& mut self) -> SmtRes< Option<bool> > {
     self.print_check_sat() ? ;
     self.parse_check_sat_or_unknown()
   }
 
   /// Get-assertions command.
-  fn print_get_assertions(& mut self) -> Res<()> {
+  fn print_get_assertions(& mut self) -> SmtRes<()> {
     stutter_arg!(self.write ;
       |w| write_str(w, "(get-assertions)\n")
     )
   }
   /// Get-assignment command.
-  fn print_get_assignment(& mut self) -> Res<()> {
+  fn print_get_assignment(& mut self) -> SmtRes<()> {
     stutter_arg!(self.write ;
       |w| write_str(w, "(get-assignment)\n")
     )
   }
   /// Get-unsat-assumptions command.
-  fn print_get_unsat_assumptions(& mut self) -> Res<()> {
+  fn print_get_unsat_assumptions(& mut self) -> SmtRes<()> {
     stutter_arg!(self.write ;
       |w| write_str(w, "(get-unsat-assumptions)\n")
     )
   }
   /// Get-proof command.
-  fn print_get_proof(& mut self) -> Res<()> {
+  fn print_get_proof(& mut self) -> SmtRes<()> {
     stutter_arg!(self.write ;
       |w| write_str(w, "(get-proof)\n")
     )
   }
   /// Get-unsat-core command.
-  fn print_get_unsat_core(& mut self) -> Res<()> {
+  fn print_get_unsat_core(& mut self) -> SmtRes<()> {
     stutter_arg!(self.write ;
       |w| write_str(w, "(get-unsat-core)\n")
     )
@@ -895,7 +895,7 @@ pub trait Solver<
   /// Get-values command.
   fn print_get_values<'a, Info, Expr, Exprs: ?Sized>(
     & mut self, exprs: & 'a Exprs, info: & Info
-  ) -> Res<()>
+  ) -> SmtRes<()>
   where
   Expr: Expr2Smt< Info > + 'a,
   & 'a Exprs: IntoIterator< Item = & 'a Expr > {
@@ -914,7 +914,7 @@ pub trait Solver<
   /// Parse the result of a get-values.
   fn parse_get_values<Info: Clone, Expr, Value>(
     & mut self, info: Info
-  ) -> Res<Vec<(Expr, Value)>>
+  ) -> SmtRes<Vec<(Expr, Value)>>
   where
   Parser: for<'a> ExprParser<'a, Expr, Info, & 'a mut SmtParser<'kid>> +
           for<'a> ValueParser<'a, Value, & 'a mut SmtParser<'kid>> {
@@ -927,7 +927,7 @@ pub trait Solver<
     'a, Info: Clone, Expr, Exprs: ?Sized, Value
   >(
     & mut self, exprs: & 'a Exprs, info: Info
-  ) -> Res<Vec<(Expr, Value)>>
+  ) -> SmtRes<Vec<(Expr, Value)>>
   where
   Parser: for<'b> ExprParser<'b, Expr, Info, & 'b mut SmtParser<'kid>> +
           for<'b> ValueParser<'b, Value, & 'b mut SmtParser<'kid>>,
@@ -940,7 +940,7 @@ pub trait Solver<
   /// Check-sat with assumptions command.
   fn print_check_sat_assuming<'a, Info, Ident, Idents: ?Sized>(
     & mut self, bool_vars: & 'a Idents, info: & Info
-  ) -> Res<()>
+  ) -> SmtRes<()>
   where
   Ident: Sym2Smt<Info> + 'a,
   & 'a Idents: IntoIterator< Item = & 'a Ident > {
@@ -969,7 +969,7 @@ pub trait Solver<
   /// Check-sat assuming command, turns `unknown` results into errors.
   fn check_sat_assuming<'a, Info, Ident, Idents: ?Sized>(
     & mut self, idents: & 'a Idents, info: & Info
-  ) -> Res<bool>
+  ) -> SmtRes<bool>
   where
   Ident: Sym2Smt<Info> + 'a,
   & 'a Idents: IntoIterator< Item = & 'a Ident > {
@@ -980,7 +980,7 @@ pub trait Solver<
   /// Check-sat assuming command, turns `unknown` results into `None`.
   fn check_sat_assuming_or_unknown<'a, Info, Ident, Idents: ?Sized>(
     & mut self, idents: & 'a Idents, info: & Info
-  ) -> Res<Option<bool>>
+  ) -> SmtRes<Option<bool>>
   where
   Ident: Sym2Smt<Info> + 'a,
   & 'a Idents: IntoIterator< Item = & 'a Ident > {

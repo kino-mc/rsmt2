@@ -17,21 +17,21 @@ use errors::* ;
 /// A symbol printable in the SMT Lib 2 standard given some info.
 pub trait Sym2Smt<Info> {
   /// Prints a symbol to a writer given some info.
-  fn sym_to_smt2<Writer>(& self, & mut Writer, & Info) -> Res<()>
+  fn sym_to_smt2<Writer>(& self, & mut Writer, & Info) -> SmtRes<()>
   where Writer: io::Write ;
 }
 
 /// An expression printable in the SMT Lib 2 standard given some info.
 pub trait Expr2Smt<Info> {
   /// Prints an expression to a writer given some info.
-  fn expr_to_smt2<Writer>(& self, & mut Writer, & Info) -> Res<()>
+  fn expr_to_smt2<Writer>(& self, & mut Writer, & Info) -> SmtRes<()>
   where Writer: io::Write ;
 }
 
 /// A sort printable in the SMT Lib 2 standard.
 pub trait Sort2Smt {
   /// Prints a sort to a writer info.
-  fn sort_to_smt2<Writer>(& self, & mut Writer) -> Res<()>
+  fn sort_to_smt2<Writer>(& self, & mut Writer) -> SmtRes<()>
   where Writer: io::Write ;
 }
 
@@ -39,7 +39,7 @@ pub trait Sort2Smt {
 #[inline(always)]
 pub fn write_str(
   w: & mut io::Write, s: & str
-) -> Res<()> {
+) -> SmtRes<()> {
   w.write_all( s.as_bytes() ) ? ;
   Ok(())
 }
@@ -47,21 +47,21 @@ pub fn write_str(
 impl<'a, T> Sym2Smt<T> for & 'a str {
   fn sym_to_smt2<Writer>(
     & self, writer: & mut Writer, _: & T
-  ) -> Res<()> where Writer: io::Write {
+  ) -> SmtRes<()> where Writer: io::Write {
     write_str(writer, self)
   }
 }
 impl<'a, T> Expr2Smt<T> for & 'a str {
   fn expr_to_smt2<Writer>(
     & self, writer: & mut Writer, _: & T
-  ) -> Res<()> where Writer: io::Write {
+  ) -> SmtRes<()> where Writer: io::Write {
     write_str(writer, self)
   }
 }
 impl<'a> Sort2Smt for & 'a str {
   fn sort_to_smt2<Writer>(
     & self, writer: & mut Writer
-  ) -> Res<()> where Writer: io::Write {
+  ) -> SmtRes<()> where Writer: io::Write {
     write_str(writer, self)
   }
 }
@@ -69,21 +69,21 @@ impl<'a> Sort2Smt for & 'a str {
 impl<T> Sym2Smt<T>  for String {
   fn sym_to_smt2<Writer>(
     & self, writer: & mut Writer, _: & T
-  ) -> Res<()> where Writer: io::Write {
+  ) -> SmtRes<()> where Writer: io::Write {
     write_str(writer, self)
   }
 }
 impl<T> Expr2Smt<T> for String {
   fn expr_to_smt2<Writer>(
     & self, writer: & mut Writer, _: & T
-  ) -> Res<()> where Writer: io::Write {
+  ) -> SmtRes<()> where Writer: io::Write {
     write_str(writer, self)
   }
 }
 impl Sort2Smt for String {
   fn sort_to_smt2<Writer>(
     & self, writer: & mut Writer
-  ) -> Res<()> where Writer: io::Write {
+  ) -> SmtRes<()> where Writer: io::Write {
     write_str(writer, self)
   }
 }
@@ -133,7 +133,7 @@ impl fmt::Display for Logic {
 }
 impl Logic {
   /// Prints the logic in a writer in SMT Lib 2 format.
-  pub fn to_smt2(& self, writer: & mut io::Write, _: ()) -> Res<()> {
+  pub fn to_smt2(& self, writer: & mut io::Write, _: ()) -> SmtRes<()> {
     write!(writer, "{}", self) ? ;
     Ok(())
   }

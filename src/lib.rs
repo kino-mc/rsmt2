@@ -76,9 +76,9 @@ enum Const {
   /// Boolean constant.
   BConst(bool),
   /// Integer constant.
-  IConst(usize),
+  IConst(isize),
   /// Rational constant.
-  RConst(usize,usize),
+  RConst(isize,usize),
 }
 
 /// An S-expression.
@@ -121,9 +121,9 @@ are:
 #   /// Boolean constant.
 #   BConst(bool),
 #   /// Integer constant.
-#   IConst(usize),
+#   IConst(isize),
 #   /// Rational constant.
-#   RConst(usize,usize),
+#   RConst(isize,usize),
 # }
 # 
 # /// An S-expression.
@@ -183,7 +183,7 @@ use std::io::Write ;
 
 use rsmt2::* ;
 use rsmt2::parse::* ;
-use rsmt2::errors::* ;
+use rsmt2::SmtRes ;
 
 use Var::* ;
 use Const::* ;
@@ -213,9 +213,9 @@ use SExpr::* ;
 #   /// Boolean constant.
 #   BConst(bool),
 #   /// Integer constant.
-#   IConst(usize),
+#   IConst(isize),
 #   /// Rational constant.
-#   RConst(usize,usize),
+#   RConst(isize,usize),
 # }
 # 
 # /// An S-expression.
@@ -248,7 +248,7 @@ impl Var {
   /// Given an offset, a variable can be printed in SMT Lib 2.
   pub fn to_smt2<Writer: Write>(
     & self, writer: & mut Writer, off: & Offset
-  ) -> Res<()> {
+  ) -> SmtRes<()> {
     match * self {
       NSVar(ref sym) => write!(writer, "|{}|", sym) ?,
       /// SVar at 0, we use the index of the current step.
@@ -266,11 +266,21 @@ impl Var {
 
 impl Const {
   /// A constant can be printed in SMT Lib 2.
-  pub fn to_smt2<Writer: Write>(& self, writer: & mut Writer) -> Res<()> {
+  pub fn to_smt2<Writer: Write>(& self, writer: & mut Writer) -> SmtRes<()> {
     match * self {
-      BConst(ref b) => write!(writer, "{}", b) ?,
-      IConst(ref i) => write!(writer, "{}", i) ?,
-      RConst(ref num, ref den) => write!(writer, "(/ {} {})", num, den) ?,
+      BConst(b) => write!(writer, "{}", b) ?,
+      IConst(i) => {
+        let neg = i < 0 ;
+        if neg { write!(writer, "(- ") ? }
+        write!(writer, "{}", i.abs()) ? ;
+        if neg { write!(writer, ")") ? }
+      },
+      RConst(num, den) => {
+        let neg = num < 0 ;
+        if neg { write!(writer, "(- ") ? }
+        write!(writer, "(/ {} {})", num, den) ? ;
+        if neg { write!(writer, ")") ? }
+      },
     }
     Ok(())
   }
@@ -283,7 +293,7 @@ impl SExpr {
   /// Given an offset, an S-expression can be printed in SMT Lib 2.
   pub fn to_smt2<Writer: Write>(
     & self, writer: & mut Writer, off: & Offset
-  ) -> Res<()> {
+  ) -> SmtRes<()> {
     match * self {
       Id(ref var) => var.to_smt2(writer, off),
       Val(ref cst) => cst.to_smt2(writer),
@@ -316,7 +326,7 @@ It is now easy to implement `Sym2Smt` and `Expr2Smt`:
 # 
 # use rsmt2::* ;
 # use rsmt2::parse::* ;
-# use rsmt2::errors::* ;
+# use rsmt2::SmtRes ;
 # 
 # use Var::* ;
 # use Const::* ;
@@ -346,9 +356,9 @@ It is now easy to implement `Sym2Smt` and `Expr2Smt`:
 #   /// Boolean constant.
 #   BConst(bool),
 #   /// Integer constant.
-#   IConst(usize),
+#   IConst(isize),
 #   /// Rational constant.
-#   RConst(usize,usize),
+#   RConst(isize,usize),
 # }
 # 
 # /// An S-expression.
@@ -382,7 +392,7 @@ It is now easy to implement `Sym2Smt` and `Expr2Smt`:
 #   #[inline(always)]
 #   pub fn to_smt2<Writer: Write>(
 #     & self, writer: & mut Writer, off: & Offset
-#   ) -> Res<()> {
+#   ) -> SmtRes<()> {
 #     match * self {
 #       NSVar(ref sym) => write!(writer, "|{}|", sym) ?,
 #       /// SVar at 0, we use the index of the current step.
@@ -401,11 +411,21 @@ It is now easy to implement `Sym2Smt` and `Expr2Smt`:
 # impl Const {
 #   /// A constant can be printed in SMT Lib 2.
 #   #[inline(always)]
-#   pub fn to_smt2<Writer: Write>(& self, writer: & mut Writer) -> Res<()> {
+#   pub fn to_smt2<Writer: Write>(& self, writer: & mut Writer) -> SmtRes<()> {
 #     match * self {
-#       BConst(ref b) => write!(writer, "{}", b) ?,
-#       IConst(ref i) => write!(writer, "{}", i) ?,
-#       RConst(ref num, ref den) => write!(writer, "(/ {} {})", num, den) ?,
+#       BConst(b) => write!(writer, "{}", b) ?,
+#       IConst(i) => {
+#         let neg = i < 0 ;
+#         if neg { write!(writer, "(- ") ? }
+#         write!(writer, "{}", i.abs()) ? ;
+#         if neg { write!(writer, ")") ? }
+#       },
+#       RConst(num, den) => {
+#         let neg = num < 0 ;
+#         if neg { write!(writer, "(- ") ? }
+#         write!(writer, "(/ {} {})", num, den) ? ;
+#         if neg { write!(writer, ")") ? }
+#       },
 #     }
 #     Ok(())
 #   }
@@ -418,7 +438,7 @@ It is now easy to implement `Sym2Smt` and `Expr2Smt`:
 #   /// Given an offset, an S-expression can be printed in SMT Lib 2.
 #   pub fn to_smt2<Writer: Write>(
 #     & self, writer: & mut Writer, off: & Offset
-#   ) -> Res<()> {
+#   ) -> SmtRes<()> {
 #     match * self {
 #       Id(ref var) => var.to_smt2(writer, off),
 #       Val(ref cst) => cst.to_smt2(writer),
@@ -444,7 +464,7 @@ use rsmt2::to_smt::{ Sym2Smt, Expr2Smt } ;
 impl<'a, 'b> Sym2Smt<()> for Symbol<'a,'b> {
   fn sym_to_smt2<Writer: Write>(
     & self, writer: & mut Writer, _: & ()
-  ) -> Res<()> {
+  ) -> SmtRes<()> {
     self.0.to_smt2(writer, self.1)
   }
 }
@@ -453,7 +473,7 @@ impl<'a, 'b> Sym2Smt<()> for Symbol<'a,'b> {
 impl<'a, 'b> Expr2Smt<()> for Unrolled<'a,'b> {
   fn expr_to_smt2<Writer: Write>(
     & self, writer: & mut Writer, _: & ()
-  ) -> Res<()> {
+  ) -> SmtRes<()> {
     self.0.to_smt2(writer, self.1)
   }
 }
@@ -480,7 +500,7 @@ the case of [`check_sat`](trait.Solver.html#method.check_sat) for example.
 # 
 # use rsmt2::* ;
 # use rsmt2::parse::* ;
-# use rsmt2::errors::* ;
+# use rsmt2::SmtRes ;
 # 
 # use Var::* ;
 # use Const::* ;
@@ -510,9 +530,9 @@ the case of [`check_sat`](trait.Solver.html#method.check_sat) for example.
 #   /// Boolean constant.
 #   BConst(bool),
 #   /// Integer constant.
-#   IConst(usize),
+#   IConst(isize),
 #   /// Rational constant.
-#   RConst(usize,usize),
+#   RConst(isize,usize),
 # }
 # 
 # /// An S-expression.
@@ -546,7 +566,7 @@ the case of [`check_sat`](trait.Solver.html#method.check_sat) for example.
 #   #[inline(always)]
 #   pub fn to_smt2<Writer: Write>(
 #     & self, writer: & mut Writer, off: & Offset
-#   ) -> Res<()> {
+#   ) -> SmtRes<()> {
 #     match * self {
 #       NSVar(ref sym) => write!(writer, "|{}|", sym) ?,
 #       /// SVar at 0, we use the index of the current step.
@@ -567,11 +587,21 @@ the case of [`check_sat`](trait.Solver.html#method.check_sat) for example.
 #   #[inline(always)]
 #   pub fn to_smt2<Writer: Write>(
 #     & self, writer: & mut Writer
-#   ) -> Res<()> {
+#   ) -> SmtRes<()> {
 #     match * self {
-#       BConst(ref b) => write!(writer, "{}", b) ?,
-#       IConst(ref i) => write!(writer, "{}", i) ?,
-#       RConst(ref num, ref den) => write!(writer, "(/ {} {})", num, den) ?,
+#       BConst(b) => write!(writer, "{}", b) ?,
+#       IConst(i) => {
+#         let neg = i < 0 ;
+#         if neg { write!(writer, "(- ") ? }
+#         write!(writer, "{}", i.abs()) ? ;
+#         if neg { write!(writer, ")") ? }
+#       },
+#       RConst(num, den) => {
+#         let neg = num < 0 ;
+#         if neg { write!(writer, "(- ") ? }
+#         write!(writer, "(/ {} {})", num, den) ? ;
+#         if neg { write!(writer, ")") ? }
+#       },
 #     }
 #     Ok(())
 #   }
@@ -584,7 +614,7 @@ the case of [`check_sat`](trait.Solver.html#method.check_sat) for example.
 #   /// Given an offset, an S-expression can be printed in SMT Lib 2.
 #   pub fn to_smt2<Writer: Write>(
 #     & self, writer: & mut Writer, off: & Offset
-#   ) -> Res<()> {
+#   ) -> SmtRes<()> {
 #     match * self {
 #       Id(ref var) => var.to_smt2(writer, off),
 #       Val(ref cst) => cst.to_smt2(writer),
@@ -609,7 +639,7 @@ the case of [`check_sat`](trait.Solver.html#method.check_sat) for example.
 # impl<'a, 'b> Sym2Smt<()> for Symbol<'a,'b> {
 #   fn sym_to_smt2<Writer: Write>(
 #     & self, writer: & mut Writer, _: & ()
-#   ) -> Res<()> {
+#   ) -> SmtRes<()> {
 #     self.0.to_smt2(writer, self.1)
 #   }
 # }
@@ -618,7 +648,7 @@ the case of [`check_sat`](trait.Solver.html#method.check_sat) for example.
 # impl<'a, 'b> Expr2Smt<()> for Unrolled<'a,'b> {
 #   fn expr_to_smt2<Writer: Write>(
 #     & self, writer: & mut Writer, _: & ()
-#   ) -> Res<()> {
+#   ) -> SmtRes<()> {
 #     self.0.to_smt2(writer, self.1)
 #   }
 # }
@@ -696,14 +726,13 @@ fn main() {
 
 ### Parsing
 
-Note that there is no reason *a priori* for the structures returned by the
-parsers to be the same as the one used for printing. In our running example,
-parsing a variable with an offset of `6` (in a `get-values` for example) as
-an `SExpr` is ambiguous. Is `6` the index of the current or next step? What's
-the other index?
+Below is the end of our running example. The `*Parser` traits are discussed in
+the [`parse`][parse] module.
 
-For this simple example however, we will use the same structures. Despite the
-fact that it makes little sense.
+Note that there is no reason *a priori* for the structures returned by the
+parsers to be the same as the one used for printing. In this example our state
+variables have a notion of offset. It is retrieved during parsing, that's why
+our `IdentParser` returns `(Var, Option<usize>)`.
 
 ```
 # // Parser library.
@@ -712,7 +741,7 @@ fact that it makes little sense.
 # 
 # use rsmt2::* ;
 # use rsmt2::parse::* ;
-# use rsmt2::errors::* ;
+# use rsmt2::SmtRes ;
 # 
 # use Var::* ;
 # use Const::* ;
@@ -747,9 +776,9 @@ fact that it makes little sense.
 #   /// Boolean constant.
 #   BConst(bool),
 #   /// Integer constant.
-#   IConst(usize),
+#   IConst(isize),
 #   /// Rational constant.
-#   RConst(usize,usize),
+#   RConst(isize,usize),
 # }
 # 
 # /// An S-expression.
@@ -783,7 +812,7 @@ fact that it makes little sense.
 #   #[inline(always)]
 #   pub fn to_smt2<Writer: Write>(
 #     & self, writer: & mut Writer, off: & Offset
-#   ) -> Res<()> {
+#   ) -> SmtRes<()> {
 #     match * self {
 #       NSVar(ref sym) => write!(writer, "|{}|", sym) ?,
 #       /// SVar at 0, we use the index of the current step.
@@ -804,11 +833,21 @@ fact that it makes little sense.
 #   #[inline(always)]
 #   pub fn to_smt2<Writer: Write>(
 #     & self, writer: & mut Writer
-#   ) -> Res<()> {
+#   ) -> SmtRes<()> {
 #     match * self {
-#       BConst(ref b) => write!(writer, "{}", b) ?,
-#       IConst(ref i) => write!(writer, "{}", i) ?,
-#       RConst(ref num, ref den) => write!(writer, "(/ {} {})", num, den) ?,
+#       BConst(b) => write!(writer, "{}", b) ?,
+#       IConst(i) => {
+#         let neg = i < 0 ;
+#         if neg { write!(writer, "(- ") ? }
+#         write!(writer, "{}", i.abs()) ? ;
+#         if neg { write!(writer, ")") ? }
+#       },
+#       RConst(num, den) => {
+#         let neg = num < 0 ;
+#         if neg { write!(writer, "(- ") ? }
+#         write!(writer, "(/ {} {})", num, den) ? ;
+#         if neg { write!(writer, ")") ? }
+#       },
 #     }
 #     Ok(())
 #   }
@@ -821,7 +860,7 @@ fact that it makes little sense.
 #   /// Given an offset, an S-expression can be printed in SMT Lib 2.
 #   pub fn to_smt2<Writer: Write>(
 #     & self, writer: & mut Writer, off: & Offset
-#   ) -> Res<()> {
+#   ) -> SmtRes<()> {
 #     match * self {
 #       Id(ref var) => var.to_smt2(writer, off),
 #       Val(ref cst) => cst.to_smt2(writer),
@@ -846,7 +885,7 @@ fact that it makes little sense.
 # impl<'a, 'b> Sym2Smt<()> for Symbol<'a,'b> {
 #   fn sym_to_smt2<Writer: Write>(
 #     & self, writer: & mut Writer, _: & ()
-#   ) -> Res<()> {
+#   ) -> SmtRes<()> {
 #     self.0.to_smt2(writer, self.1)
 #   }
 # }
@@ -855,7 +894,7 @@ fact that it makes little sense.
 # impl<'a, 'b> Expr2Smt<()> for Unrolled<'a,'b> {
 #   fn expr_to_smt2<Writer: Write>(
 #     & self, writer: & mut Writer, _: & ()
-#   ) -> Res<()> {
+#   ) -> SmtRes<()> {
 #     self.0.to_smt2(writer, self.1)
 #   }
 # }
@@ -875,7 +914,7 @@ extern crate error_chain ;
 #[derive(Clone, Copy)]
 struct Parser ;
 impl<'a> IdentParser< 'a, (Var, Option<usize>), Type, & 'a str > for Parser {
-  fn parse_ident(self, s: & 'a str) -> Res<(Var, Option<usize>)> {
+  fn parse_ident(self, s: & 'a str) -> SmtRes<(Var, Option<usize>)> {
     if s.len() <= 2 { bail!("not one of my idents...") }
     let s = & s[ 1 .. (s.len() - 1) ] ; // Removing surrounding pipes.
     let mut parts = s.split("@") ;
@@ -886,17 +925,16 @@ impl<'a> IdentParser< 'a, (Var, Option<usize>), Type, & 'a str > for Parser {
       use std::str::FromStr ;
       Ok( (
         Var::SVar0(id),
-        Some(
-          usize::from_str(index).chain_err(
-            || format!("while parsing the offset in `{}`", s)
-          ) ?
-        )
+        match usize::from_str(index) {
+          Ok(index) => Some(index),
+          Err(e) => bail!("while parsing the offset in `{}`: {}", s, e)
+        }
       ) )
     } else {
       Ok( (Var::NSVar(id), None) )
     }
   }
-  fn parse_type(self, s: & 'a str) -> Res<Type> {
+  fn parse_type(self, s: & 'a str) -> SmtRes<Type> {
     match s {
       "Int" => Ok( Type::Int ),
       "Bool" => Ok( Type::Bool ),
@@ -907,7 +945,7 @@ impl<'a> IdentParser< 'a, (Var, Option<usize>), Type, & 'a str > for Parser {
 }
 
 impl<'a> ValueParser< 'a, Const, & 'a str > for Parser {
-  fn parse_value(self, s: & 'a str) -> Res<Const> {
+  fn parse_value(self, s: & 'a str) -> SmtRes<Const> {
     if s == "true" {
       return Ok( Const::BConst(true) )
     } else if s == "false" {
@@ -915,7 +953,7 @@ impl<'a> ValueParser< 'a, Const, & 'a str > for Parser {
     }
 
     use std::str::FromStr ;
-    if let Ok(int) = usize::from_str(s) {
+    if let Ok(int) = isize::from_str(s) {
       return Ok( Const::IConst(int) )
     }
 
@@ -930,7 +968,7 @@ impl<'a> ValueParser< 'a, Const, & 'a str > for Parser {
     }
 
     match (
-      tokens.next().map(|t| usize::from_str(t)),
+      tokens.next().map(|t| isize::from_str(t)),
       tokens.next().map(|t| usize::from_str(t)),
       tokens.next(),
     ) {
@@ -1001,9 +1039,11 @@ fn main() {
     for ((var, off), args, typ, val) in model {
       if var.sym() == "stateful var" {
         assert_eq!(off, Some(0)) ;
+        assert_eq!(typ, Type::Bool) ;
         assert_eq!(val, Const::BConst(false))
       } else if var.sym() == "non stateful var" {
         assert_eq!(off, None) ;
+        assert_eq!(typ, Type::Bool) ;
         assert_eq!(val, Const::BConst(true))
       }
     }
@@ -1016,6 +1056,327 @@ fn main() {
 }
 ```
 
+Note that it would have been a bit easier to implement `ValueParser` with a [`&
+mut SmtParser`][smt parser], as it provides the parsers we want.
+
+```
+# // Parser library.
+# extern crate rsmt2 ;
+# use std::io::Write ;
+# 
+# use rsmt2::* ;
+# use rsmt2::parse::* ;
+# use rsmt2::SmtRes ;
+# 
+# use Var::* ;
+# use Const::* ;
+# use SExpr::* ;
+# 
+# /// Under the hood a symbol is a string.
+# type Sym = String ;
+# 
+# /// A variable wraps a symbol.
+# #[derive(Debug,Clone,PartialEq)]
+# enum Var {
+#   /// Variable constant in time (Non-Stateful Var: SVar).
+#   NSVar(Sym),
+#   /// State variable in the current step.
+#   SVar0(Sym),
+#   /// State variable in the next step.
+#   SVar1(Sym),
+# }
+# impl Var {
+#   fn sym(& self) -> & str {
+#     match * self { NSVar(ref s) => s, SVar0(ref s) => s, SVar1(ref s) => s }
+#   }
+# }
+#
+# /// A type.
+# #[derive(Debug,Clone,Copy,PartialEq)]
+# enum Type { Int, Bool, Real }
+# 
+# /// A constant.
+# #[derive(Debug,Clone,PartialEq)]
+# enum Const {
+#   /// Boolean constant.
+#   BConst(bool),
+#   /// Integer constant.
+#   IConst(isize),
+#   /// Rational constant.
+#   RConst(isize,usize),
+# }
+# 
+# /// An S-expression.
+# #[derive(Debug,Clone,PartialEq)]
+# enum SExpr {
+#   /// A variable.
+#   Id(Var),
+#   /// A constant.
+#   Val(Const),
+#   /// An application of function symbol.
+#   App(Sym, Vec<SExpr>),
+# }
+#
+# /// An offset gives the index of current and next step.
+# #[derive(Debug,Clone,Copy,PartialEq)]
+# struct Offset(usize, usize) ;
+# 
+# /// A symbol is a variable and an offset.
+# #[derive(Debug,Clone,PartialEq)]
+# struct Symbol<'a, 'b>(& 'a Var, & 'b Offset) ;
+# 
+# /// An unrolled SExpr.
+# #[derive(Debug,Clone,PartialEq)]
+# struct Unrolled<'a, 'b>(& 'a SExpr, & 'b Offset) ;
+#
+# impl Var {
+#   pub fn nsvar(s: & str) -> Self { NSVar(s.to_string()) }
+#   pub fn svar0(s: & str) -> Self { SVar0(s.to_string()) }
+#   pub fn svar1(s: & str) -> Self { SVar1(s.to_string()) }
+#   /// Given an offset, a variable can be printed in SMT Lib 2.
+#   #[inline(always)]
+#   pub fn to_smt2<Writer: Write>(
+#     & self, writer: & mut Writer, off: & Offset
+#   ) -> SmtRes<()> {
+#     match * self {
+#       NSVar(ref sym) => write!(writer, "|{}|", sym) ?,
+#       /// SVar at 0, we use the index of the current step.
+#       SVar0(ref sym) => write!(writer, "|{}@{}|", sym, off.0) ?,
+#       /// SVar at 1, we use the index of the next step.
+#       SVar1(ref sym) => write!(writer, "|{}@{}|", sym, off.1) ?,
+#     }
+#     Ok(())
+#   }
+#   /// Given an offset, a variable can become a Symbol.
+#   pub fn to_sym<'a, 'b>(& 'a self, off: & 'b Offset) -> Symbol<'a, 'b> {
+#     Symbol(self, off)
+#   }
+# }
+# 
+# impl Const {
+#   /// A constant can be printed in SMT Lib 2.
+#   #[inline(always)]
+#   pub fn to_smt2<Writer: Write>(
+#     & self, writer: & mut Writer
+#   ) -> SmtRes<()> {
+#     match * self {
+#       BConst(b) => write!(writer, "{}", b) ?,
+#       IConst(i) => {
+#         let neg = i < 0 ;
+#         if neg { write!(writer, "(- ") ? }
+#         write!(writer, "{}", i.abs()) ? ;
+#         if neg { write!(writer, ")") ? }
+#       },
+#       RConst(num, den) => {
+#         let neg = num < 0 ;
+#         if neg { write!(writer, "(- ") ? }
+#         write!(writer, "(/ {} {})", num, den) ? ;
+#         if neg { write!(writer, ")") ? }
+#       },
+#     }
+#     Ok(())
+#   }
+# }
+# 
+# impl SExpr {
+#   pub fn app(sym: & str, args: Vec<SExpr>) -> Self {
+#     App(sym.to_string(), args)
+#   }
+#   /// Given an offset, an S-expression can be printed in SMT Lib 2.
+#   pub fn to_smt2<Writer: Write>(
+#     & self, writer: & mut Writer, off: & Offset
+#   ) -> SmtRes<()> {
+#     match * self {
+#       Id(ref var) => var.to_smt2(writer, off),
+#       Val(ref cst) => cst.to_smt2(writer),
+#       App(ref sym, ref args) => {
+#         write!(writer, "({}", sym) ? ;
+#         for ref arg in args {
+#           write!(writer, " ") ? ;
+#           arg.to_smt2(writer, off) ?
+#         }
+#         write!(writer, ")") ? ;
+#         Ok(())
+#       }
+#     }
+#   }
+#   /// Given an offset, an S-expression can be unrolled.
+#   pub fn unroll<'a, 'b>(& 'a self, off: & 'b Offset) -> Unrolled<'a,'b> {
+#     Unrolled(self, off)
+#   }
+# }
+# use rsmt2::to_smt::* ;
+# /// A symbol can be printed in SMT Lib 2.
+# impl<'a, 'b> Sym2Smt<()> for Symbol<'a,'b> {
+#   fn sym_to_smt2<Writer: Write>(
+#     & self, writer: & mut Writer, _: & ()
+#   ) -> SmtRes<()> {
+#     self.0.to_smt2(writer, self.1)
+#   }
+# }
+# 
+# /// An unrolled SExpr can be printed in SMT Lib 2.
+# impl<'a, 'b> Expr2Smt<()> for Unrolled<'a,'b> {
+#   fn expr_to_smt2<Writer: Write>(
+#     & self, writer: & mut Writer, _: & ()
+#   ) -> SmtRes<()> {
+#     self.0.to_smt2(writer, self.1)
+#   }
+# }
+# /// Convenience macro.
+# macro_rules! smtry {
+#   ($e:expr, failwith $( $msg:expr ),+) => (
+#     match $e {
+#       Ok(something) => something,
+#       Err(e) => panic!( $($msg),+ , e)
+#     }
+#   ) ;
+# }
+# #[macro_use]
+# extern crate error_chain ;
+# 
+# /// Parser structure.
+# #[derive(Clone, Copy)]
+# struct Parser ;
+# impl<'a> IdentParser< 'a, (Var, Option<usize>), Type, & 'a str > for Parser {
+#   fn parse_ident(self, s: & 'a str) -> SmtRes<(Var, Option<usize>)> {
+#     if s.len() <= 2 { bail!("not one of my idents...") }
+#     let s = & s[ 1 .. (s.len() - 1) ] ; // Removing surrounding pipes.
+#     let mut parts = s.split("@") ;
+#     let id = if let Some(id) = parts.next() { id.to_string() } else {
+#       bail!("nothing between my pipes!")
+#     } ;
+#     if let Some(index) = parts.next() {
+#       use std::str::FromStr ;
+#       Ok( (
+#         Var::SVar0(id),
+#         match usize::from_str(index) {
+#           Ok(index) => Some(index),
+#           Err(e) => bail!("while parsing the offset in `{}`: {}", s, e)
+#         }
+#       ) )
+#     } else {
+#       Ok( (Var::NSVar(id), None) )
+#     }
+#   }
+#   fn parse_type(self, s: & 'a str) -> SmtRes<Type> {
+#     match s {
+#       "Int" => Ok( Type::Int ),
+#       "Bool" => Ok( Type::Bool ),
+#       "Real" => Ok( Type::Real ),
+#       _ => bail!( format!("unknown type `{}`", s) ),
+#     }
+#   }
+# }
+
+use rsmt2::parse::SmtParser ;
+
+impl<'a, Br> ValueParser< 'a, Const, & 'a mut SmtParser<Br> > for Parser
+where Br: ::std::io::BufRead {
+  fn parse_value(self, input: & 'a mut SmtParser<Br>) -> SmtRes<Const> {
+    use std::str::FromStr ;
+    if let Some(b) = input.try_bool() ? {
+      Ok( Const::BConst(b) )
+    } else if let Some(int) = input.try_int(
+      |int, pos| match isize::from_str(int) {
+        Ok(int) => if pos { Ok(int) } else { Ok(- int) },
+        Err(e) => Err(e),
+      }
+    ) ? {
+      Ok( Const::IConst(int) )
+    } else if let Some((num, den)) = input.try_rat (
+      |num, den, pos| match (isize::from_str(num), usize::from_str(den)) {
+        (Ok(num), Ok(den)) => if pos {
+          Ok((num, den))
+        } else { Ok((- num, den)) },
+        (Err(e), _) | (_, Err(e)) => Err( format!("{}", e) )
+      }
+    ) ? {
+      Ok( Const::RConst(num, den) )
+    } else {
+      input.fail_with("unexpected value")
+    }
+  }
+}
+
+# fn main() {
+#   use rsmt2::* ;
+#   use rsmt2::conf::SolverConf ;
+# 
+#   let conf = SolverConf::z3() ;
+# 
+#   let mut kid = match Kid::new(conf) {
+#     Ok(kid) => kid,
+#     Err(e) => panic!("Could not spawn solver kid: {:?}", e)
+#   } ;
+# 
+#   {
+# 
+#     let mut solver = smtry!(
+#       solver(& mut kid, Parser),
+#       failwith "could not create solver: {:?}"
+#     ) ;
+# 
+#     let nsv = Var::nsvar("non stateful var") ;
+#     let s_nsv = Id(nsv.clone()) ;
+#     let sv_0 = Var::svar0("stateful var") ;
+#     let s_sv_0 = Id(sv_0.clone()) ;
+#     let app2 = SExpr::app("not", vec![ s_sv_0.clone() ]) ;
+#     let app1 = SExpr::app("and", vec![ s_nsv.clone(), app2.clone() ]) ;
+#     let offset1 = Offset(0,1) ;
+# 
+#     let sym = nsv.to_sym(& offset1) ;
+#     smtry!(
+#       solver.declare_fun(& sym, &[] as & [& str], & "Bool", & ()),
+#       failwith "declaration failed: {:?}"
+#     ) ;
+# 
+#     let sym = sv_0.to_sym(& offset1) ;
+#     smtry!(
+#       solver.declare_fun(& sym, &[] as & [& str], & "Bool", & ()),
+#       failwith "declaration failed: {:?}"
+#     ) ;
+# 
+#     let expr = app1.unroll(& offset1) ;
+#     smtry!(
+#       solver.assert(& expr, & ()),
+#       failwith "assert failed: {:?}"
+#     ) ;
+# 
+#     if ! smtry!(
+#       solver.check_sat(),
+#       failwith "error in checksat: {:?}"
+#     ) {
+#       panic!("expected sat, got unsat")
+#     }
+# 
+#     let model = smtry!(
+#       solver.get_model(),
+#       failwith "while getting model: {:?}"
+#     ) ;
+# 
+#     for ((var, off), args, typ, val) in model {
+#       if var.sym() == "stateful var" {
+#         assert_eq!(off, Some(0)) ;
+#         assert_eq!(typ, Type::Bool) ;
+#         assert_eq!(val, Const::BConst(false))
+#       } else if var.sym() == "non stateful var" {
+#         assert_eq!(off, None) ;
+#         assert_eq!(typ, Type::Bool) ;
+#         assert_eq!(val, Const::BConst(true))
+#       }
+#     }
+#   }
+# 
+#   smtry!(
+#     kid.kill(),
+#     failwith "error while killing solver: {:?}"
+#   ) ;
+# }
+```
+
+[parse]: parse/index.html (parse module)
+[smt parser]: parse/struct.SmtParser.html (SmtParser structure)
 "#]
 
 #[macro_use]
@@ -1025,7 +1386,7 @@ extern crate error_chain ;
 pub mod errors {
   error_chain!{
     types {
-      Error, ErrorKind, ResExt, Res ;
+      Error, ErrorKind, ResExt, SmtRes ;
     }
 
     foreign_links {
@@ -1070,6 +1431,8 @@ mod common ;
 pub mod conf ;
 pub mod parse ;
 mod solver ;
+
+pub use errors::SmtRes ;
 
 pub use solver::{
   solver, Kid, Solver, PlainSolver, TeeSolver
