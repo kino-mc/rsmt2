@@ -130,3 +130,38 @@ impl Logic {
     Ok(())
   }
 }
+
+#[test]
+fn logic() {
+
+  let conf = SolverConf::z3() ;
+
+  let mut kid = match Kid::new(conf) {
+    Ok(kid) => kid,
+    Err(e) => panic!("Could not spawn solver kid: {:?}", e)
+  } ;
+
+  let mut solver = smtry!(
+    solver(& mut kid, ()),
+    failwith "could not create solver: {:?}"
+  ) ;
+
+  solver.set_logic(Logic::QF_UF).expect("QF_UF") ;
+  solver.reset().expect("reset") ;
+  solver.set_logic(Logic::QF_LIA).expect("QF_LIA") ;
+  solver.reset().expect("reset") ;
+  solver.set_logic(Logic::QF_NIA).expect("QF_NIA") ;
+  solver.reset().expect("reset") ;
+  solver.set_logic(Logic::QF_LRA).expect("QF_LRA") ;
+  solver.reset().expect("reset") ;
+  solver.set_logic(Logic::QF_AUFLIA).expect("QF_AUFLIA") ;
+  olver.reset().expect("reset") ;
+  solver.set_logic(Logic::AUFLIA).expect("AUFLIA") ;
+  solver.reset().expect("reset") ;
+  solver.set_logic(Logic::AUFLIRA).expect("AUFLIRA") ;
+  solver.reset().expect("reset") ;
+  solver.set_logic(Logic::AUFNIRA).expect("AUFNIRA") ;
+  solver.reset().expect("reset") ;
+  solver.set_logic(Logic::LRA).expect("LRA") ;
+  solver.reset().expect("reset") ;
+}
