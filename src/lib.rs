@@ -1441,3 +1441,341 @@ pub use solver::{
 pub mod to_smt {
   pub use common::{ Expr2Smt, Sort2Smt, Sym2Smt } ;
 }
+
+
+
+
+
+#[cfg(test)]
+mod top {
+
+  // Parser library.
+  use std::io::Write ;
+  
+  use * ;
+  use parse::* ;
+  
+  use self::Var::* ;
+  use self::Const::* ;
+  use self::SExpr::* ;
+  
+  /// Under the hood a symbol is a string.
+  type Sym = String ;
+
+  /// A variable wraps a symbol.
+  #[derive(Debug,Clone,PartialEq)]
+  enum Var {
+    /// Variable constant in time (Non-Stateful Var: SVar).
+    NSVar(Sym),
+    /// State variable in the current step.
+    SVar0(Sym),
+    /// State variable in the next step.
+    SVar1(Sym),
+  }
+  impl Var {
+    fn sym(& self) -> & str {
+      match * self { NSVar(ref s) => s, SVar0(ref s) => s, SVar1(ref s) => s }
+    }
+  }
+
+  /// A type.
+  #[derive(Debug,Clone,Copy,PartialEq)]
+  enum Type { Int, Bool, Real }
+  
+  /// A constant.
+  #[derive(Debug,Clone,PartialEq)]
+  enum Const {
+    /// Boolean constant.
+    BConst(bool),
+    /// Integer constant.
+    IConst(isize),
+    /// Rational constant.
+    RConst(isize,usize),
+  }
+
+  /// An S-expression.
+  #[derive(Debug,Clone,PartialEq)]
+  enum SExpr {
+    /// A variable.
+    Id(Var),
+    /// A constant.
+    Val(Const),
+    /// An application of function symbol.
+    App(Sym, Vec<SExpr>),
+  }
+
+  /// An offset gives the index of current and next step.
+  #[derive(Debug,Clone,Copy,PartialEq)]
+  struct Offset(usize, usize) ;
+  
+  /// A symbol is a variable and an offset.
+  #[derive(Debug,Clone,PartialEq)]
+  struct Symbol<'a, 'b>(& 'a Var, & 'b Offset) ;
+  
+  /// An unrolled SExpr.
+  #[derive(Debug,Clone,PartialEq)]
+  struct Unrolled<'a, 'b>(& 'a SExpr, & 'b Offset) ;
+
+  impl Var {
+    pub fn nsvar(s: & str) -> Self { NSVar(s.to_string()) }
+    pub fn svar0(s: & str) -> Self { SVar0(s.to_string()) }
+    pub fn svar1(s: & str) -> Self { SVar1(s.to_string()) }
+    /// Given an offset, a variable can be printed in SMT Lib 2.
+    #[inline(always)]
+    pub fn to_smt2<Writer: Write>(
+      & self, writer: & mut Writer, off: & Offset
+    ) -> SmtRes<()> {
+      match * self {
+        NSVar(ref sym) => write!(writer, "|{}|", sym) ?,
+        /// SVar at 0, we use the index of the current step.
+        SVar0(ref sym) => write!(writer, "|{}@{}|", sym, off.0) ?,
+        /// SVar at 1, we use the index of the next step.
+        SVar1(ref sym) => write!(writer, "|{}@{}|", sym, off.1) ?,
+      }
+      Ok(())
+    }
+    /// Given an offset, a variable can become a Symbol.
+    pub fn to_sym<'a, 'b>(& 'a self, off: & 'b Offset) -> Symbol<'a, 'b> {
+      Symbol(self, off)
+    }
+  }
+  
+  impl Const {
+    /// A constant can be printed in SMT Lib 2.
+    #[inline(always)]
+    pub fn to_smt2<Writer: Write>(
+      & self, writer: & mut Writer
+    ) -> SmtRes<()> {
+      match * self {
+        BConst(b) => write!(writer, "{}", b) ?,
+        IConst(i) => {
+          let neg = i < 0 ;
+          if neg { write!(writer, "(- ") ? }
+          write!(writer, "{}", i.abs()) ? ;
+          if neg { write!(writer, ")") ? }
+        },
+        RConst(num, den) => {
+          let neg = num < 0 ;
+          if neg { write!(writer, "(- ") ? }
+          write!(writer, "(/ {} {})", num, den) ? ;
+          if neg { write!(writer, ")") ? }
+        },
+      }
+      Ok(())
+    }
+  }
+  
+  impl SExpr {
+    pub fn app(sym: & str, args: Vec<SExpr>) -> Self {
+      App(sym.to_string(), args)
+    }
+    /// Given an offset, an S-expression can be printed in SMT Lib 2.
+    pub fn to_smt2<Writer: Write>(
+      & self, writer: & mut Writer, off: & Offset
+    ) -> SmtRes<()> {
+      match * self {
+        Id(ref var) => var.to_smt2(writer, off),
+        Val(ref cst) => cst.to_smt2(writer),
+        App(ref sym, ref args) => {
+          write!(writer, "({}", sym) ? ;
+          for ref arg in args {
+            write!(writer, " ") ? ;
+            arg.to_smt2(writer, off) ?
+          }
+          write!(writer, ")") ? ;
+          Ok(())
+        }
+      }
+    }
+    /// Given an offset, an S-expression can be unrolled.
+    pub fn unroll<'a, 'b>(& 'a self, off: & 'b Offset) -> Unrolled<'a,'b> {
+      Unrolled(self, off)
+    }
+  }
+  use to_smt::* ;
+  /// A symbol can be printed in SMT Lib 2.
+  impl<'a, 'b> Sym2Smt<()> for Symbol<'a,'b> {
+    fn sym_to_smt2<Writer: Write>(
+      & self, writer: & mut Writer, _: & ()
+    ) -> SmtRes<()> {
+      self.0.to_smt2(writer, self.1)
+    }
+  }
+  
+  /// An unrolled SExpr can be printed in SMT Lib 2.
+  impl<'a, 'b> Expr2Smt<()> for Unrolled<'a,'b> {
+    fn expr_to_smt2<Writer: Write>(
+      & self, writer: & mut Writer, _: & ()
+    ) -> SmtRes<()> {
+      self.0.to_smt2(writer, self.1)
+    }
+  }
+  /// Convenience macro.
+  macro_rules! smtry {
+    ($e:expr, failwith $( $msg:expr ),+) => (
+      match $e {
+        Ok(something) => something,
+        Err(e) => panic!( $($msg),+ , e)
+      }
+    ) ;
+  }
+  
+  /// Parser structure.
+  #[derive(Clone, Copy)]
+  struct Parser ;
+  impl<'a> IdentParser< 'a, (Var, Option<usize>), Type, & 'a str > for Parser {
+    fn parse_ident(self, s: & 'a str) -> SmtRes<(Var, Option<usize>)> {
+      if s.len() <= 2 { bail!("not one of my idents...") }
+      let s = & s[ 1 .. (s.len() - 1) ] ; // Removing surrounding pipes.
+      let mut parts = s.split("@") ;
+      let id = if let Some(id) = parts.next() { id.to_string() } else {
+        bail!("nothing between my pipes!")
+      } ;
+      if let Some(index) = parts.next() {
+        use std::str::FromStr ;
+        Ok( (
+          Var::SVar0(id),
+          match usize::from_str(index) {
+            Ok(index) => Some(index),
+            Err(e) => bail!("while parsing the offset in `{}`: {}", s, e)
+          }
+        ) )
+      } else {
+        Ok( (Var::NSVar(id), None) )
+      }
+    }
+    fn parse_type(self, s: & 'a str) -> SmtRes<Type> {
+      match s {
+        "Int" => Ok( Type::Int ),
+        "Bool" => Ok( Type::Bool ),
+        "Real" => Ok( Type::Real ),
+        _ => bail!( format!("unknown type `{}`", s) ),
+      }
+    }
+  }
+
+  use parse::SmtParser ;
+
+  impl<'a, Br> ValueParser< 'a, Const, & 'a mut SmtParser<Br> > for Parser
+  where Br: ::std::io::BufRead {
+    fn parse_value(self, input: & 'a mut SmtParser<Br>) -> SmtRes<Const> {
+      use std::str::FromStr ;
+      if let Some(b) = input.try_bool() ? {
+        Ok( Const::BConst(b) )
+      } else if let Some(int) = input.try_int(
+        |int, pos| match isize::from_str(int) {
+          Ok(int) => if pos { Ok(int) } else { Ok(- int) },
+          Err(e) => Err(e),
+        }
+      ) ? {
+        Ok( Const::IConst(int) )
+      } else if let Some((num, den)) = input.try_rat (
+        |num, den, pos| match (isize::from_str(num), usize::from_str(den)) {
+          (Ok(num), Ok(den)) => if pos {
+            Ok((num, den))
+          } else { Ok((- num, den)) },
+          (Err(e), _) | (_, Err(e)) => Err( format!("{}", e) )
+        }
+      ) ? {
+        Ok( Const::RConst(num, den) )
+      } else {
+        input.fail_with("unexpected value")
+      }
+    }
+  }
+
+  #[test]
+  fn complete() {
+    use * ;
+    use conf::SolverConf ;
+  
+    let conf = SolverConf::z3() ;
+  
+    let mut kid = match Kid::new(conf) {
+      Ok(kid) => kid,
+      Err(e) => panic!("Could not spawn solver kid: {:?}", e)
+    } ;
+  
+    {
+  
+      let mut solver = smtry!(
+        solver(& mut kid, Parser),
+        failwith "could not create solver: {:?}"
+      ) ;
+  
+      let nsv = Var::nsvar("non stateful var") ;
+      let s_nsv = Id(nsv.clone()) ;
+      let sv_0 = Var::svar0("stateful var") ;
+      let s_sv_0 = Id(sv_0.clone()) ;
+      let sv_1 = Var::svar1("also stateful") ;
+      let s_sv_1 = Id(sv_1.clone()) ;
+      let app2 = SExpr::app("not", vec![ s_sv_0.clone() ]) ;
+      let app3 = SExpr::app(
+        ">", vec![ s_sv_1.clone(), Val( Const::IConst(7) ) ]
+      ) ;
+      let app1 = SExpr::app("and", vec![ s_nsv.clone(), app2, app3 ]) ;
+      let offset1 = Offset(0,1) ;
+  
+      let sym = nsv.to_sym(& offset1) ;
+      smtry!(
+        solver.declare_fun(& sym, &[] as & [& str], & "Bool", & ()),
+        failwith "declaration failed: {:?}"
+      ) ;
+  
+      let sym = sv_0.to_sym(& offset1) ;
+      smtry!(
+        solver.declare_const(& sym, & "Bool", & ()),
+        failwith "declaration failed: {:?}"
+      ) ;
+  
+      let sym = sv_1.to_sym(& offset1) ;
+      smtry!(
+        solver.declare_const(& sym, & "Int", & ()),
+        failwith "declaration failed: {:?}"
+      ) ;
+  
+      let expr = app1.unroll(& offset1) ;
+      smtry!(
+        solver.assert(& expr, & ()),
+        failwith "assert failed: {:?}"
+      ) ;
+  
+      if ! smtry!(
+        solver.check_sat(),
+        failwith "error in checksat: {:?}"
+      ) {
+        panic!("expected sat, got unsat")
+      }
+  
+      let model = smtry!(
+        solver.get_model(),
+        failwith "while getting model: {:?}"
+      ) ;
+  
+      for ((var, off), _, typ, val) in model {
+        if var.sym() == "stateful var" {
+          assert_eq!(off, Some(0)) ;
+          assert_eq!(typ, Type::Bool) ;
+          assert_eq!(val, Const::BConst(false))
+        } else if var.sym() == "also stateful" {
+          assert_eq!(off, Some(1)) ;
+          assert_eq!(typ, Type::Int) ;
+          if let Const::IConst(val) = val {
+            assert!( val > 7 )
+          } else {
+            panic!("expected variable, got {:?}", val)
+          }
+        } else if var.sym() == "non stateful var" {
+          assert_eq!(off, None) ;
+          assert_eq!(typ, Type::Bool) ;
+          assert_eq!(val, Const::BConst(true))
+        }
+      }
+    }
+  
+    smtry!(
+      kid.kill(),
+      failwith "error while killing solver: {:?}"
+    ) ;
+  }
+}
