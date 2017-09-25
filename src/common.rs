@@ -139,10 +139,7 @@ fn logic() {
 
   let conf = SolverConf::z3() ;
 
-  let mut kid = match Kid::new(conf) {
-    Ok(kid) => kid,
-    Err(e) => panic!("Could not spawn solver kid: {:?}", e)
-  } ;
+  let mut kid = Kid::new(conf).expect("kid") ;
 
   let mut solver = solver(& mut kid, ()).expect("solver") ;
 

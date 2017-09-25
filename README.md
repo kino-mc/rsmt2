@@ -2,7 +2,7 @@
 
 | linux | windows |     |     |
 |:-----:|:-------:|:---:|:---:|
-| [![Build Status](https://travis-ci.org/kino-mc/rsmt2.svg?branch=master)](https://travis-ci.org/kino-mc/rsmt2) | [![Build status](https://ci.appveyor.com/api/projects/status/db247pe2jp9uo9cs?svg=true)](https://ci.appveyor.com/project/AdrienChampion/rsmt2) | [![Latest Version](https://img.shields.io/crates/v/rsmt2.svg)](https://crates.io/crates/rsmt2) | [![Coverage Status](https://coveralls.io/repos/github/kino-mc/rsmt2/badge.svg?branch=master)](https://coveralls.io/github/kino-mc/rsmt2?branch=master) |
+| [![Build Status](https://travis-ci.org/kino-mc/rsmt2.svg?branch=master)](https://travis-ci.org/kino-mc/rsmt2) | [![Build status](https://ci.appveyor.com/api/projects/status/db247pe2jp9uo9cs?svg=true)](https://ci.appveyor.com/project/AdrienChampion/rsmt2) | [![Latest Version](https://img.shields.io/crates/v/rsmt2.svg)](https://crates.io/crates/rsmt2) | [![codecov](https://codecov.io/gh/kino-mc/rsmt2/branch/master/graph/badge.svg)](https://codecov.io/gh/kino-mc/rsmt2) |
 
 A generic library to interact with SMT-LIB 2 compliant solvers running in a separate system process, such as Z3 and CVC4.
 
