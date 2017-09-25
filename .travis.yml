@@ -35,6 +35,7 @@ before_script:
     fi
 
 script:
-  - wget -O ~/.cargo/bin/cargo-make https://bintray.com/sagiegurari/cargo-make/download_file?file_path=cargo-make_v0.5.2
-  - chmod 777 ~/.cargo/bin/cargo-make
-  - cargo-make make ci-flow
+  - |
+      cargo install cargo-travis &&
+      export PATH=$HOME/.cargo/bin:$PATH &&
+      cargo-make make ci-flow
