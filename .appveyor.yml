@@ -6,12 +6,12 @@ environment:
 install:
   - curl -sSf -o rustup-init.exe https://win.rustup.rs/
   - rustup-init.exe -y --default-host %TARGET%
+  - set PATH=%PATH%;C:\Users\appveyor\.cargo\bin;C:\Users\appveyor\
   - rustc -vV
   - cargo -vV
-  - curl -LsSf -o z3.zip https://github.com/Z3Prover/z3/releases/download/z3-4.5.0/z3-4.5.0-x64-win.zip
+  - curl -LsSf -o z3.zip https://github.com/Z3Prover/z3/releases/download/z3-4.5.0/z3-4.5.0-x64-win.zipaddons
   - unzip z3.zip
   - mv z3-4.5.0-x64-win/bin/z3.exe C:\Users\appveyor\z3
-  - set PATH=%PATH%;C:\Users\appveyor\.cargo\bin;C:\Users\appveyor\
 build: false
 test_script:
   - cargo build --verbose
