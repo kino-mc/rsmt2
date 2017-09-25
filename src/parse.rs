@@ -899,8 +899,7 @@ impl<R: BufRead> SmtParser<R> {
 /// For more information refer to the [module-level documentation].
 ///
 /// [module-level documentation]: index.html
-pub trait IdentParser<'a, Ident, Type, Input>: Copy
-where Input: ?Sized {
+pub trait IdentParser<'a, Ident, Type, Input>: Copy {
   fn parse_ident(self, Input) -> Res<Ident> ;
   fn parse_type(self, Input) -> Res<Type> ;
 }
@@ -931,8 +930,7 @@ T: IdentParser<'a, Ident, Type, & 'a str>, Br: BufRead {
 /// For more information refer to the [module-level documentation].
 ///
 /// [module-level documentation]: index.html
-pub trait ValueParser<'a, Value, Input>: Copy
-where Input: ?Sized {
+pub trait ValueParser<'a, Value, Input>: Copy {
   fn parse_value(self, Input) -> Res<Value> ;
 }
 impl<'a, Value, T> ValueParser<'a, Value, & 'a str> for T
@@ -955,8 +953,7 @@ T: ValueParser<'a, Value, & 'a str>, Br: BufRead {
 /// For more information refer to the [module-level documentation].
 ///
 /// [module-level documentation]: index.html
-pub trait ExprParser<'a, Expr, Info, Input>: Copy
-where Input: ?Sized {
+pub trait ExprParser<'a, Expr, Info, Input>: Copy {
   fn parse_expr(self, Input, Info) -> Res<Expr> ;
 }
 impl<'a, Expr, Info, T> ExprParser<'a, Expr, Info, & 'a str> for T
@@ -981,8 +978,7 @@ where T: ExprParser<'a, Expr, Info, & 'a str>, Br: BufRead {
 /// For more information refer to the [module-level documentation].
 ///
 /// [module-level documentation]: index.html
-pub trait ProofParser<'a, Proof, Input>: Copy
-where Input: ?Sized {
+pub trait ProofParser<'a, Proof, Input>: Copy {
   fn parse_proof(self, Input) -> Res<Proof> ;
 }
 impl<'a, Proof, T> ProofParser<'a, Proof, & 'a str> for T
