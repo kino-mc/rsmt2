@@ -8,7 +8,7 @@ rust:
   - stable
   - beta
 
-sudo: true
+sudo: false
 
 addons:
   apt:
