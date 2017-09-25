@@ -2,13 +2,13 @@ language: rust
 
 os:
   - linux
-  # - osx
+  - osx
 
 rust:
   - stable
   - beta
 
-sudo: false
+sudo: required
 
 addons:
   apt:
