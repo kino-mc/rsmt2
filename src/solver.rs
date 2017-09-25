@@ -72,6 +72,7 @@ pub struct Kid {
 impl Kid {
   /// Creates a new solver kid.
   pub fn new(conf: SolverConf) -> SmtRes<Self> {
+    let cmd = conf.get_cmd().to_string() ;
     // Constructing command and spawning kid.
     Command::new(
       // Command.
@@ -91,7 +92,7 @@ impl Kid {
         conf: conf,
       }
     ).chain_err::<_, ErrorKind>(
-      || "while spawning child process".into()
+      || format!("while spawning child process with {}", cmd).into()
     )
   }
   /// Kills the solver kid.
