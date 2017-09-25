@@ -22,6 +22,10 @@ addons:
       - binutils-dev
       - libiberty-dev
 
+env:
+  global:
+  - RUSTFLAGS="-C link-dead-code"
+
 before_script:
 - |
   mkdir -p $HOME/.local/bin &&
@@ -41,5 +45,21 @@ before_script:
   fi
 
 script:
+  - travis-cargo build
   - travis-cargo build -- --release
   - travis-cargo test
+
+after_success: |
+  wget https://github.com/kino-mc/rsmt2/archive/master.tar.gz &&
+  tar xzf master.tar.gz &&
+  cd kcov-master &&
+  mkdir build &&
+  cd build &&
+  cmake .. &&
+  make &&
+  make install DESTDIR=../../kcov-build &&
+  cd ../.. &&
+  rm -rf kcov-master &&
+  for file in target/debug/examplerust-*[^\.d]; do mkdir -p "target/cov/$(basename $file)"; ./kcov-build/usr/local/bin/kcov --exclude-pattern=/.cargo,/usr/lib --verify "target/cov/$(basename $file)" "$file"; done &&
+  bash <(curl -s https://codecov.io/bash) &&
+  echo "Uploaded code coverage"
