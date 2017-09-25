@@ -673,7 +673,7 @@ fn main() {
       failwith "could not create solver: {:?}"
     ) ;
 
-    let nsv = Var::nsvar("non stateful var") ;
+    let nsv = Var::nsvar("non-stateful var") ;
     let s_nsv = Id(nsv.clone()) ;
     let sv_0 = Var::svar0("stateful var") ;
     let s_sv_0 = Id(sv_0.clone()) ;
@@ -990,7 +990,7 @@ fn main() {
       failwith "could not create solver: {:?}"
     ) ;
 
-    let nsv = Var::nsvar("non stateful var") ;
+    let nsv = Var::nsvar("non-stateful var") ;
     let s_nsv = Id(nsv.clone()) ;
     let sv_0 = Var::svar0("stateful var") ;
     let s_sv_0 = Id(sv_0.clone()) ;
@@ -1033,7 +1033,7 @@ fn main() {
         assert_eq!(off, Some(0)) ;
         assert_eq!(typ, Type::Bool) ;
         assert_eq!(val, Const::BConst(false))
-      } else if var.sym() == "non stateful var" {
+      } else if var.sym() == "non-stateful var" {
         assert_eq!(off, None) ;
         assert_eq!(typ, Type::Bool) ;
         assert_eq!(val, Const::BConst(true))
@@ -1309,7 +1309,7 @@ where Br: ::std::io::BufRead {
 #       failwith "could not create solver: {:?}"
 #     ) ;
 # 
-#     let nsv = Var::nsvar("non stateful var") ;
+#     let nsv = Var::nsvar("non-stateful var") ;
 #     let s_nsv = Id(nsv.clone()) ;
 #     let sv_0 = Var::svar0("stateful var") ;
 #     let s_sv_0 = Id(sv_0.clone()) ;
@@ -1352,7 +1352,7 @@ where Br: ::std::io::BufRead {
 #         assert_eq!(off, Some(0)) ;
 #         assert_eq!(typ, Type::Bool) ;
 #         assert_eq!(val, Const::BConst(false))
-#       } else if var.sym() == "non stateful var" {
+#       } else if var.sym() == "non-stateful var" {
 #         assert_eq!(off, None) ;
 #         assert_eq!(typ, Type::Bool) ;
 #         assert_eq!(val, Const::BConst(true))
@@ -1685,7 +1685,34 @@ mod top {
   }
 
   #[test]
-  fn complete() {
+  fn declare_non_nullary_fun() {
+    use * ;
+    use conf::SolverConf ;
+  
+    let conf = SolverConf::z3() ;
+  
+    let mut kid = match Kid::new(conf) {
+      Ok(kid) => kid,
+      Err(e) => panic!("Could not spawn solver kid: {:?}", e)
+    } ;
+  
+    {
+  
+      let mut solver = smtry!(
+        solver(& mut kid, Parser),
+        failwith "could not create solver: {:?}"
+      ) ;
+
+      smtry!(
+        solver.declare_fun(
+          "my_fun", & [ "Int", "Real", "Bool" ], "Real", & ()
+        ), failwith "during function declaration: {:?}"
+      )
+    }
+  }
+
+  #[test]
+  fn complete_1() {
     use * ;
     use conf::SolverConf ;
   
@@ -1703,22 +1730,36 @@ mod top {
         failwith "could not create solver: {:?}"
       ) ;
   
-      let nsv = Var::nsvar("non stateful var") ;
-      let s_nsv = Id(nsv.clone()) ;
+      let nsv_0 = Var::nsvar("non-stateful var") ;
+      let s_nsv_0 = Id(nsv_0.clone()) ;
+      let nsv_1 = Var::nsvar("also non-stateful") ;
+      let s_nsv_1 = Id(nsv_1.clone()) ;
       let sv_0 = Var::svar0("stateful var") ;
       let s_sv_0 = Id(sv_0.clone()) ;
       let sv_1 = Var::svar1("also stateful") ;
       let s_sv_1 = Id(sv_1.clone()) ;
-      let app2 = SExpr::app("not", vec![ s_sv_0.clone() ]) ;
-      let app3 = SExpr::app(
+      let app1 = SExpr::app("not", vec![ s_sv_0.clone() ]) ;
+      let app2 = SExpr::app(
         ">", vec![ s_sv_1.clone(), Val( Const::IConst(7) ) ]
       ) ;
-      let app1 = SExpr::app("and", vec![ s_nsv.clone(), app2, app3 ]) ;
+      let app3 = SExpr::app(
+        "=", vec![
+          Val( Const::RConst(- 7, 3) ),
+          SExpr::app("+", vec![ s_nsv_1.clone(), Val(Const::RConst(2, 1)) ])
+        ]
+      ) ;
+      let app = SExpr::app("and", vec![ s_nsv_0.clone(), app1, app2, app3 ]) ;
       let offset1 = Offset(0,1) ;
   
-      let sym = nsv.to_sym(& offset1) ;
+      let sym = nsv_0.to_sym(& offset1) ;
       smtry!(
-        solver.declare_fun(& sym, &[] as & [& str], & "Bool", & ()),
+        solver.declare_const(& sym, & "Bool", & ()),
+        failwith "declaration failed: {:?}"
+      ) ;
+  
+      let sym = nsv_1.to_sym(& offset1) ;
+      smtry!(
+        solver.declare_const(& sym, & "Real", & ()),
         failwith "declaration failed: {:?}"
       ) ;
   
@@ -1734,18 +1775,18 @@ mod top {
         failwith "declaration failed: {:?}"
       ) ;
   
-      let expr = app1.unroll(& offset1) ;
+      let expr = app.unroll(& offset1) ;
       smtry!(
         solver.assert(& expr, & ()),
         failwith "assert failed: {:?}"
       ) ;
   
-      if ! smtry!(
-        solver.check_sat(),
-        failwith "error in checksat: {:?}"
-      ) {
-        panic!("expected sat, got unsat")
-      }
+      assert!(
+        smtry!(
+          solver.check_sat(),
+          failwith "error in checksat: {:?}"
+        )
+      ) ;
   
       let model = smtry!(
         solver.get_model(),
@@ -1765,17 +1806,22 @@ mod top {
           } else {
             panic!("expected variable, got {:?}", val)
           }
-        } else if var.sym() == "non stateful var" {
+        } else if var.sym() == "non-stateful var" {
           assert_eq!(off, None) ;
           assert_eq!(typ, Type::Bool) ;
           assert_eq!(val, Const::BConst(true))
+        } else if var.sym() == "also non-stateful" {
+          assert_eq!(off, None) ;
+          assert_eq!(typ, Type::Real) ;
+          if let Const::RConst(num, den) = val {
+            assert_eq!( num * 3 + (2 * 3 * den as isize), (7 * den as isize) )
+          } else {
+            panic!("expected variable, got {:?}", val)
+          }
         }
       }
     }
   
-    smtry!(
-      kid.kill(),
-      failwith "error while killing solver: {:?}"
-    ) ;
+    kid.kill().expect("kill") ;
   }
 }

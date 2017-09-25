@@ -512,7 +512,7 @@ pub trait Solver<
   /// Declares a new function symbol.
   #[inline]
   fn declare_fun<
-    'a, FunSym, ArgSort, Args: ?Sized, I, OutSort
+    'a, FunSym: ?Sized, ArgSort: ?Sized, Args: ?Sized, I, OutSort: ?Sized
   > (
     & mut self, symbol: & FunSym, args: & 'a Args, out: & OutSort, info: & I
   ) -> SmtRes<()>

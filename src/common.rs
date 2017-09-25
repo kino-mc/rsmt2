@@ -58,6 +58,28 @@ impl<'a> Sort2Smt for & 'a str {
   }
 }
 
+impl<T> Sym2Smt<T> for str {
+  fn sym_to_smt2<Writer>(
+    & self, writer: & mut Writer, _: & T
+  ) -> SmtRes<()> where Writer: io::Write {
+    write_str(writer, self)
+  }
+}
+impl<T> Expr2Smt<T> for str {
+  fn expr_to_smt2<Writer>(
+    & self, writer: & mut Writer, _: & T
+  ) -> SmtRes<()> where Writer: io::Write {
+    write_str(writer, self)
+  }
+}
+impl Sort2Smt for str {
+  fn sort_to_smt2<Writer>(
+    & self, writer: & mut Writer
+  ) -> SmtRes<()> where Writer: io::Write {
+    write_str(writer, self)
+  }
+}
+
 impl<T> Sym2Smt<T>  for String {
   fn sym_to_smt2<Writer>(
     & self, writer: & mut Writer, _: & T

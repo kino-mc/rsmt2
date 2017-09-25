@@ -2,7 +2,7 @@ language: rust
 
 os:
   - linux
-  - osx
+  # - osx
 
 rust:
   - stable
@@ -22,16 +22,13 @@ addons:
       - binutils-dev
       - libiberty-dev
 
-env:
-  global:
-  - RUSTFLAGS="-C link-dead-code"
-
 before_script:
 - |
-  mkdir -p $HOME/.local/bin &&
-  export PATH=$HOME/.local/bin:$PATH
+  mkdir -p $HOME/.local/bin
 - |
-  pip install 'travis-cargo<0.2' --user
+  pip install 'travis-cargo<0.2' --user &&
+  export PATH=$HOME/.local/bin:$PATH &&
+  travis-cargo -h
 - |
   if [ "$TRAVIS_OS_NAME" == "linux" ] ; then
     wget https://github.com/Z3Prover/z3/releases/download/z3-4.5.0/z3-4.5.0-x64-ubuntu-14.04.zip &&
@@ -62,7 +59,7 @@ after_success:
   cd ../.. &&
   rm -rf kcov-master &&
   cargo clean &&
-  cargo test --no-run &&
+  RUSTFLAGS="-C link-dead-code" cargo test --no-run &&
   for file in target/debug/rsmt2-*[^\(\.d\)]; do mkdir -p "target/cov/$(basename $file)"; ./kcov-build/usr/local/bin/kcov --exclude-pattern=/.cargo,/usr/lib --verify "target/cov/$(basename $file)" "$file"; done &&
   bash <(curl -s https://codecov.io/bash) &&
   echo "Uploaded code coverage"

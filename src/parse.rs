@@ -111,6 +111,16 @@ use std::io::{ BufRead, BufReader } ;
 
 
 
+/// Tries a user parser.
+macro_rules! try_apply {
+  ($e:expr => |$res:pat| $do:expr, $msg:expr) => (
+    match $e {
+      Ok($res) => $do,
+      Err(e) => bail!("{}: {}", $msg, e)
+    }
+  ) ;
+}
+
 
 /// SMT-LIB 2.0 parser.
 pub struct SmtParser<R: BufRead> {
@@ -734,10 +744,10 @@ impl<R: BufRead> SmtParser<R> {
     if let Some((start, end)) = self.try_uint_indices() ? {
       self.cursor = end ;
       let uint = & self.buff[start .. end] ;
-      match f(uint, true) {
-        Ok(int) => res = Some(int),
-        Err(e) => bail!("error parsing integer `{}`: {}", uint, e),
-      }
+      try_apply!(
+        f(uint, true) => |int| res = Some(int),
+        format!("error parsing integer `{}`", uint)
+      )
     } else if self.try_tag("(") ? {
       let pos = if self.try_tag("-") ? {
         false
@@ -781,11 +791,11 @@ impl<R: BufRead> SmtParser<R> {
   /// Only recognizes integers of the form
   ///
   /// ```bash
-  /// rat   ::= '(' '/' usize usize ')'
-  ///         | '(' '-' '(' '/' usize usize ')' ')'
-  ///         | int
-  /// int   ::= usize
-  ///         | '(' '-' usize ')'
+  /// rat   ::= '(' '/' udec udec ')'
+  ///         | '(' '-' '(' '/' udec udec ')' ')'
+  ///         | idec
+  /// idec  ::= '(' '-' udec ')' | udec
+  /// udec  ::= usize | usize.0
   /// usize ::= [0-9][0-9]*
   /// ```
   ///
@@ -830,54 +840,88 @@ impl<R: BufRead> SmtParser<R> {
   /// ```
   pub fn try_rat<F, T, Err>(& mut self, f: F) -> SmtRes<Option<T>>
   where F: Fn(& str, & str, bool) -> Result<T, Err>, Err: ::std::fmt::Display {
+    let err = "error parsing rational" ;
     self.load_sexpr() ? ;
 
-    if let Some(res) = self.try_int(
-      |num, pos| f(num, "1", pos)
-    ) ? {
-      return Ok( Some(res) )
+    let mut res = None ;
+
+    let pos = if self.try_tags( & [ "(", "-" ] ) ? {
+      self.spc_cmt() ;
+      false
+    } else {
+      true
+    } ;
+
+    if let Some((fst_start, fst_end)) = self.try_uint_indices() ? {
+      if fst_end + 1 < self.buff.len()
+      && & self.buff[ fst_end .. (fst_end + 2) ] == ".0" {
+        self.cursor = fst_end + 2
+      } else if fst_end < self.buff.len()
+      && & self.buff[ fst_end .. (fst_end + 1) ] == "." {
+        self.cursor = fst_end + 1
+      } else {
+        self.cursor = fst_end
+      }
+      try_apply!(
+        f(
+          & self.buff[fst_start..fst_end], "1", pos
+        ) => |okay| res = Some(okay), err
+      )
     }
     self.mark() ;
 
-    if ! self.try_tag("(") ? {
-      self.backtrack() ;
-      return Ok(None)
-    }
-    
-    let negated = if self.try_tag("-") ? {
+    if res.is_none() {
+
       if ! self.try_tag("(") ? {
         self.backtrack() ;
         return Ok(None)
-      } else {
-        true
       }
-    } else { false } ;
 
-    if ! self.try_tag("/") ? {
-      self.backtrack() ;
-      return Ok(None)
+      if ! self.try_tag("/") ? {
+        self.backtrack() ;
+        return Ok(None)
+      }
+
+      self.spc_cmt() ;
+      res = if let Some((num_start, num_end)) = self.try_uint_indices() ? {
+        if num_end + 1 < self.buff.len()
+        && & self.buff[ num_end .. (num_end + 2) ] == ".0" {
+          self.cursor = num_end + 2
+        } else if num_end < self.buff.len()
+        && & self.buff[ num_end .. (num_end + 1) ] == "." {
+          self.cursor = num_end + 1
+        } else {
+          self.cursor = num_end
+        }
+        self.spc_cmt() ;
+        if let Some((den_start, den_end)) = self.try_uint_indices() ? {
+          if den_end + 1 < self.buff.len()
+          && & self.buff[ den_end .. (den_end + 2) ] == ".0" {
+            self.cursor = den_end + 2
+          } else if den_end < self.buff.len()
+          && & self.buff[ den_end .. (den_end + 1) ] == "." {
+            self.cursor = den_end + 1
+          } else {
+            self.cursor = den_end
+          }
+          match f(
+            & self.buff[num_start .. num_end],
+            & self.buff[den_start .. den_end],
+            pos
+          ) {
+            Ok(res) => Some(res),
+            Err(e) => bail!("error parsing rational: {}", e),
+          }
+        } else { None }
+      } else { None } ;
+
+      if res.is_some() {
+        self.tag(")") ?
+      }
     }
 
-    self.spc_cmt() ;
-    let res = if let Some((num_start, num_end)) = self.try_uint_indices() ? {
-      self.cursor = num_end ;
-      self.spc_cmt() ;
-      if let Some((den_start, den_end)) = self.try_uint_indices() ? {
-        self.cursor = den_end ;
-        match f(
-          & self.buff[num_start .. num_end],
-          & self.buff[den_start .. den_end],
-          ! negated
-        ) {
-          Ok(res) => Some(res),
-          Err(e) => bail!("error parsing rational: {}", e),
-        }
-      } else { None }
-    } else { None } ;
-
     if res.is_some() {
-      self.tag(")") ? ;
-      if negated { self.tag(")") ? }
+      if ! pos { self.tag(")") ? }
       self.clear_mark() ;
       Ok(res)
     } else {
