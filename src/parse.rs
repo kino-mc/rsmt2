@@ -649,7 +649,6 @@ impl<R: BufRead> SmtParser<R> {
   fn try_uint_indices(& self) -> SmtRes< Option<(usize, usize)> > {
     let mut end = self.cursor ;
     for c in self.buff[ self.cursor .. ].chars() {
-      println!("'{}' {}", c, end) ;
       if c.is_numeric() {
         end += 1
       } else {
@@ -667,7 +666,6 @@ impl<R: BufRead> SmtParser<R> {
     self.spc_cmt() ;
     if let Some((start, end)) = self.try_uint_indices() ? {
       self.cursor = end ;
-      println!("`{}` {}, {}", & self.buff[ start .. end ], start, end) ;
       Ok( Some( & self.buff[ start .. end ] ) )
     } else {
       Ok(None)
