@@ -646,6 +646,7 @@ impl<R: BufRead> SmtParser<R> {
 
   /// Tries to parse an unsigned integer. Does **not** load, backtrack, or
   /// mark. Returns start and end positions.
+  #[inline]
   fn try_uint_indices(& self) -> SmtRes< Option<(usize, usize)> > {
     let mut end = self.cursor ;
     for c in self.buff[ self.cursor .. ].chars() {
@@ -662,6 +663,7 @@ impl<R: BufRead> SmtParser<R> {
 
   /// Tries to parse an unsigned integer. Does **not** load, backtrack, or
   /// mark, but moves the cursor to the end of the integer if any.
+  #[inline]
   fn try_uint(& mut self) -> SmtRes< Option<& str> > {
     self.spc_cmt() ;
     if let Some((start, end)) = self.try_uint_indices() ? {
@@ -729,11 +731,18 @@ impl<R: BufRead> SmtParser<R> {
     self.load_sexpr() ? ;
     self.mark() ;
     let mut res = None ;
-    if self.try_tag("(") ? {
-      let pos = if self.try_tag("+") ? {
-        true
-      } else if self.try_tag("-") ? {
+    if let Some((start, end)) = self.try_uint_indices() ? {
+      self.cursor = end ;
+      let uint = & self.buff[start .. end] ;
+      match f(uint, true) {
+        Ok(int) => res = Some(int),
+        Err(e) => bail!("error parsing integer `{}`: {}", uint, e),
+      }
+    } else if self.try_tag("(") ? {
+      let pos = if self.try_tag("-") ? {
         false
+      } else if self.try_tag("+") ? {
+        true
       } else {
         self.backtrack() ;
         return Ok(None)
@@ -754,13 +763,6 @@ impl<R: BufRead> SmtParser<R> {
       } else {
         self.backtrack() ;
         return Ok(None)
-      }
-    } else {
-      if let Some(uint) = self.try_uint() ? {
-        match f(uint, true) {
-          Ok(int) => res = Some(int),
-          Err(e) => bail!("error parsing integer `{}`: {}", uint, e),
-        }
       }
     }
     if res.is_none() { self.backtrack() } else { self.clear_mark() }
@@ -929,9 +931,9 @@ impl<R: BufRead> SmtParser<R> {
     let end = self.load_sexpr() ? ;
     let is_sym = if let Some(c) = self.buff[ self.cursor .. ].chars().next() {
       match c {
+        _ if c.is_alphabetic() => true,
         '|' | '~' | '!' | '@' | '$' | '%' | '^' | '&' | '*' | '_' | '-' | '+' |
         '=' | '<' | '>' | '.' | '?' => true,
-        _ if c.is_alphabetic() => true,
         _ => false,
       }
     } else {
