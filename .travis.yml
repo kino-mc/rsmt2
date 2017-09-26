@@ -10,6 +10,12 @@ rust:
 
 sudo: false
 
+env:
+  global:
+  - RUSTFLAGS="-C link-dead-code"
+
+cache: cargo
+
 addons:
   apt:
     packages:
@@ -40,9 +46,9 @@ before_script:
   fi
 
 script:
-  - cargo build
-  - cargo build -- --release
-  - cargo test
+  - cargo build --verbose
+  - cargo build --verbose --release
+  - cargo test --verbose
 
 after_success:
 - |
