@@ -2,7 +2,7 @@ language: rust
 
 os:
   - linux
-  # - osx
+  - osx
 
 rust:
   - stable
@@ -25,14 +25,13 @@ addons:
 before_script:
 - |
   mkdir -p $HOME/.local/bin &&
-  pip install 'travis-cargo<0.2' --user &&
-  export PATH=$HOME/.local/bin:$PATH &&
-  travis-cargo -h
+  export PATH=$HOME/.local/bin:$PATH
 - |
   if [ "$TRAVIS_OS_NAME" == "linux" ] ; then
     wget https://github.com/Z3Prover/z3/releases/download/z3-4.5.0/z3-4.5.0-x64-ubuntu-14.04.zip &&
     unzip z3-4.5.0-x64-ubuntu-14.04.zip &&
-    mv z3-4.5.0-x64-ubuntu-14.04/bin/z3 $HOME/.local/bin/.
+    mv z3-4.5.0-x64-ubuntu-14.04/bin/z3 $HOME/.local/bin/. &&
+    z3 -h
   elif [ "$TRAVIS_OS_NAME" == "osx" ] ; then
     wget https://github.com/Z3Prover/z3/releases/download/z3-4.5.0/z3-4.5.0-x64-osx-10.11.6.zip &&
     unzip z3-4.5.0-x64-osx-10.11.6.zip &&
@@ -41,9 +40,9 @@ before_script:
   fi
 
 script:
-  - travis-cargo build
-  - travis-cargo build -- --release
-  - travis-cargo test
+  - cargo build
+  - cargo build -- --release
+  - cargo test
 
 after_success:
 - |
