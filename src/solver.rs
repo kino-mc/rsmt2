@@ -92,9 +92,14 @@ impl Kid {
     if let Some(stdin) = self.kid.stdin.as_mut() {
       let _ = writeln!(stdin, "(exit)\n") ;
     }
-    self.kid.kill().chain_err::<_, ErrorKind>(
-      || "while killing child process".into()
-    )
+    if let None = self.kid.try_wait().chain_err(
+      || "waiting for child process to exit"
+    ) ? {
+      self.kid.kill().chain_err::<_, ErrorKind>(
+        || "while killing child process".into()
+      ) ?
+    }
+    Ok(())
   }
 }
 
