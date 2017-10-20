@@ -9,14 +9,14 @@ use errors::* ;
 /// A symbol printable in the SMT Lib 2 standard given some info.
 pub trait Sym2Smt<Info> {
   /// Prints a symbol to a writer given some info.
-  fn sym_to_smt2<Writer>(& self, & mut Writer, & Info) -> SmtRes<()>
+  fn sym_to_smt2<Writer>(& self, & mut Writer, Info) -> SmtRes<()>
   where Writer: io::Write ;
 }
 
 /// An expression printable in the SMT Lib 2 standard given some info.
 pub trait Expr2Smt<Info> {
   /// Prints an expression to a writer given some info.
-  fn expr_to_smt2<Writer>(& self, & mut Writer, & Info) -> SmtRes<()>
+  fn expr_to_smt2<Writer>(& self, & mut Writer, Info) -> SmtRes<()>
   where Writer: io::Write ;
 }
 
@@ -36,16 +36,16 @@ pub fn write_str(
   Ok(())
 }
 
-impl<'a, T> Sym2Smt<T> for & 'a str {
+impl<'a> Sym2Smt<()> for & 'a str {
   fn sym_to_smt2<Writer>(
-    & self, writer: & mut Writer, _: & T
+    & self, writer: & mut Writer, _: ()
   ) -> SmtRes<()> where Writer: io::Write {
     write_str(writer, self)
   }
 }
-impl<'a, T> Expr2Smt<T> for & 'a str {
+impl<'a> Expr2Smt<()> for & 'a str {
   fn expr_to_smt2<Writer>(
-    & self, writer: & mut Writer, _: & T
+    & self, writer: & mut Writer, _: ()
   ) -> SmtRes<()> where Writer: io::Write {
     write_str(writer, self)
   }
@@ -58,16 +58,16 @@ impl<'a> Sort2Smt for & 'a str {
   }
 }
 
-impl<T> Sym2Smt<T> for str {
+impl Sym2Smt<()> for str {
   fn sym_to_smt2<Writer>(
-    & self, writer: & mut Writer, _: & T
+    & self, writer: & mut Writer, _: ()
   ) -> SmtRes<()> where Writer: io::Write {
     write_str(writer, self)
   }
 }
-impl<T> Expr2Smt<T> for str {
+impl Expr2Smt<()> for str {
   fn expr_to_smt2<Writer>(
-    & self, writer: & mut Writer, _: & T
+    & self, writer: & mut Writer, _: ()
   ) -> SmtRes<()> where Writer: io::Write {
     write_str(writer, self)
   }
@@ -80,16 +80,16 @@ impl Sort2Smt for str {
   }
 }
 
-impl<T> Sym2Smt<T>  for String {
+impl Sym2Smt<()> for String {
   fn sym_to_smt2<Writer>(
-    & self, writer: & mut Writer, _: & T
+    & self, writer: & mut Writer, _: ()
   ) -> SmtRes<()> where Writer: io::Write {
     write_str(writer, self)
   }
 }
-impl<T> Expr2Smt<T> for String {
+impl Expr2Smt<()> for String {
   fn expr_to_smt2<Writer>(
-    & self, writer: & mut Writer, _: & T
+    & self, writer: & mut Writer, _: ()
   ) -> SmtRes<()> where Writer: io::Write {
     write_str(writer, self)
   }

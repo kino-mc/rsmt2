@@ -455,7 +455,7 @@ use rsmt2::to_smt::{ Sym2Smt, Expr2Smt } ;
 /// A symbol can be printed in SMT Lib 2.
 impl<'a, 'b> Sym2Smt<()> for Symbol<'a,'b> {
   fn sym_to_smt2<Writer: Write>(
-    & self, writer: & mut Writer, _: & ()
+    & self, writer: & mut Writer, _: ()
   ) -> SmtRes<()> {
     self.0.to_smt2(writer, self.1)
   }
@@ -464,7 +464,7 @@ impl<'a, 'b> Sym2Smt<()> for Symbol<'a,'b> {
 /// An unrolled SExpr can be printed in SMT Lib 2.
 impl<'a, 'b> Expr2Smt<()> for Unrolled<'a,'b> {
   fn expr_to_smt2<Writer: Write>(
-    & self, writer: & mut Writer, _: & ()
+    & self, writer: & mut Writer, _: ()
   ) -> SmtRes<()> {
     self.0.to_smt2(writer, self.1)
   }
@@ -630,7 +630,7 @@ the case of [`check_sat`](trait.Solver.html#method.check_sat) for example.
 # /// A symbol can be printed in SMT Lib 2.
 # impl<'a, 'b> Sym2Smt<()> for Symbol<'a,'b> {
 #   fn sym_to_smt2<Writer: Write>(
-#     & self, writer: & mut Writer, _: & ()
+#     & self, writer: & mut Writer, _: ()
 #   ) -> SmtRes<()> {
 #     self.0.to_smt2(writer, self.1)
 #   }
@@ -639,7 +639,7 @@ the case of [`check_sat`](trait.Solver.html#method.check_sat) for example.
 # /// An unrolled SExpr can be printed in SMT Lib 2.
 # impl<'a, 'b> Expr2Smt<()> for Unrolled<'a,'b> {
 #   fn expr_to_smt2<Writer: Write>(
-#     & self, writer: & mut Writer, _: & ()
+#     & self, writer: & mut Writer, _: ()
 #   ) -> SmtRes<()> {
 #     self.0.to_smt2(writer, self.1)
 #   }
@@ -683,19 +683,19 @@ fn main() {
 
     let sym = nsv.to_sym(& offset1) ;
     smtry!(
-      solver.declare_fun(& sym, &[] as & [& str], & "Bool", & ()),
+      solver.declare_fun(& sym, &[] as & [& str], & "Bool", ()),
       failwith "declaration failed: {:?}"
     ) ;
 
     let sym = sv_0.to_sym(& offset1) ;
     smtry!(
-      solver.declare_fun(& sym, &[] as & [& str], & "Bool", & ()),
+      solver.declare_fun(& sym, &[] as & [& str], & "Bool", ()),
       failwith "declaration failed: {:?}"
     ) ;
 
     let expr = app1.unroll(& offset1) ;
     smtry!(
-      solver.assert(& expr, & ()),
+      solver.assert(& expr, ()),
       failwith "assert failed: {:?}"
     ) ;
 
@@ -876,7 +876,7 @@ our `IdentParser` returns `(Var, Option<usize>)`.
 # /// A symbol can be printed in SMT Lib 2.
 # impl<'a, 'b> Sym2Smt<()> for Symbol<'a,'b> {
 #   fn sym_to_smt2<Writer: Write>(
-#     & self, writer: & mut Writer, _: & ()
+#     & self, writer: & mut Writer, _: ()
 #   ) -> SmtRes<()> {
 #     self.0.to_smt2(writer, self.1)
 #   }
@@ -885,7 +885,7 @@ our `IdentParser` returns `(Var, Option<usize>)`.
 # /// An unrolled SExpr can be printed in SMT Lib 2.
 # impl<'a, 'b> Expr2Smt<()> for Unrolled<'a,'b> {
 #   fn expr_to_smt2<Writer: Write>(
-#     & self, writer: & mut Writer, _: & ()
+#     & self, writer: & mut Writer, _: ()
 #   ) -> SmtRes<()> {
 #     self.0.to_smt2(writer, self.1)
 #   }
@@ -1000,19 +1000,19 @@ fn main() {
 
     let sym = nsv.to_sym(& offset1) ;
     smtry!(
-      solver.declare_fun(& sym, &[] as & [& str], & "Bool", & ()),
+      solver.declare_fun(& sym, &[] as & [& str], & "Bool", ()),
       failwith "declaration failed: {:?}"
     ) ;
 
     let sym = sv_0.to_sym(& offset1) ;
     smtry!(
-      solver.declare_fun(& sym, &[] as & [& str], & "Bool", & ()),
+      solver.declare_fun(& sym, &[] as & [& str], & "Bool", ()),
       failwith "declaration failed: {:?}"
     ) ;
 
     let expr = app1.unroll(& offset1) ;
     smtry!(
-      solver.assert(& expr, & ()),
+      solver.assert(& expr, ()),
       failwith "assert failed: {:?}"
     ) ;
 
@@ -1201,7 +1201,7 @@ mut SmtParser`][smt parser], as it provides the parsers we want.
 # /// A symbol can be printed in SMT Lib 2.
 # impl<'a, 'b> Sym2Smt<()> for Symbol<'a,'b> {
 #   fn sym_to_smt2<Writer: Write>(
-#     & self, writer: & mut Writer, _: & ()
+#     & self, writer: & mut Writer, _: ()
 #   ) -> SmtRes<()> {
 #     self.0.to_smt2(writer, self.1)
 #   }
@@ -1210,7 +1210,7 @@ mut SmtParser`][smt parser], as it provides the parsers we want.
 # /// An unrolled SExpr can be printed in SMT Lib 2.
 # impl<'a, 'b> Expr2Smt<()> for Unrolled<'a,'b> {
 #   fn expr_to_smt2<Writer: Write>(
-#     & self, writer: & mut Writer, _: & ()
+#     & self, writer: & mut Writer, _: ()
 #   ) -> SmtRes<()> {
 #     self.0.to_smt2(writer, self.1)
 #   }
@@ -1319,19 +1319,19 @@ where Br: ::std::io::BufRead {
 # 
 #     let sym = nsv.to_sym(& offset1) ;
 #     smtry!(
-#       solver.declare_fun(& sym, &[] as & [& str], & "Bool", & ()),
+#       solver.declare_fun(& sym, &[] as & [& str], & "Bool", ()),
 #       failwith "declaration failed: {:?}"
 #     ) ;
 # 
 #     let sym = sv_0.to_sym(& offset1) ;
 #     smtry!(
-#       solver.declare_fun(& sym, &[] as & [& str], & "Bool", & ()),
+#       solver.declare_fun(& sym, &[] as & [& str], & "Bool", ()),
 #       failwith "declaration failed: {:?}"
 #     ) ;
 # 
 #     let expr = app1.unroll(& offset1) ;
 #     smtry!(
-#       solver.assert(& expr, & ()),
+#       solver.assert(& expr, ()),
 #       failwith "assert failed: {:?}"
 #     ) ;
 # 
@@ -1527,9 +1527,9 @@ mod top {
     ) -> SmtRes<()> {
       match * self {
         NSVar(ref sym) => write!(writer, "|{}|", sym) ?,
-        /// SVar at 0, we use the index of the current step.
+        // SVar at 0, we use the index of the current step.
         SVar0(ref sym) => write!(writer, "|{}@{}|", sym, off.0) ?,
-        /// SVar at 1, we use the index of the next step.
+        // SVar at 1, we use the index of the next step.
         SVar1(ref sym) => write!(writer, "|{}@{}|", sym, off.1) ?,
       }
       Ok(())
@@ -1596,7 +1596,7 @@ mod top {
   /// A symbol can be printed in SMT Lib 2.
   impl<'a, 'b> Sym2Smt<()> for Symbol<'a,'b> {
     fn sym_to_smt2<Writer: Write>(
-      & self, writer: & mut Writer, _: & ()
+      & self, writer: & mut Writer, _: ()
     ) -> SmtRes<()> {
       self.0.to_smt2(writer, self.1)
     }
@@ -1605,7 +1605,7 @@ mod top {
   /// An unrolled SExpr can be printed in SMT Lib 2.
   impl<'a, 'b> Expr2Smt<()> for Unrolled<'a,'b> {
     fn expr_to_smt2<Writer: Write>(
-      & self, writer: & mut Writer, _: & ()
+      & self, writer: & mut Writer, _: ()
     ) -> SmtRes<()> {
       self.0.to_smt2(writer, self.1)
     }
@@ -1705,7 +1705,7 @@ mod top {
 
       smtry!(
         solver.declare_fun(
-          "my_fun", & [ "Int", "Real", "Bool" ], "Real", & ()
+          "my_fun", & [ "Int", "Real", "Bool" ], "Real", ()
         ), failwith "during function declaration: {:?}"
       )
     }
@@ -1753,31 +1753,31 @@ mod top {
   
       let sym = nsv_0.to_sym(& offset1) ;
       smtry!(
-        solver.declare_const(& sym, & "Bool", & ()),
+        solver.declare_const(& sym, & "Bool", ()),
         failwith "declaration failed: {:?}"
       ) ;
   
       let sym = nsv_1.to_sym(& offset1) ;
       smtry!(
-        solver.declare_const(& sym, & "Real", & ()),
+        solver.declare_const(& sym, & "Real", ()),
         failwith "declaration failed: {:?}"
       ) ;
   
       let sym = sv_0.to_sym(& offset1) ;
       smtry!(
-        solver.declare_const(& sym, & "Bool", & ()),
+        solver.declare_const(& sym, & "Bool", ()),
         failwith "declaration failed: {:?}"
       ) ;
   
       let sym = sv_1.to_sym(& offset1) ;
       smtry!(
-        solver.declare_const(& sym, & "Int", & ()),
+        solver.declare_const(& sym, & "Int", ()),
         failwith "declaration failed: {:?}"
       ) ;
   
       let expr = app.unroll(& offset1) ;
       smtry!(
-        solver.assert(& expr, & ()),
+        solver.assert(& expr, ()),
         failwith "assert failed: {:?}"
       ) ;
   
