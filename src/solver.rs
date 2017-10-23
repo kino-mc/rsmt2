@@ -87,7 +87,19 @@ impl Kid {
       || format!("while spawning child process with {}", cmd).into()
     )
   }
+
   /// Kills the solver kid.
+  ///
+  /// The windows version just prints `(exit)\n` on the kid's `stdin`. Anything
+  /// else seems to cause problems.
+  #[cfg(not(windows))]
+  pub fn kill(mut self) -> SmtRes<()> {
+    if let Some(stdin) = self.kid.stdin.as_mut() {
+      let _ = writeln!(stdin, "(exit)\n") ;
+    }
+    Ok(())
+  }
+  #[cfg(windows)]
   pub fn kill(mut self) -> SmtRes<()> {
     if let Some(stdin) = self.kid.stdin.as_mut() {
       let _ = writeln!(stdin, "(exit)\n") ;
