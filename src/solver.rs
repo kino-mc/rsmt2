@@ -92,14 +92,14 @@ impl Kid {
   ///
   /// The windows version just prints `(exit)\n` on the kid's `stdin`. Anything
   /// else seems to cause problems.
-  #[cfg(not(windows))]
+  #[cfg(windows)]
   pub fn kill(mut self) -> SmtRes<()> {
     if let Some(stdin) = self.kid.stdin.as_mut() {
       let _ = writeln!(stdin, "(exit)\n") ;
     }
     Ok(())
   }
-  #[cfg(windows)]
+  #[cfg(not(windows))]
   pub fn kill(mut self) -> SmtRes<()> {
     if let Some(stdin) = self.kid.stdin.as_mut() {
       let _ = writeln!(stdin, "(exit)\n") ;
