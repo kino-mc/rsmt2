@@ -1423,6 +1423,7 @@ mod common ;
 pub mod conf ;
 pub mod parse ;
 mod solver ;
+pub mod actlit ;
 
 pub use errors::SmtRes ;
 

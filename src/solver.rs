@@ -15,11 +15,41 @@ use common::* ;
 use conf::SolverConf ;
 use parse::{ IdentParser, ValueParser, ExprParser } ;
 
-
 /// Alias for the underlying parser.
 pub type SmtParser<'kid> = ::parse::SmtParser<
   BufReader<& 'kid mut ChildStdout>
 > ;
+
+
+
+
+
+/// Prefix of an actlit identifier.
+#[allow(non_upper_case_globals)]
+pub static actlit_pref: & str = "|rsmt2 actlit " ;
+/// Suffix of an actlit identifier.
+#[allow(non_upper_case_globals)]
+pub static actlit_suff: & str = "|" ;
+
+/// An activation literal is an opaque wrapper around a `usize`.
+///
+/// Obtained by a solver's [`get_actlit`][get actlit].
+///
+/// [get actlit]: ../trait.Solver.html#method.get_actlit (get_actlit documentation)
+pub struct Actlit {
+  /// ID of the actlit.
+  id: usize,
+}
+impl Actlit {
+  /// Writes the actlit as an SMT-LIB 2 symbol.
+  fn write<W>(& self, w: & mut W) -> SmtRes<()> where W: Write {
+    write!(w, "{}{}{}", actlit_pref, self.id, actlit_suff) ? ;
+    Ok(())
+  }
+}
+
+
+
 
 
 macro_rules! stutter_arg {
@@ -87,6 +117,11 @@ impl Kid {
       || format!("while spawning child process with {}", cmd).into()
     )
   }
+  /// Creates a solver kid with the default configuration. Mostly used in
+  /// tests.
+  pub fn default() -> SmtRes<Self> {
+    Self::new( SolverConf::z3() )
+  }
 
   /// Kills the solver kid.
   ///
@@ -119,8 +154,6 @@ impl Kid {
 
 
 
-
-
 /// Plain solver, as opposed to `TeeSolver` which logs IOs.
 pub struct PlainSolver<'kid, Parser: Copy> {
   /// Solver configuration.
@@ -129,10 +162,10 @@ pub struct PlainSolver<'kid, Parser: Copy> {
   stdin: BufWriter<& 'kid mut ChildStdin>,
   /// Stdout parser.
   smt_parser: SmtParser<'kid>,
-  // /// Kid's stderr.
-  // stderr: BufReader<& 'kid mut ChildStderr>,
   /// User-provided parser.
   parser: Parser,
+  /// Actlit counter.
+  actlit: usize,
 }
 impl<'kid, Parser: Copy> PlainSolver<'kid, Parser> {
   /// Creates a plain solver.
@@ -161,6 +194,7 @@ impl<'kid, Parser: Copy> PlainSolver<'kid, Parser> {
       smt_parser: SmtParser::new(stdout),
       // stderr: stderr,
       parser: parser,
+      actlit: 0,
     } ;
     if solver.conf.get_parse_success() {
       // Function `print_success` parses its own success.
@@ -185,6 +219,13 @@ impl<'kid, Parser: Copy> PlainSolver<'kid, Parser> {
 impl<
   'kid, Parser: Copy
 > SolverBasic<'kid, Parser> for PlainSolver<'kid, Parser> {
+  fn next_actlit(& mut self) -> usize {
+    let res = self.actlit ;
+    self.actlit += 1 ;
+    res
+  }
+  fn has_actlits(& self) -> bool { self.actlit != 0 }
+  fn reset_actlits(& mut self) { self.actlit = 0 }
   fn parsers(& mut self) -> (& mut SmtParser<'kid>, Parser) {
     (& mut self.smt_parser, self.parser)
   }
@@ -239,6 +280,11 @@ impl<'kid, Parser: Copy> TeeSolver<'kid, Parser> {
 impl<
   'kid, Parser: Copy
 > SolverBasic<'kid, Parser> for TeeSolver<'kid, Parser> {
+  fn next_actlit(& mut self) -> usize {
+    self.solver.next_actlit()
+  }
+  fn has_actlits(& self) -> bool { self.solver.has_actlits() }
+  fn reset_actlits(& mut self) { self.solver.reset_actlits() }
   fn parsers(& mut self) -> (& mut SmtParser<'kid>, Parser) {
     self.solver.parsers()
   }
@@ -286,6 +332,15 @@ impl<
 
 /// Most basic function needed to provide SMT-LIB commands.
 pub trait SolverBasic<'kid, Parser: Copy> {
+  /// ID of the next activation literal.
+  #[inline]
+  fn next_actlit(& mut self) -> usize ;
+  /// True if at least one actlit was requested in the past.
+  #[inline]
+  fn has_actlits(& self) -> bool ;
+  /// Cancels all previous calls to `next_actlit`.
+  #[inline]
+  fn reset_actlits(& mut self) ;
   /// Accessor to the parser.
   #[inline]
   fn parsers(& mut self) -> (& mut SmtParser<'kid>, Parser) ;
@@ -341,7 +396,9 @@ pub trait Solver<
           self.write ; |w| write_str(w, "(reset)\n")
         )
       }
-    )
+    ) ? ;
+    self.reset_actlits() ;
+    Ok(())
   }
 
 
@@ -480,6 +537,60 @@ pub trait Solver<
 
   // |===| Introducing new symbols.
 
+  /// Introduces a new actlit.
+  #[inline]
+  fn get_actlit(& mut self) -> SmtRes<Actlit> {
+    let next_actlit = Actlit { id: self.next_actlit() } ;
+    parse_success!(
+      self for {
+        stutter_arg!(self.write ;
+          |w| {
+            write!(
+              w, "(declare-fun {}{}{} () Bool)",
+              actlit_pref, next_actlit.id, actlit_suff
+            ) ? ;
+            Ok(())
+          }
+        )
+      }
+    ) ? ;
+    Ok(next_actlit)
+  }
+
+  /// Deactivates an activation literal, alias for
+  /// `solver.set_actlit(actlit, false)`.
+  #[inline]
+  fn de_actlit(& mut self, actlit: Actlit) -> SmtRes<()> {
+    self.set_actlit(actlit, false)
+  }
+
+  /// Forces the value of an actlit and consumes it.
+  #[inline]
+  fn set_actlit(
+    & mut self, actlit: Actlit, b: bool
+  ) -> SmtRes<()> {
+    parse_success!(
+      self for {
+        stutter_arg!(self.write ;
+          |w| {
+            if b {
+              write!(w, "(assert ") ?
+            } else {
+              write!(w, "(assert (not ") ?
+            }
+            actlit.write(w) ? ;
+            if b {
+              write!(w, ")\n") ?
+            } else {
+              write!(w, ") )\n") ?
+            }
+            Ok(())
+          }
+        )
+      }
+    )
+  }
+
   /// Declares a new sort.
   #[inline]
   fn declare_sort<Sort: Sort2Smt>(
@@ -592,7 +703,7 @@ pub trait Solver<
   fn declare_const_u<Sym, Sort> (
     & mut self, symbol: & Sym, out_sort: & Sort
   ) -> SmtRes<()>
-  where Sym: Sym2Smt<()>, Sort: Sort2Smt {
+  where Sym: ?Sized + Sym2Smt<()>, Sort: ?Sized + Sort2Smt {
     self.declare_const(symbol, out_sort, ())
   }
 
@@ -601,7 +712,7 @@ pub trait Solver<
   fn declare_const<Info, Sym, Sort> (
     & mut self, symbol: & Sym, out_sort: & Sort, info: Info
   ) -> SmtRes<()>
-  where Info: Copy, Sym: Sym2Smt<Info>, Sort: Sort2Smt {
+  where Info: Copy, Sym: ?Sized + Sym2Smt<Info>, Sort: ?Sized + Sort2Smt {
     parse_success!(
       self for {
         stutter_arg!(self.write ;
@@ -820,13 +931,23 @@ pub trait Solver<
 
   // |===| Asserting and inspecting formulas.
 
-  /// Asserts an expression with some print information.
+  /// Asserts an expression without print information.
   #[inline]
   fn assert_u<Expr>(
     & mut self, expr: & Expr
   ) -> SmtRes<()>
-  where Expr: Expr2Smt<()> {
+  where Expr: ?Sized + Expr2Smt<()> {
     self.assert(expr, ())
+  }
+
+  /// Asserts an expression without print information, guarded by an activation
+  /// literal.
+  #[inline]
+  fn assert_act_u<Expr>(
+    & mut self, actlit: & Actlit, expr: & Expr
+  ) -> SmtRes<()>
+  where Expr: ?Sized + Expr2Smt<()> {
+    self.assert_act(actlit, expr, ())
   }
 
   /// Asserts an expression with some print information.
@@ -836,7 +957,7 @@ pub trait Solver<
   ) -> SmtRes<()>
   where
   Info: Copy,
-  Expr: Expr2Smt<Info> {
+  Expr: ?Sized + Expr2Smt<Info> {
     parse_success!(
       self for {
         stutter_arg!(self.write ;
@@ -844,6 +965,30 @@ pub trait Solver<
             write_str(w, "(assert\n  ") ? ;
             expr.expr_to_smt2(w, info) ? ;
             write_str(w, "\n)\n")
+          }
+        )
+      }
+    )
+  }
+
+  /// Asserts an expression with some print information, guarded by an
+  /// activation literal.
+  #[inline]
+  fn assert_act<Info, Expr>(
+    & mut self, actlit: & Actlit, expr: & Expr, info: Info
+  ) -> SmtRes<()>
+  where
+  Info: Copy,
+  Expr: ?Sized + Expr2Smt<Info>, {
+    parse_success!(
+      self for {
+        stutter_arg!(self.write ;
+          |w| {
+            write_str(w, "(assert\n  (=>\n    ") ? ;
+            actlit.write(w) ? ;
+            write_str(w, "\n    ") ? ;
+            expr.expr_to_smt2(w, info) ? ;
+            write_str(w, "\n  )\n)\n")
           }
         )
       }
@@ -892,6 +1037,24 @@ pub trait Solver<
       |w| write_str(w, "(check-sat)\n")
     )
   }
+  /// Check-sat command, with actlits.
+  #[inline(always)]
+  fn print_check_sat_act<'a, Actlits>(
+    & mut self, actlits: Actlits
+  ) -> SmtRes<()>
+  where
+  Actlits: Copy + IntoIterator<Item = & 'a Actlit> {
+    stutter_arg!(self.write ;
+      |w| {
+        write_str(w, "(check-sat") ? ;
+        for actlit in actlits {
+          write!(w, " ") ? ;
+          actlit.write(w) ?
+        }
+        write_str(w, ")\n")
+      }
+    )
+  }
 
   /// Get-model command.
   #[inline(always)]
@@ -908,8 +1071,9 @@ pub trait Solver<
   where
   Parser: for<'a> IdentParser<'a, Ident, Type, & 'a mut SmtParser<'kid>> +
           for<'a> ValueParser<'a, Value, & 'a mut SmtParser<'kid>> {
+    let has_actlits = self.has_actlits() ;
     let (smt_parser, parser) = self.parsers() ;
-    smt_parser.get_model(parser)
+    smt_parser.get_model(has_actlits, parser)
   }
 
   /// Get-model command.
@@ -930,8 +1094,9 @@ pub trait Solver<
   where
   Parser: for<'a> IdentParser<'a, Ident, Type, & 'a mut SmtParser<'kid>> +
           for<'a> ValueParser<'a, Value, & 'a mut SmtParser<'kid>> {
+    let has_actlits = self.has_actlits() ;
     let (smt_parser, parser) = self.parsers() ;
-    smt_parser.get_model_const(parser)
+    smt_parser.get_model_const(has_actlits, parser)
   }
 
   /// Get-model command when all the symbols are nullary.
@@ -974,10 +1139,30 @@ pub trait Solver<
     self.print_check_sat() ? ;
     self.parse_check_sat()
   }
+  /// Check-sat command with activation literals, turns `unknown` results into
+  /// errors.
+  fn check_sat_act<'a, Actlits>(
+    & mut self, actlits: Actlits
+  ) -> SmtRes<bool>
+  where
+  Actlits: Copy + IntoIterator<Item = & 'a Actlit> {
+    self.print_check_sat_act(actlits) ? ;
+    self.parse_check_sat()
+  }
 
   /// Check-sat command, turns `unknown` results in `None`.
   fn check_sat_or_unknown(& mut self) -> SmtRes< Option<bool> > {
     self.print_check_sat() ? ;
+    self.parse_check_sat_or_unknown()
+  }
+  /// Check-sat command with activation literals, turns `unknown` results in
+  /// `None`.
+  fn check_sat_act_or_unknown<'a, Actlits>(
+    & mut self, actlits: Actlits
+  ) -> SmtRes< Option<bool> >
+  where
+  Actlits: Copy + IntoIterator<Item = & 'a Actlit> {
+    self.print_check_sat_act(actlits) ? ;
     self.parse_check_sat_or_unknown()
   }
 
@@ -1017,7 +1202,7 @@ pub trait Solver<
     & mut self, exprs: Exprs
   ) -> SmtRes<()>
   where
-  Expr: Expr2Smt<()> + 'a,
+  Expr: ?Sized + Expr2Smt<()> + 'a,
   Exprs: Clone + IntoIterator< Item = & 'a Expr > {
     self.print_get_values(exprs, ())
   }
@@ -1028,7 +1213,7 @@ pub trait Solver<
   ) -> SmtRes<()>
   where
   Info: Copy,
-  Expr: Expr2Smt< Info > + 'a,
+  Expr: ?Sized + Expr2Smt< Info > + 'a,
   Exprs: Clone + IntoIterator< Item = & 'a Expr > {
     stutter_arg!(self.write ;
       |w| {
@@ -1065,28 +1250,34 @@ pub trait Solver<
   }
 
   /// Get-values command.
-  fn get_values_u<'a, Expr, Exprs, Value>(
+  ///
+  /// Notice that the input expression type and the output one have no reason
+  /// to be the same.
+  fn get_values_u<'a, Expr, Exprs, PExpr, PValue>(
     & mut self, exprs: Exprs
-  ) -> SmtRes<Vec<(Expr, Value)>>
+  ) -> SmtRes<Vec<(PExpr, PValue)>>
   where
-  Parser: for<'b> ExprParser<'b, Expr, (), & 'b mut SmtParser<'kid>> +
-          for<'b> ValueParser<'b, Value, & 'b mut SmtParser<'kid>>,
-  Expr: Expr2Smt<()> + 'a,
+  Parser: for<'b> ExprParser<'b, PExpr, (), & 'b mut SmtParser<'kid>> +
+          for<'b> ValueParser<'b, PValue, & 'b mut SmtParser<'kid>>,
+  Expr: ?Sized + Expr2Smt<()> + 'a,
   Exprs: Copy + IntoIterator< Item = & 'a Expr > {
     self.get_values(exprs, ())
   }
 
   /// Get-values command.
+  ///
+  /// Notice that the input expression type and the output one have no reason
+  /// to be the same.
   fn get_values<
-    'a, Info, Expr, Exprs, Value
+    'a, Info, Expr, Exprs, PExpr, PValue
   >(
     & mut self, exprs: Exprs, info: Info
-  ) -> SmtRes<Vec<(Expr, Value)>>
+  ) -> SmtRes<Vec<(PExpr, PValue)>>
   where
   Info: Copy,
-  Parser: for<'b> ExprParser<'b, Expr, Info, & 'b mut SmtParser<'kid>> +
-          for<'b> ValueParser<'b, Value, & 'b mut SmtParser<'kid>>,
-  Expr: Expr2Smt<Info> + 'a,
+  Parser: for<'b> ExprParser<'b, PExpr, Info, & 'b mut SmtParser<'kid>> +
+          for<'b> ValueParser<'b, PValue, & 'b mut SmtParser<'kid>>,
+  Expr: ?Sized + Expr2Smt<Info> + 'a,
   Exprs: Copy + IntoIterator< Item = & 'a Expr > {
     self.print_get_values( exprs, info.clone() ) ? ;
     self.parse_get_values(info)
@@ -1097,7 +1288,7 @@ pub trait Solver<
     & mut self, bool_vars: Idents
   ) -> SmtRes<()>
   where
-  Ident: Sym2Smt<()> + 'a,
+  Ident: ?Sized + Sym2Smt<()> + 'a,
   Idents: Copy + IntoIterator< Item = & 'a Ident > {
     self.print_check_sat_assuming(bool_vars, ())
   }
@@ -1108,7 +1299,7 @@ pub trait Solver<
   ) -> SmtRes<()>
   where
   Info: Copy,
-  Ident: Sym2Smt<Info> + 'a,
+  Ident: ?Sized + Sym2Smt<Info> + 'a,
   Idents: Copy + IntoIterator< Item = & 'a Ident > {
     match * self.solver().conf.get_check_sat_assuming() {
       Some(ref cmd) => {
@@ -1137,7 +1328,7 @@ pub trait Solver<
     & mut self, idents: Idents
   ) -> SmtRes<bool>
   where
-  Ident: Sym2Smt<()> + 'a,
+  Ident: ?Sized + Sym2Smt<()> + 'a,
   Idents: Copy + IntoIterator< Item = & 'a Ident > {
     self.check_sat_assuming(idents, ())
   }
@@ -1148,7 +1339,7 @@ pub trait Solver<
   ) -> SmtRes<bool>
   where
   Info: Copy,
-  Ident: Sym2Smt<Info> + 'a,
+  Ident: ?Sized + Sym2Smt<Info> + 'a,
   Idents: Copy + IntoIterator< Item = & 'a Ident > {
     self.print_check_sat_assuming(idents, info) ? ;
     self.parse_check_sat()
@@ -1159,7 +1350,7 @@ pub trait Solver<
     & mut self, idents: Idents
   ) -> SmtRes<Option<bool>>
   where
-  Ident: Sym2Smt<()> + 'a,
+  Ident: ?Sized + Sym2Smt<()> + 'a,
   Idents: Copy + IntoIterator< Item = & 'a Ident > {
     self.check_sat_assuming_or_unknown(idents, ())
   }
@@ -1170,7 +1361,7 @@ pub trait Solver<
   ) -> SmtRes<Option<bool>>
   where
   Info: Copy,
-  Ident: Sym2Smt<Info> + 'a,
+  Ident: ?Sized + Sym2Smt<Info> + 'a,
   Idents: Copy + IntoIterator< Item = & 'a Ident > {
     self.print_check_sat_assuming(idents, info) ? ;
     self.parse_check_sat_or_unknown()

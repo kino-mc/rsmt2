@@ -46,7 +46,7 @@
 //!   }
 //! }
 //!
-//! let model = parser.get_model_const( & Parser ).expect("model") ;
+//! let model = parser.get_model_const( false, & Parser ).expect("model") ;
 //! assert_eq!( model, vec![ ("a".into(), "Int".into(), "(- 17)".into()) ] )
 //! # }
 //! ```
@@ -87,7 +87,7 @@
 //! }
 //!
 //! use rsmt2::errors::ErrorKind ;
-//! match * parser.get_model_const( & Parser ).unwrap_err().kind() {
+//! match * parser.get_model_const( false, & Parser ).unwrap_err().kind() {
 //!   ErrorKind::ParseError(ref msg, ref token) => {
 //!     assert_eq!(
 //!       msg, "expected `(` opening define-fun or `)` closing model"
@@ -654,6 +654,15 @@ impl<R: BufRead> SmtParser<R> {
     }
   }
 
+  /// Parses a boolean or fails.
+  pub fn bool(& mut self) -> SmtRes<bool> {
+    if let Some(b) = self.try_bool() ? {
+      Ok(b)
+    } else {
+      self.fail_with("expected boolean")
+    }
+  }
+
   /// Tries to parse an unsigned integer. Does **not** load, backtrack, or
   /// mark. Returns start and end positions.
   #[inline]
@@ -681,6 +690,16 @@ impl<R: BufRead> SmtParser<R> {
       Ok( Some( & self.buff[ start .. end ] ) )
     } else {
       Ok(None)
+    }
+  }
+  /// Parses an usigned integer or fails.
+  #[inline]
+  fn uint<F, T>(& mut self, f: F) -> SmtRes<T>
+  where F: Fn(& str) -> T {
+    if let Some(res) = self.try_uint()?.map(f) {
+      Ok(res)
+    } else {
+      self.fail_with("expected unsigned integer")
     }
   }
 
@@ -1018,10 +1037,23 @@ impl<R: BufRead> SmtParser<R> {
     }
   }
 
+  /// Tries to parse a reserved actlit id.
+  pub fn try_actlit_id(& mut self) -> SmtRes<bool> {
+    if self.try_tag( ::solver::actlit_pref ) ? {
+      self.uint(|_| ()).chain_err(
+        || "while parsing internal actlit identifier"
+      ) ? ;
+      self.tag( ::solver::actlit_suff ) ? ;
+      Ok(true)
+    } else {
+      Ok(false)
+    }
+  }
+
 
   /// Parses the result of a get-model where all symbols are nullary.
   pub fn get_model_const<Ident, Value, Type, Parser>(
-    & mut self, parser: Parser
+    & mut self, prune_actlits: bool, parser: Parser
   ) -> SmtRes< Vec<(Ident, Type, Value)> >
   where
   Parser: for<'a> IdentParser<'a, Ident, Type, & 'a mut Self> +
@@ -1031,11 +1063,18 @@ impl<R: BufRead> SmtParser<R> {
     while ! self.try_tag(")") ? {
       self.tag_info("(", "opening define-fun or `)` closing model") ? ;
       self.tag( "define-fun" ) ? ;
-      let id = parser.parse_ident(self) ? ;
-      self.tags( & ["(", ")"] ) ? ;
-      let typ = parser.parse_type(self) ? ;
-      let value = parser.parse_value(self) ? ;
-      model.push( (id, typ, value) ) ;
+
+      if prune_actlits && self.try_actlit_id() ? {
+        self.tags( & ["(", ")"] ) ? ;
+        self.tag("Bool") ? ;
+        self.bool() ? ;
+      } else {
+        let id = parser.parse_ident(self) ? ;
+        self.tags( & ["(", ")"] ) ? ;
+        let typ = parser.parse_type(self) ? ;
+        let value = parser.parse_value(self) ? ;
+        model.push( (id, typ, value) ) ;
+      }
       self.tag(")") ?
     }
     self.clear() ;
@@ -1045,7 +1084,7 @@ impl<R: BufRead> SmtParser<R> {
 
   /// Parses the result of a get-model.
   pub fn get_model<Ident, Value, Type, Parser>(
-    & mut self, parser: Parser
+    & mut self, prune_actlits: bool, parser: Parser
   ) -> SmtRes< Vec<(Ident, Vec<Type>, Type, Value)> >
   where
   Parser: for<'a> IdentParser<'a, Ident, Type, & 'a mut Self> +
@@ -1055,16 +1094,23 @@ impl<R: BufRead> SmtParser<R> {
     while ! self.try_tag(")") ? {
       self.tag_info("(", "opening define-fun or `)` closing model") ? ;
       self.tag( "define-fun" ) ? ;
-      let id = parser.parse_ident(self) ? ;
-      self.tag("(") ? ;
-      let mut args = Vec::new() ;
-      while ! self.try_tag(")") ? {
+
+      if prune_actlits && self.try_actlit_id() ? {
+        self.tags( & ["(", ")"] ) ? ;
+        self.tag("Bool") ? ;
+        self.bool() ? ;
+      } else {
+        let id = parser.parse_ident(self) ? ;
+        self.tag("(") ? ;
+        let mut args = Vec::new() ;
+        while ! self.try_tag(")") ? {
+          let typ = parser.parse_type(self) ? ;
+          args.push(typ)
+        }
         let typ = parser.parse_type(self) ? ;
-        args.push(typ)
+        let value = parser.parse_value(self) ? ;
+        model.push( (id, args, typ, value) ) ;
       }
-      let typ = parser.parse_type(self) ? ;
-      let value = parser.parse_value(self) ? ;
-      model.push( (id, args, typ, value) ) ;
       self.tag(")") ? ;
     }
     self.clear() ;
