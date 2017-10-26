@@ -41,10 +41,18 @@ pub struct Actlit {
   id: usize,
 }
 impl Actlit {
+  /// Unique number of this actlit.
+  pub fn uid(& self) -> usize { self.id }
   /// Writes the actlit as an SMT-LIB 2 symbol.
-  fn write<W>(& self, w: & mut W) -> SmtRes<()> where W: Write {
+  pub fn write<W>(& self, w: & mut W) -> SmtRes<()> where W: Write {
     write!(w, "{}{}{}", actlit_pref, self.id, actlit_suff) ? ;
     Ok(())
+  }
+}
+impl ::std::ops::Deref for Actlit {
+  type Target = usize ;
+  fn deref(& self) -> & usize {
+    & self.id
   }
 }
 

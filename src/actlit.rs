@@ -5,7 +5,7 @@ For an explanation of what activation literal are, see
 
 **NB**: while `rmst2`'s actlit API declares some constant symbols in the
 underlying solver, these will not appear in the result of
-[`get_model`](get_model).
+[`get_model`](get_model) queries.
 
 
 # Relevant functions on solvers
@@ -93,6 +93,7 @@ let mut kid = match Kid::default() {
 
   let actlit = solver.get_actlit().unwrap() ;
   solver.assert_act_u(& actlit, "(> x 7)").unwrap() ;
+  solver.assert_act_u(& actlit, "(= (mod x 2) 0)").unwrap() ;
   assert!{
     solver.check_sat_act( Some(& actlit) ).unwrap()
   }
@@ -103,6 +104,55 @@ kid.kill().unwrap()
 ```
 
 
+**NB**: under the hood, `rmst2` declares a constant boolean symbol for each
+actlit. Hence, there is a (very low) risk of collision with the user's symbol.
+The internal actlits are named `"|rsmt2 actlit <uid>|"`. Any symbol starting
+with `"|rsmt2 actlit "` is assumed to be a `rsmt2` actlit. In particular, such
+symbols will be pruned out of `get_model` queries (if at least one actlit was
+requested since the last reset).
+
+```
+use rsmt2::* ;
+
+let mut kid = match Kid::default() {
+  Ok(kid) => kid,
+  Err(e) => panic!("Could not spawn solver kid: {:?}", e)
+} ;
+
+struct Parser ;
+impl<'a> IdentParser<'a, String, (), & 'a str> for Parser {
+  fn parse_ident(self, s: & 'a str) -> SmtRes<String> {
+    Ok(s.to_string())
+  }
+  fn parse_type(self, s: & 'a str) -> SmtRes<()> {
+    bail!("type parsing is unimplemented")
+  }
+}
+impl<'a> ValueParser<'a , String, & 'a str> for 
+
+{
+  let mut solver = solver(& mut kid, ()).unwrap() ;
+  solver.declare_const_u("x", "Int").unwrap() ;
+
+  let actlit = solver.get_actlit().unwrap() ;
+  let mut buf: Vec<u8> = vec![] ;
+  actlit.write(& mut buf).unwrap() ;
+  assert_eq!{
+    "|rsmt2 actlit 0|",
+    ::std::str::from_utf8(& buf).unwrap()
+  }
+
+  solver.assert_act_u(& actlit, "(> x 7)").unwrap() ;
+  solver.assert_act_u(& actlit, "(= (mod x 2) 0)").unwrap() ;
+  assert!{
+    solver.check_sat_act( Some(& actlit) ).unwrap()
+  }
+
+  solver.de_actlit(actlit).unwrap()
+}
+
+kid.kill().unwrap()
+```
 
 
 
