@@ -113,6 +113,7 @@ requested since the last reset).
 
 ```
 use rsmt2::* ;
+use rsmt2::parse::* ;
 
 let mut kid = match Kid::default() {
   Ok(kid) => kid,
@@ -120,18 +121,22 @@ let mut kid = match Kid::default() {
 } ;
 
 struct Parser ;
-impl<'a> IdentParser<'a, String, (), & 'a str> for Parser {
+impl<'a, 'b> IdentParser<'a, String, String, & 'a str> for & 'b Parser {
   fn parse_ident(self, s: & 'a str) -> SmtRes<String> {
     Ok(s.to_string())
   }
-  fn parse_type(self, s: & 'a str) -> SmtRes<()> {
-    bail!("type parsing is unimplemented")
+  fn parse_type(self, s: & 'a str) -> SmtRes<String> {
+    Ok(s.to_string())
   }
 }
-impl<'a> ValueParser<'a , String, & 'a str> for 
+impl<'a, 'b> ValueParser<'a , String, & 'a str> for & 'b Parser {
+  fn parse_value(self, s: & 'a str) -> SmtRes<String> {
+    Ok(s.to_string())
+  }
+}
 
 {
-  let mut solver = solver(& mut kid, ()).unwrap() ;
+  let mut solver = solver(& mut kid, & Parser).unwrap() ;
   solver.declare_const_u("x", "Int").unwrap() ;
 
   let actlit = solver.get_actlit().unwrap() ;
@@ -146,6 +151,23 @@ impl<'a> ValueParser<'a , String, & 'a str> for
   solver.assert_act_u(& actlit, "(= (mod x 2) 0)").unwrap() ;
   assert!{
     solver.check_sat_act( Some(& actlit) ).unwrap()
+  }
+
+  let model = solver.get_model_const().unwrap() ;
+  let mut model = model.into_iter() ;
+  if let Some((x, int, n)) = model.next() {
+    assert_eq!{ x, "x" }
+    assert_eq!{ int, "Int" }
+    use std::str::FromStr ;
+    let n = i64::from_str(& n).unwrap() ;
+    println!("{}", n) ;
+    assert!{ n > 7 }
+    assert!{ n % 2 == 0 }
+  } else {
+    panic!("expected the model for `x`")
+  }
+  assert_eq!{
+    model.next(), None
   }
 
   solver.de_actlit(actlit).unwrap()
