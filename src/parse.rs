@@ -32,12 +32,12 @@
 //! let mut parser = SmtParser::of_str(txt) ;
 //!
 //! struct Parser ;
-//! impl<'a, 'b> ValueParser<'a, String, & 'a str> for & 'b Parser {
+//! impl<'a, 'b> ValueParser<String, & 'a str> for & 'b Parser {
 //!   fn parse_value(self, input: & 'a str) -> SmtRes<String> {
 //!     Ok(input.into())
 //!   }
 //! }
-//! impl<'a, 'b> IdentParser<'a, String, String, & 'a str> for & 'b Parser {
+//! impl<'a, 'b> IdentParser<String, String, & 'a str> for & 'b Parser {
 //!   fn parse_ident(self, input: & 'a str) -> SmtRes<String> {
 //!     Ok(input.into())
 //!   }
@@ -68,7 +68,7 @@
 //!
 //! struct Parser ;
 //! impl<'a, 'b, Br: ::std::io::BufRead> ValueParser<
-//!   'a, String, & 'a mut SmtParser<Br>
+//!   String, & 'a mut SmtParser<Br>
 //! > for & 'b Parser {
 //!   fn parse_value(self, input: & 'a mut SmtParser<Br>) -> SmtRes<String> {
 //!     input.tag("(- 17))") ? ; Ok( "-17".into() )
@@ -76,7 +76,7 @@
 //!   }
 //! }
 //! impl<'a, 'b, Br: ::std::io::BufRead> IdentParser<
-//!   'a, String, String, & 'a mut SmtParser<Br>
+//!   String, String, & 'a mut SmtParser<Br>
 //! > for & 'b Parser {
 //!   fn parse_ident(self, input: & 'a mut SmtParser<Br>) -> SmtRes<String> {
 //!     input.tag("a") ? ; Ok( "a".into() )
@@ -1056,8 +1056,8 @@ impl<R: BufRead> SmtParser<R> {
     & mut self, prune_actlits: bool, parser: Parser
   ) -> SmtRes< Vec<(Ident, Type, Value)> >
   where
-  Parser: for<'a> IdentParser<'a, Ident, Type, & 'a mut Self> +
-          for<'a> ValueParser<'a, Value, & 'a mut Self> {
+  Parser: for<'a> IdentParser<Ident, Type, & 'a mut Self> +
+          for<'a> ValueParser<Value, & 'a mut Self> {
     let mut model = Vec::new() ;
     self.tags( & ["(", "model"] ) ? ;
     while ! self.try_tag(")") ? {
@@ -1087,8 +1087,8 @@ impl<R: BufRead> SmtParser<R> {
     & mut self, prune_actlits: bool, parser: Parser
   ) -> SmtRes< Vec<(Ident, Vec<Type>, Type, Value)> >
   where
-  Parser: for<'a> IdentParser<'a, Ident, Type, & 'a mut Self> +
-          for<'a> ValueParser<'a, Value, & 'a mut Self> {
+  Parser: for<'a> IdentParser<Ident, Type, & 'a mut Self> +
+          for<'a> ValueParser<Value, & 'a mut Self> {
     let mut model = Vec::new() ;
     self.tags( &["(", "model"] ) ? ;
     while ! self.try_tag(")") ? {
@@ -1122,8 +1122,8 @@ impl<R: BufRead> SmtParser<R> {
     & mut self, parser: Parser, info: Info
   ) -> SmtRes< Vec<(Expr, Value)> >
   where
-  Parser: for<'a> ValueParser<'a, Value, & 'a mut Self> +
-          for<'a> ExprParser<'a, Expr, Info, & 'a mut Self> {
+  Parser: for<'a> ValueParser<Value, & 'a mut Self> +
+          for<'a> ExprParser<Expr, Info, & 'a mut Self> {
     let mut values = Vec::new() ;
     self.tag("(") ? ;
     while ! self.try_tag(")") ? {
@@ -1148,12 +1148,14 @@ impl<R: BufRead> SmtParser<R> {
 /// For more information refer to the [module-level documentation].
 ///
 /// [module-level documentation]: index.html
-pub trait IdentParser<'a, Ident, Type, Input>: Copy {
+pub trait IdentParser<Ident, Type, Input>: Copy {
+  /// Parses an identifier.
   fn parse_ident(self, Input) -> SmtRes<Ident> ;
+  /// Parses a type.
   fn parse_type(self, Input) -> SmtRes<Type> ;
 }
-impl<'a, Ident, Type, T> IdentParser<'a, Ident, Type, & 'a str> for T
-where T: IdentParser<'a, Ident, Type, & 'a [u8]> {
+impl<'a, Ident, Type, T> IdentParser<Ident, Type, & 'a str> for T
+where T: IdentParser<Ident, Type, & 'a [u8]> {
   fn parse_ident(self, input: & 'a str) -> SmtRes<Ident> {
     self.parse_ident( input.as_bytes() )
   }
@@ -1162,10 +1164,9 @@ where T: IdentParser<'a, Ident, Type, & 'a [u8]> {
   }
 }
 impl<'a, Ident, Type, T, Br> IdentParser<
-  'a, Ident, Type, & 'a mut SmtParser<Br>
+  Ident, Type, & 'a mut SmtParser<Br>
 > for T
-where
-T: IdentParser<'a, Ident, Type, & 'a str>, Br: BufRead {
+where T: IdentParser<Ident, Type, & 'a str>, Br: BufRead {
   fn parse_ident(self, input: & 'a mut SmtParser<Br>) -> SmtRes<Ident> {
     self.parse_ident( input.get_sexpr() ? )
   }
@@ -1179,19 +1180,19 @@ T: IdentParser<'a, Ident, Type, & 'a str>, Br: BufRead {
 /// For more information refer to the [module-level documentation].
 ///
 /// [module-level documentation]: index.html
-pub trait ValueParser<'a, Value, Input>: Copy {
+pub trait ValueParser<Value, Input>: Copy {
   fn parse_value(self, Input) -> SmtRes<Value> ;
 }
-impl<'a, Value, T> ValueParser<'a, Value, & 'a str> for T
-where T: ValueParser<'a, Value, & 'a [u8]> {
+impl<'a, Value, T> ValueParser<Value, & 'a str> for T
+where T: ValueParser<Value, & 'a [u8]> {
   fn parse_value(self, input: & 'a str) -> SmtRes<Value> {
     self.parse_value( input.as_bytes() )
   }
 }
 impl<'a, Value, T, Br> ValueParser<
-  'a, Value, & 'a mut SmtParser<Br>
+  Value, & 'a mut SmtParser<Br>
 > for T where
-T: ValueParser<'a, Value, & 'a str>, Br: BufRead {
+T: ValueParser<Value, & 'a str>, Br: BufRead {
   fn parse_value(self, input: & 'a mut SmtParser<Br>) -> SmtRes<Value> {
     self.parse_value( input.get_sexpr() ? )
   }
@@ -1202,19 +1203,19 @@ T: ValueParser<'a, Value, & 'a str>, Br: BufRead {
 /// For more information refer to the [module-level documentation].
 ///
 /// [module-level documentation]: index.html
-pub trait ExprParser<'a, Expr, Info, Input>: Copy {
+pub trait ExprParser<Expr, Info, Input>: Copy {
   fn parse_expr(self, Input, Info) -> SmtRes<Expr> ;
 }
-impl<'a, Expr, Info, T> ExprParser<'a, Expr, Info, & 'a str> for T
-where T: ExprParser<'a, Expr, Info, & 'a [u8]> {
+impl<'a, Expr, Info, T> ExprParser<Expr, Info, & 'a str> for T
+where T: ExprParser<Expr, Info, & 'a [u8]> {
   fn parse_expr(self, input: & 'a str, info: Info) -> SmtRes<Expr> {
     self.parse_expr( input.as_bytes(), info )
   }
 }
 impl<'a, Expr, Info, T, Br> ExprParser<
-  'a, Expr, Info, & 'a mut SmtParser<Br>
+  Expr, Info, & 'a mut SmtParser<Br>
 > for T
-where T: ExprParser<'a, Expr, Info, & 'a str>, Br: BufRead {
+where T: ExprParser<Expr, Info, & 'a str>, Br: BufRead {
   fn parse_expr(
     self, input: & 'a mut SmtParser<Br>, info: Info
   ) -> SmtRes<Expr> {
@@ -1227,19 +1228,19 @@ where T: ExprParser<'a, Expr, Info, & 'a str>, Br: BufRead {
 /// For more information refer to the [module-level documentation].
 ///
 /// [module-level documentation]: index.html
-pub trait ProofParser<'a, Proof, Input>: Copy {
+pub trait ProofParser<Proof, Input>: Copy {
   fn parse_proof(self, Input) -> SmtRes<Proof> ;
 }
-impl<'a, Proof, T> ProofParser<'a, Proof, & 'a str> for T
-where T: ProofParser<'a, Proof, & 'a [u8]> {
+impl<'a, Proof, T> ProofParser<Proof, & 'a str> for T
+where T: ProofParser<Proof, & 'a [u8]> {
   fn parse_proof(self, input: & 'a str) -> SmtRes<Proof> {
     self.parse_proof( input.as_bytes() )
   }
 }
 impl<'a, Proof, T, Br> ProofParser<
-  'a, Proof, & 'a mut SmtParser<Br>
+  Proof, & 'a mut SmtParser<Br>
 > for T
-where T: ProofParser<'a, Proof, & 'a str>, Br: BufRead {
+where T: ProofParser<Proof, & 'a str>, Br: BufRead {
   fn parse_proof(self, input: & 'a mut SmtParser<Br>) -> SmtRes<Proof> {
     self.parse_proof( input.get_sexpr() ? )
   }

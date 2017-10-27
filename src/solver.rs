@@ -1077,8 +1077,8 @@ pub trait Solver<
     & mut self
   ) -> SmtRes<Vec<(Ident, Vec<Type>, Type, Value)>>
   where
-  Parser: for<'a> IdentParser<'a, Ident, Type, & 'a mut SmtParser<'kid>> +
-          for<'a> ValueParser<'a, Value, & 'a mut SmtParser<'kid>> {
+  Parser: for<'a> IdentParser<Ident, Type, & 'a mut SmtParser<'kid>> +
+          for<'a> ValueParser<Value, & 'a mut SmtParser<'kid>> {
     let has_actlits = self.has_actlits() ;
     let (smt_parser, parser) = self.parsers() ;
     smt_parser.get_model(has_actlits, parser)
@@ -1089,8 +1089,8 @@ pub trait Solver<
     & mut self
   ) -> SmtRes<Vec<(Ident, Vec<Type>, Type, Value)>>
   where
-  Parser: for<'a> IdentParser<'a, Ident, Type, & 'a mut SmtParser<'kid>> +
-          for<'a> ValueParser<'a, Value, & 'a mut SmtParser<'kid>> {
+  Parser: for<'a> IdentParser<Ident, Type, & 'a mut SmtParser<'kid>> +
+          for<'a> ValueParser<Value, & 'a mut SmtParser<'kid>> {
     self.print_get_model() ? ;
     self.parse_get_model()
   }
@@ -1100,8 +1100,8 @@ pub trait Solver<
     & mut self
   ) -> SmtRes<Vec<(Ident, Type, Value)>>
   where
-  Parser: for<'a> IdentParser<'a, Ident, Type, & 'a mut SmtParser<'kid>> +
-          for<'a> ValueParser<'a, Value, & 'a mut SmtParser<'kid>> {
+  Parser: for<'a> IdentParser<Ident, Type, & 'a mut SmtParser<'kid>> +
+          for<'a> ValueParser<Value, & 'a mut SmtParser<'kid>> {
     let has_actlits = self.has_actlits() ;
     let (smt_parser, parser) = self.parsers() ;
     smt_parser.get_model_const(has_actlits, parser)
@@ -1112,8 +1112,8 @@ pub trait Solver<
     & mut self
   ) -> SmtRes<Vec<(Ident, Type, Value)>>
   where
-  Parser: for<'a> IdentParser<'a, Ident, Type, & 'a mut SmtParser<'kid>> +
-          for<'a> ValueParser<'a, Value, & 'a mut SmtParser<'kid>> {
+  Parser: for<'a> IdentParser<Ident, Type, & 'a mut SmtParser<'kid>> +
+          for<'a> ValueParser<Value, & 'a mut SmtParser<'kid>> {
     self.print_get_model() ? ;
     self.parse_get_model_const()
   }
@@ -1240,8 +1240,8 @@ pub trait Solver<
     & mut self
   ) -> SmtRes<Vec<(Expr, Value)>>
   where
-  Parser: for<'a> ExprParser<'a, Expr, (), & 'a mut SmtParser<'kid>> +
-          for<'a> ValueParser<'a, Value, & 'a mut SmtParser<'kid>> {
+  Parser: for<'a> ExprParser<Expr, (), & 'a mut SmtParser<'kid>> +
+          for<'a> ValueParser<Value, & 'a mut SmtParser<'kid>> {
     self.parse_get_values(())
   }
 
@@ -1251,8 +1251,8 @@ pub trait Solver<
   ) -> SmtRes<Vec<(Expr, Value)>>
   where
   Info: Copy,
-  Parser: for<'a> ExprParser<'a, Expr, Info, & 'a mut SmtParser<'kid>> +
-          for<'a> ValueParser<'a, Value, & 'a mut SmtParser<'kid>> {
+  Parser: for<'a> ExprParser<Expr, Info, & 'a mut SmtParser<'kid>> +
+          for<'a> ValueParser<Value, & 'a mut SmtParser<'kid>> {
     let (smt_parser, parser) = self.parsers() ;
     smt_parser.get_values(parser, info)
   }
@@ -1265,8 +1265,8 @@ pub trait Solver<
     & mut self, exprs: Exprs
   ) -> SmtRes<Vec<(PExpr, PValue)>>
   where
-  Parser: for<'b> ExprParser<'b, PExpr, (), & 'b mut SmtParser<'kid>> +
-          for<'b> ValueParser<'b, PValue, & 'b mut SmtParser<'kid>>,
+  Parser: for<'b> ExprParser<PExpr, (), & 'b mut SmtParser<'kid>> +
+          for<'b> ValueParser<PValue, & 'b mut SmtParser<'kid>>,
   Expr: ?Sized + Expr2Smt<()> + 'a,
   Exprs: Copy + IntoIterator< Item = & 'a Expr > {
     self.get_values(exprs, ())
@@ -1283,8 +1283,8 @@ pub trait Solver<
   ) -> SmtRes<Vec<(PExpr, PValue)>>
   where
   Info: Copy,
-  Parser: for<'b> ExprParser<'b, PExpr, Info, & 'b mut SmtParser<'kid>> +
-          for<'b> ValueParser<'b, PValue, & 'b mut SmtParser<'kid>>,
+  Parser: for<'b> ExprParser<PExpr, Info, & 'b mut SmtParser<'kid>> +
+          for<'b> ValueParser<PValue, & 'b mut SmtParser<'kid>>,
   Expr: ?Sized + Expr2Smt<Info> + 'a,
   Exprs: Copy + IntoIterator< Item = & 'a Expr > {
     self.print_get_values( exprs, info.clone() ) ? ;

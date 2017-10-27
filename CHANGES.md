@@ -3,6 +3,7 @@
 - the info used by `*2Smt` is not explicitely a reference anymore
 - all solver commands that take an info now have a `<fn_name>_u` version that
   omits the info when it's unit `()`
+- added an API for activation literals
 
 # v0.9.0
 

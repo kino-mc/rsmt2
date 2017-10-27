@@ -121,7 +121,7 @@ let mut kid = match Kid::default() {
 } ;
 
 struct Parser ;
-impl<'a, 'b> IdentParser<'a, String, String, & 'a str> for & 'b Parser {
+impl<'a, 'b> IdentParser<String, String, & 'a str> for & 'b Parser {
   fn parse_ident(self, s: & 'a str) -> SmtRes<String> {
     Ok(s.to_string())
   }
@@ -129,7 +129,7 @@ impl<'a, 'b> IdentParser<'a, String, String, & 'a str> for & 'b Parser {
     Ok(s.to_string())
   }
 }
-impl<'a, 'b> ValueParser<'a , String, & 'a str> for & 'b Parser {
+impl<'a, 'b> ValueParser<String, & 'a str> for & 'b Parser {
   fn parse_value(self, s: & 'a str) -> SmtRes<String> {
     Ok(s.to_string())
   }

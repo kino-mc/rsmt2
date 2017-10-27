@@ -905,7 +905,7 @@ extern crate error_chain ;
 /// Parser structure.
 #[derive(Clone, Copy)]
 struct Parser ;
-impl<'a> IdentParser< 'a, (Var, Option<usize>), Type, & 'a str > for Parser {
+impl<'a> IdentParser< (Var, Option<usize>), Type, & 'a str > for Parser {
   fn parse_ident(self, s: & 'a str) -> SmtRes<(Var, Option<usize>)> {
     if s.len() <= 2 { bail!("not one of my idents...") }
     let s = & s[ 1 .. (s.len() - 1) ] ; // Removing surrounding pipes.
@@ -936,7 +936,7 @@ impl<'a> IdentParser< 'a, (Var, Option<usize>), Type, & 'a str > for Parser {
   }
 }
 
-impl<'a> ValueParser< 'a, Const, & 'a str > for Parser {
+impl<'a> ValueParser< Const, & 'a str > for Parser {
   fn parse_value(self, s: & 'a str) -> SmtRes<Const> {
     if s == "true" {
       return Ok( Const::BConst(true) )
@@ -1230,7 +1230,7 @@ mut SmtParser`][smt parser], as it provides the parsers we want.
 # /// Parser structure.
 # #[derive(Clone, Copy)]
 # struct Parser ;
-# impl<'a> IdentParser< 'a, (Var, Option<usize>), Type, & 'a str > for Parser {
+# impl<'a> IdentParser< (Var, Option<usize>), Type, & 'a str > for Parser {
 #   fn parse_ident(self, s: & 'a str) -> SmtRes<(Var, Option<usize>)> {
 #     if s.len() <= 2 { bail!("not one of my idents...") }
 #     let s = & s[ 1 .. (s.len() - 1) ] ; // Removing surrounding pipes.
@@ -1263,7 +1263,7 @@ mut SmtParser`][smt parser], as it provides the parsers we want.
 
 use rsmt2::parse::SmtParser ;
 
-impl<'a, Br> ValueParser< 'a, Const, & 'a mut SmtParser<Br> > for Parser
+impl<'a, Br> ValueParser< Const, & 'a mut SmtParser<Br> > for Parser
 where Br: ::std::io::BufRead {
   fn parse_value(self, input: & 'a mut SmtParser<Br>) -> SmtRes<Const> {
     use std::str::FromStr ;
@@ -1624,7 +1624,7 @@ mod top {
   /// Parser structure.
   #[derive(Clone, Copy)]
   struct Parser ;
-  impl<'a> IdentParser< 'a, (Var, Option<usize>), Type, & 'a str > for Parser {
+  impl<'a> IdentParser< (Var, Option<usize>), Type, & 'a str > for Parser {
     fn parse_ident(self, s: & 'a str) -> SmtRes<(Var, Option<usize>)> {
       if s.len() <= 2 { bail!("not one of my idents...") }
       let s = & s[ 1 .. (s.len() - 1) ] ; // Removing surrounding pipes.
@@ -1657,7 +1657,7 @@ mod top {
 
   use parse::SmtParser ;
 
-  impl<'a, Br> ValueParser< 'a, Const, & 'a mut SmtParser<Br> > for Parser
+  impl<'a, Br> ValueParser< Const, & 'a mut SmtParser<Br> > for Parser
   where Br: ::std::io::BufRead {
     fn parse_value(self, input: & 'a mut SmtParser<Br>) -> SmtRes<Const> {
       use std::str::FromStr ;
