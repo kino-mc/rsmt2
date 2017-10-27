@@ -4,6 +4,7 @@
 - all solver commands that take an info now have a `<fn_name>_u` version that
   omits the info when it's unit `()`
 - added an API for activation literals
+- simplified parse traits type parameters a bit
 
 # v0.9.0
 
