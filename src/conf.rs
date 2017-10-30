@@ -89,6 +89,19 @@ impl fmt::Display for SolverStyle {
 }
 
 
+/// Creates a default z3 solver configuration.
+#[inline]
+pub fn z3() -> SolverConf {
+  SolverConf::z3()
+}
+
+/// Creates a default cvc4 solver configuration.
+#[inline]
+pub fn cvc4() -> SolverConf {
+  SolverConf::cvc4()
+}
+
+
 /// Configuration and solver specific info.
 #[derive(Debug, Clone)]
 pub struct SolverConf {
