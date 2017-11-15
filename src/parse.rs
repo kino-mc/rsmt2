@@ -1130,7 +1130,6 @@ impl<R: BufRead> SmtParser<R> {
       self.tag_info(
         "(", "opening expr/value pair or `)` closing value list"
       ) ? ;
-      // self.tag( "define-fun" ) ? ;
       let expr = parser.parse_expr( self, info.clone() ) ? ;
       let value = parser.parse_value(self) ? ;
       values.push( (expr, value) ) ;
