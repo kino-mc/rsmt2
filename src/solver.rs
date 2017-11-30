@@ -620,7 +620,7 @@ pub trait Solver<
 
   /// Defines a new sort.
   #[inline]
-  fn define_sort_u<'a, Sort, Arg, Args, Body>(
+  fn define_sort<'a, Sort, Arg, Args, Body>(
     & mut self, sort: & Sort, args: Args, body: & Body
   ) -> SmtRes<()>
   where
@@ -628,12 +628,12 @@ pub trait Solver<
   Arg: Expr2Smt<()> + 'a,
   Body: Expr2Smt<()>,
   Args: Copy + IntoIterator< Item = & 'a Arg > {
-    self.define_sort(sort, args, body, ())
+    self.define_sort_with(sort, args, body, ())
   }
 
   /// Defines a new sort.
   #[inline]
-  fn define_sort<'a, Sort, Info, Arg, Args, Body>(
+  fn define_sort_with<'a, Sort, Info, Arg, Args, Body>(
     & mut self, sort: & Sort, args: Args, body: & Body, info: Info
   ) -> SmtRes<()>
   where
@@ -664,7 +664,7 @@ pub trait Solver<
 
   /// Declares a new function symbol.
   #[inline]
-  fn declare_fun_u<'a, FunSym, ArgSort, Args, OutSort> (
+  fn declare_fun<'a, FunSym, ArgSort, Args, OutSort> (
     & mut self, symbol: & FunSym, args: Args, out: & OutSort
   ) -> SmtRes<()>
   where
@@ -672,12 +672,12 @@ pub trait Solver<
   ArgSort: ?Sized + Sort2Smt + 'a,
   OutSort: ?Sized + Sort2Smt,
   Args: Copy + IntoIterator< Item = & 'a ArgSort > {
-    self.declare_fun(symbol, args, out, ())
+    self.declare_fun_with(symbol, args, out, ())
   }
 
   /// Declares a new function symbol.
   #[inline]
-  fn declare_fun<'a, Info, FunSym, ArgSort, Args, OutSort> (
+  fn declare_fun_with<'a, Info, FunSym, ArgSort, Args, OutSort> (
     & mut self, symbol: & FunSym, args: Args, out: & OutSort, info: Info
   ) -> SmtRes<()>
   where
@@ -708,16 +708,16 @@ pub trait Solver<
 
   /// Declares a new constant.
   #[inline]
-  fn declare_const_u<Sym, Sort> (
+  fn declare_const<Sym, Sort> (
     & mut self, symbol: & Sym, out_sort: & Sort
   ) -> SmtRes<()>
   where Sym: ?Sized + Sym2Smt<()>, Sort: ?Sized + Sort2Smt {
-    self.declare_const(symbol, out_sort, ())
+    self.declare_const_with(symbol, out_sort, ())
   }
 
   /// Declares a new constant.
   #[inline]
-  fn declare_const<Info, Sym, Sort> (
+  fn declare_const_with<Info, Sym, Sort> (
     & mut self, symbol: & Sym, out_sort: & Sort, info: Info
   ) -> SmtRes<()>
   where Info: Copy, Sym: ?Sized + Sym2Smt<Info>, Sort: ?Sized + Sort2Smt {
@@ -738,7 +738,7 @@ pub trait Solver<
 
   /// Defines a new function symbol.
   #[inline]
-  fn define_fun_u<
+  fn define_fun<
     'a, FunSym, ArgSym, ArgSort, Args, OutSort, Body
   >(
     & mut self, symbol: & FunSym, args: Args, out: & OutSort, body: & Body
@@ -750,12 +750,12 @@ pub trait Solver<
   ArgSym: Sym2Smt<()> + 'a,
   Body: Expr2Smt<()>,
   Args: Copy + IntoIterator< Item = & 'a (ArgSym, ArgSort) > {
-    self.define_fun(symbol, args, out, body, ())
+    self.define_fun_with(symbol, args, out, body, ())
   }
 
   /// Defines a new function symbol.
   #[inline]
-  fn define_fun<
+  fn define_fun_with<
     'a, Info, FunSym, ArgSym, ArgSort, Args, OutSort, Body
   >(
     & mut self, symbol: & FunSym, args: Args,
@@ -797,7 +797,7 @@ pub trait Solver<
 
   /// Defines some new (possibily mutually) recursive functions.
   #[inline]
-  fn define_funs_rec_u<
+  fn define_funs_rec<
     'a, FunSym, ArgSym, ArgSort, Args, OutSort, Body, Funs
   >(
     & mut self, funs: Funs
@@ -810,12 +810,12 @@ pub trait Solver<
   Body: Expr2Smt<()> + 'a,
   & 'a Args: IntoIterator< Item = & 'a (ArgSym, ArgSort) > + 'a,
   Funs: Copy + IntoIterator< Item = & 'a (FunSym, Args, OutSort, Body) > {
-    self.define_funs_rec(funs, ())
+    self.define_funs_rec_with(funs, ())
   }
 
   /// Defines some new (possibily mutually) recursive functions.
   #[inline]
-  fn define_funs_rec<
+  fn define_funs_rec_with<
     'a, Info, FunSym, ArgSym, ArgSort, Args, OutSort, Body, Funs
   >(
     & mut self, funs: Funs, info: Info
@@ -871,7 +871,7 @@ pub trait Solver<
 
   /// Defines a new recursive function.
   #[inline]
-  fn define_fun_rec_u<
+  fn define_fun_rec<
     'a, FunSym, ArgSym, ArgSort, Args, OutSort, Body
   >(
     & mut self,  symbol: & FunSym, args: Args, out: & OutSort, body: & Body
@@ -883,12 +883,12 @@ pub trait Solver<
   ArgSym: Sym2Smt<()> + 'a,
   Body: Expr2Smt<()>,
   Args: Copy + IntoIterator< Item = & 'a (ArgSym, ArgSort) > {
-    self.define_fun_rec(symbol, args, out, body, ())
+    self.define_fun_rec_with(symbol, args, out, body, ())
   }
 
   /// Defines a new recursive function.
   #[inline]
-  fn define_fun_rec<
+  fn define_fun_rec_with<
     'a, Info, FunSym, ArgSym, ArgSort, Args, OutSort, Body
   >(
     & mut self,  symbol: & FunSym, args: Args,
@@ -941,26 +941,26 @@ pub trait Solver<
 
   /// Asserts an expression without print information.
   #[inline]
-  fn assert_u<Expr>(
+  fn assert<Expr>(
     & mut self, expr: & Expr
   ) -> SmtRes<()>
   where Expr: ?Sized + Expr2Smt<()> {
-    self.assert(expr, ())
+    self.assert_with(expr, ())
   }
 
   /// Asserts an expression without print information, guarded by an activation
   /// literal.
   #[inline]
-  fn assert_act_u<Expr>(
+  fn assert_act<Expr>(
     & mut self, actlit: & Actlit, expr: & Expr
   ) -> SmtRes<()>
   where Expr: ?Sized + Expr2Smt<()> {
-    self.assert_act(actlit, expr, ())
+    self.assert_act_with(actlit, expr, ())
   }
 
   /// Asserts an expression with some print information.
   #[inline]
-  fn assert<Info, Expr>(
+  fn assert_with<Info, Expr>(
     & mut self, expr: & Expr, info: Info
   ) -> SmtRes<()>
   where
@@ -982,7 +982,7 @@ pub trait Solver<
   /// Asserts an expression with some print information, guarded by an
   /// activation literal.
   #[inline]
-  fn assert_act<Info, Expr>(
+  fn assert_act_with<Info, Expr>(
     & mut self, actlit: & Actlit, expr: & Expr, info: Info
   ) -> SmtRes<()>
   where
@@ -1206,17 +1206,17 @@ pub trait Solver<
   }
 
   /// Get-values command.
-  fn print_get_values_u<'a, Expr, Exprs>(
+  fn print_get_values<'a, Expr, Exprs>(
     & mut self, exprs: Exprs
   ) -> SmtRes<()>
   where
   Expr: ?Sized + Expr2Smt<()> + 'a,
   Exprs: Clone + IntoIterator< Item = & 'a Expr > {
-    self.print_get_values(exprs, ())
+    self.print_get_values_with(exprs, ())
   }
 
   /// Get-values command.
-  fn print_get_values<'a, Info, Expr, Exprs>(
+  fn print_get_values_with<'a, Info, Expr, Exprs>(
     & mut self, exprs: Exprs, info: Info
   ) -> SmtRes<()>
   where
@@ -1236,17 +1236,17 @@ pub trait Solver<
   }
 
   /// Parse the result of a get-values.
-  fn parse_get_values_u<Expr, Value>(
+  fn parse_get_values<Expr, Value>(
     & mut self
   ) -> SmtRes<Vec<(Expr, Value)>>
   where
   Parser: for<'a> ExprParser<Expr, (), & 'a mut SmtParser<'kid>> +
           for<'a> ValueParser<Value, & 'a mut SmtParser<'kid>> {
-    self.parse_get_values(())
+    self.parse_get_values_with(())
   }
 
   /// Parse the result of a get-values.
-  fn parse_get_values<Info, Expr, Value>(
+  fn parse_get_values_with<Info, Expr, Value>(
     & mut self, info: Info
   ) -> SmtRes<Vec<(Expr, Value)>>
   where
@@ -1261,7 +1261,7 @@ pub trait Solver<
   ///
   /// Notice that the input expression type and the output one have no reason
   /// to be the same.
-  fn get_values_u<'a, Expr, Exprs, PExpr, PValue>(
+  fn get_values<'a, Expr, Exprs, PExpr, PValue>(
     & mut self, exprs: Exprs
   ) -> SmtRes<Vec<(PExpr, PValue)>>
   where
@@ -1269,14 +1269,14 @@ pub trait Solver<
           for<'b> ValueParser<PValue, & 'b mut SmtParser<'kid>>,
   Expr: ?Sized + Expr2Smt<()> + 'a,
   Exprs: Copy + IntoIterator< Item = & 'a Expr > {
-    self.get_values(exprs, ())
+    self.get_values_with(exprs, ())
   }
 
   /// Get-values command.
   ///
   /// Notice that the input expression type and the output one have no reason
   /// to be the same.
-  fn get_values<
+  fn get_values_with<
     'a, Info, Expr, Exprs, PExpr, PValue
   >(
     & mut self, exprs: Exprs, info: Info
@@ -1287,22 +1287,22 @@ pub trait Solver<
           for<'b> ValueParser<PValue, & 'b mut SmtParser<'kid>>,
   Expr: ?Sized + Expr2Smt<Info> + 'a,
   Exprs: Copy + IntoIterator< Item = & 'a Expr > {
-    self.print_get_values( exprs, info.clone() ) ? ;
-    self.parse_get_values(info)
+    self.print_get_values_with( exprs, info.clone() ) ? ;
+    self.parse_get_values_with(info)
   }
 
   /// Check-sat with assumptions command with unit info.
-  fn print_check_sat_assuming_u<'a, Ident, Idents>(
+  fn print_check_sat_assuming<'a, Ident, Idents>(
     & mut self, bool_vars: Idents
   ) -> SmtRes<()>
   where
   Ident: ?Sized + Sym2Smt<()> + 'a,
   Idents: Copy + IntoIterator< Item = & 'a Ident > {
-    self.print_check_sat_assuming(bool_vars, ())
+    self.print_check_sat_assuming_with(bool_vars, ())
   }
 
   /// Check-sat with assumptions command.
-  fn print_check_sat_assuming<'a, Info, Ident, Idents>(
+  fn print_check_sat_assuming_with<'a, Info, Ident, Idents>(
     & mut self, bool_vars: Idents, info: Info
   ) -> SmtRes<()>
   where
@@ -1332,24 +1332,24 @@ pub trait Solver<
   }
 
   /// Check-sat assuming command, turns `unknown` results into errors.
-  fn check_sat_assuming_u<'a, Ident, Idents>(
+  fn check_sat_assuming<'a, Ident, Idents>(
     & mut self, idents: Idents
   ) -> SmtRes<bool>
   where
   Ident: ?Sized + Sym2Smt<()> + 'a,
   Idents: Copy + IntoIterator< Item = & 'a Ident > {
-    self.check_sat_assuming(idents, ())
+    self.check_sat_assuming_with(idents, ())
   }
 
   /// Check-sat assuming command, turns `unknown` results into errors.
-  fn check_sat_assuming<'a, Info, Ident, Idents>(
+  fn check_sat_assuming_with<'a, Info, Ident, Idents>(
     & mut self, idents: Idents, info: Info
   ) -> SmtRes<bool>
   where
   Info: Copy,
   Ident: ?Sized + Sym2Smt<Info> + 'a,
   Idents: Copy + IntoIterator< Item = & 'a Ident > {
-    self.print_check_sat_assuming(idents, info) ? ;
+    self.print_check_sat_assuming_with(idents, info) ? ;
     self.parse_check_sat()
   }
 
@@ -1371,7 +1371,7 @@ pub trait Solver<
   Info: Copy,
   Ident: ?Sized + Sym2Smt<Info> + 'a,
   Idents: Copy + IntoIterator< Item = & 'a Ident > {
-    self.print_check_sat_assuming(idents, info) ? ;
+    self.print_check_sat_assuming_with(idents, info) ? ;
     self.parse_check_sat_or_unknown()
   }
 }

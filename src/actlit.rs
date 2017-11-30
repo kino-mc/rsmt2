@@ -15,7 +15,7 @@ underlying solver, these will not appear in the result of
 - [`de_actlit`](../trait.Solver.html#method.de_actlit)
 - [`set_actlit`](../trait.Solver.html#method.set_actlit)
 - [`assert_act`](../trait.Solver.html#method.assert_act)
-- [`assert_act_u`](../trait.Solver.html#method.assert_act_u)
+- [`assert_act_with`](../trait.Solver.html#method.assert_act_with)
 - [`print_check_sat_act`](../trait.Solver.html#method.print_check_sat_act)
 - [`check_sat_act`](../trait.Solver.html#method.check_sat_act)
 - [`check_sat_act_or_unknown`](../trait.Solver.html#method.check_sat_act_or_unknown)
@@ -37,29 +37,29 @@ let mut kid = match Kid::default() {
 
 {
   let mut solver = solver(& mut kid, ()).unwrap() ;
-  solver.declare_const_u("x", "Int").unwrap() ;
+  solver.declare_const("x", "Int").unwrap() ;
 
-  solver.declare_const_u("actlit", "Bool").unwrap() ;
-  solver.assert_u("\
+  solver.declare_const("actlit", "Bool").unwrap() ;
+  solver.assert("\
     (=> actlit \
         (and (> x 0) (< x 3) (= (mod x 3) 0))\
     )\
   ").unwrap() ;
   assert!{
-    ! solver.check_sat_assuming_u( Some("actlit") ).unwrap()
+    ! solver.check_sat_assuming( Some("actlit") ).unwrap()
   }
-  solver.assert_u("(not actlit)").unwrap() ;
+  solver.assert("(not actlit)").unwrap() ;
 
-  solver.declare_const_u("other_actlit", "Bool").unwrap() ;
-  solver.assert_u("\
+  solver.declare_const("other_actlit", "Bool").unwrap() ;
+  solver.assert("\
     (=> other_actlit \
         (and (> x 7) (= (mod x 2) 0))\
     )\
   ").unwrap() ;
   assert!{
-    solver.check_sat_assuming_u( Some("other_actlit") ).unwrap()
+    solver.check_sat_assuming( Some("other_actlit") ).unwrap()
   }
-  solver.assert_u("(not other_actlit)").unwrap() ;
+  solver.assert("(not other_actlit)").unwrap() ;
 }
 
 kid.kill().unwrap()
@@ -77,12 +77,12 @@ let mut kid = match Kid::default() {
 
 {
   let mut solver = solver(& mut kid, ()).unwrap() ;
-  solver.declare_const_u("x", "Int").unwrap() ;
+  solver.declare_const("x", "Int").unwrap() ;
 
   let actlit = solver.get_actlit().unwrap() ;
-  solver.assert_act_u(& actlit, "(> x 0)").unwrap() ;
-  solver.assert_act_u(& actlit, "(< x 3)").unwrap() ;
-  solver.assert_act_u(& actlit, "(= (mod x 3) 0)").unwrap() ;
+  solver.assert_act(& actlit, "(> x 0)").unwrap() ;
+  solver.assert_act(& actlit, "(< x 3)").unwrap() ;
+  solver.assert_act(& actlit, "(= (mod x 3) 0)").unwrap() ;
 
   assert!{
     ! solver.check_sat_act( Some(& actlit) ).unwrap()
@@ -92,8 +92,8 @@ let mut kid = match Kid::default() {
   // version above, since use-after-deactivate is not possible.
 
   let actlit = solver.get_actlit().unwrap() ;
-  solver.assert_act_u(& actlit, "(> x 7)").unwrap() ;
-  solver.assert_act_u(& actlit, "(= (mod x 2) 0)").unwrap() ;
+  solver.assert_act(& actlit, "(> x 7)").unwrap() ;
+  solver.assert_act(& actlit, "(= (mod x 2) 0)").unwrap() ;
   assert!{
     solver.check_sat_act( Some(& actlit) ).unwrap()
   }
@@ -137,7 +137,7 @@ impl<'a, 'b> ValueParser<String, & 'a str> for & 'b Parser {
 
 {
   let mut solver = solver(& mut kid, & Parser).unwrap() ;
-  solver.declare_const_u("x", "Int").unwrap() ;
+  solver.declare_const("x", "Int").unwrap() ;
 
   let actlit = solver.get_actlit().unwrap() ;
   let mut buf: Vec<u8> = vec![] ;
@@ -147,8 +147,8 @@ impl<'a, 'b> ValueParser<String, & 'a str> for & 'b Parser {
     ::std::str::from_utf8(& buf).unwrap()
   }
 
-  solver.assert_act_u(& actlit, "(> x 7)").unwrap() ;
-  solver.assert_act_u(& actlit, "(= (mod x 2) 0)").unwrap() ;
+  solver.assert_act(& actlit, "(> x 7)").unwrap() ;
+  solver.assert_act(& actlit, "(= (mod x 2) 0)").unwrap() ;
   assert!{
     solver.check_sat_act( Some(& actlit) ).unwrap()
   }
