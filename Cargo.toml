@@ -1,6 +1,6 @@
 [package]
 name = "rsmt2"
-version = "0.9.2"
+version = "0.9.3"
 authors = ["Adrien Champion <adrien.champion@email.com>"]
 description = "Wrapper for SMT-LIB 2 compliant SMT solvers."
 documentation = "https://docs.rs/rsmt2"
