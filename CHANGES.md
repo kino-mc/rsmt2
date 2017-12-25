@@ -1,3 +1,6 @@
+# v0.9.2
+- fixed problem in `get_values` result parsing
+
 # v0.9.1
 
 - the info used by `*2Smt` is not explicitely a reference anymore
