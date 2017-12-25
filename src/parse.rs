@@ -787,9 +787,9 @@ impl<R: BufRead> SmtParser<R> {
           },
         }
       }
-      if res.is_some() {
-        self.tag(")") ?
-      } else {
+      if ! (
+        res.is_some() && self.try_tag(")") ?
+      ) {
         self.backtrack() ;
         return Ok(None)
       }
