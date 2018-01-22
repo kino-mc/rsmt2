@@ -762,11 +762,17 @@ impl<R: BufRead> SmtParser<R> {
     let mut res = None ;
     if let Some((start, end)) = self.try_uint_indices() ? {
       self.cursor = end ;
-      let uint = & self.buff[start .. end] ;
-      try_apply!(
-        f(uint, true) => |int| res = Some(int),
-        format!("error parsing integer `{}`", uint)
-      )
+      if self.try_tag(".") ? {
+        self.backtrack() ;
+        res = None
+      } else {
+        self.cursor = end ;
+        let uint = & self.buff[start .. end] ;
+        try_apply!(
+          f(uint, true) => |int| res = Some(int),
+          format!("error parsing integer `{}`", uint)
+        )
+      }
     } else if self.try_tag("(") ? {
       let pos = if self.try_tag("-") ? {
         false
@@ -837,12 +843,20 @@ impl<R: BufRead> SmtParser<R> {
   ///   Ok((num, den))
   /// }
   /// let txt = "\
-  ///   666 (- 11) false; comment\n(/ 31 27) (- (/ 63 0)) (= tru)\
+  ///   0.0 666.0 7.42 (- 11.0) false; comment\n(/ 31 27) (- (/ 63 0)) (= tru)\
   /// " ;
   /// let mut parser = SmtParser::of_str(txt) ;
+  /// assert_eq!( parser.try_rat(to_rat).expect("rat"), Some((0, 1)) ) ;
+  /// assert_eq!(
+  ///   parser.buff_rest(), " 666.0 7.42 (- 11.0) false; comment\n"
+  /// ) ;
   /// assert_eq!( parser.try_rat(to_rat).expect("rat"), Some((666, 1)) ) ;
   /// assert_eq!(
-  ///   parser.buff_rest(), " (- 11) false; comment\n"
+  ///   parser.buff_rest(), " 7.42 (- 11.0) false; comment\n"
+  /// ) ;
+  /// assert_eq!( parser.try_rat(to_rat).expect("rat"), Some((742, 100)) ) ;
+  /// assert_eq!(
+  ///   parser.buff_rest(), " (- 11.0) false; comment\n"
   /// ) ;
   /// assert_eq!( parser.try_rat(to_rat).expect("rat"), Some((- 11, 1)) ) ;
   /// assert_eq!(
@@ -874,18 +888,45 @@ impl<R: BufRead> SmtParser<R> {
     if let Some((fst_start, fst_end)) = self.try_uint_indices() ? {
       if fst_end + 1 < self.buff.len()
       && & self.buff[ fst_end .. (fst_end + 2) ] == ".0" {
+        try_apply!(
+          f(
+            & self.buff[ fst_start .. fst_end ], "1", pos
+          ) => |okay| res = Some(okay), err
+        ) ;
         self.cursor = fst_end + 2
       } else if fst_end < self.buff.len()
       && & self.buff[ fst_end .. (fst_end + 1) ] == "." {
-        self.cursor = fst_end + 1
+        self.cursor = fst_end + 1 ;
+        if let Some((snd_start, snd_end)) = self.try_uint_indices() ? {
+          let num = format!(
+            "{}{}",
+            & self.buff[ fst_start .. fst_end ],
+            & self.buff[ snd_start .. snd_end ],
+          ) ;
+          let mut den = String::with_capacity ( snd_end - snd_start ) ;
+          den.push('1') ;
+          for _ in snd_start .. snd_end {
+            den.push('0')
+          }
+          try_apply!(
+            f(
+              & num, & den, pos
+            ) => |okay| res = Some(okay), err
+          ) ;
+          self.cursor = snd_end
+        } else {
+          bail!("ill-formed rational")
+        }
       } else {
-        self.cursor = fst_end
+        return Ok(None)
+        // self.cursor = fst_end
       }
-      try_apply!(
-        f(
-          & self.buff[fst_start..fst_end], "1", pos
-        ) => |okay| res = Some(okay), err
-      )
+      // unimplemented!()
+      // try_apply!(
+      //   f(
+      //     & self.buff[fst_start..fst_end], "1", pos
+      //   ) => |okay| res = Some(okay), err
+      // )
     }
     self.mark() ;
 
@@ -906,9 +947,9 @@ impl<R: BufRead> SmtParser<R> {
         if num_end + 1 < self.buff.len()
         && & self.buff[ num_end .. (num_end + 2) ] == ".0" {
           self.cursor = num_end + 2
-        } else if num_end < self.buff.len()
-        && & self.buff[ num_end .. (num_end + 1) ] == "." {
-          self.cursor = num_end + 1
+        // } else if num_end < self.buff.len()
+        // && & self.buff[ num_end .. (num_end + 1) ] == "." {
+        //   self.cursor = num_end + 1
         } else {
           self.cursor = num_end
         }
@@ -917,9 +958,9 @@ impl<R: BufRead> SmtParser<R> {
           if den_end + 1 < self.buff.len()
           && & self.buff[ den_end .. (den_end + 2) ] == ".0" {
             self.cursor = den_end + 2
-          } else if den_end < self.buff.len()
-          && & self.buff[ den_end .. (den_end + 1) ] == "." {
-            self.cursor = den_end + 1
+          // } else if den_end < self.buff.len()
+          // && & self.buff[ den_end .. (den_end + 1) ] == "." {
+          //   self.cursor = den_end + 1
           } else {
             self.cursor = den_end
           }
