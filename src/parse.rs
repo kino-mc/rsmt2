@@ -132,8 +132,6 @@ pub struct SmtParser<R: BufRead> {
   buff_2: String,
   /// Current position in the text.
   cursor: usize,
-  /// Marked position, for backtracking.
-  mark: Option<usize>,
 }
 impl<'a> SmtParser< BufReader<& 'a [u8]> > {
   /// Constructor from a string, mostly for doc/test purposes.
@@ -149,7 +147,6 @@ impl<R: BufRead> SmtParser<R> {
       buff: String::with_capacity(5_000),
       buff_2: String::with_capacity(5_000),
       cursor: 0,
-      mark: None,
     }
   }
 
@@ -454,6 +451,15 @@ impl<R: BufRead> SmtParser<R> {
     }
   }
 
+  /// The current position.
+  fn pos(& self) -> usize {
+    self.cursor
+  }
+  /// Backtracks to the position specified.
+  fn backtrack_to(& mut self, pos: usize) {
+    self.cursor = pos
+  }
+
   /// Parses a tag followed by a whitespace, a paren or a comment.
   ///
   /// If this function returns `false`, then the cursor is at the first
@@ -493,40 +499,17 @@ impl<R: BufRead> SmtParser<R> {
   /// # }
   /// ```
   pub fn try_word(& mut self, word: & str) -> SmtRes<bool> {
-    self.mark() ;
+    let start_pos = self.pos() ;
     if self.try_tag(word) ? {
       if let Some(c) = self.buff[ self.cursor .. ].chars().next() {
         if c.is_whitespace() || c == ')' || c == '(' || c == ';' {
-          self.clear_mark() ;
           return Ok(true)
         }
       }
     }
-    self.backtrack() ;
+    self.backtrack_to(start_pos) ;
     self.spc_cmt() ;
     Ok(false)
-  }
-
-  /// Marks the current position.
-  #[inline]
-  fn mark(& mut self) {
-    debug_assert!( self.mark.is_none() ) ;
-    self.mark = Some(self.cursor)
-  }
-  /// Clears the marked position.
-  #[inline]
-  fn clear_mark(& mut self) {
-    debug_assert!( self.mark.is_some() ) ;
-    self.mark = None
-  }
-  /// Backtracks to the marked position.
-  fn backtrack(& mut self) {
-    if let Some(position) = self.mark {
-      self.cursor = position ;
-      self.clear_mark() ;
-    } else {
-      panic!("cannot backtrack, no marked position")
-    }
   }
 
   /// Tries to parse a sequence of things potentially separated by whitespaces
@@ -560,15 +543,14 @@ impl<R: BufRead> SmtParser<R> {
   /// ```
   pub fn try_tags<'a, Tags, S>(& mut self, tags: & 'a Tags) -> SmtRes<bool>
   where & 'a Tags: IntoIterator<Item = S>, S: AsRef<str> {
-    self.mark() ;
+    let start_pos = self.pos() ;
     for tag in tags {
       if ! self.try_tag( tag.as_ref() ) ? {
-        self.backtrack() ;
+        self.backtrack_to(start_pos) ;
         self.spc_cmt() ;
         return Ok(false)
       }
     }
-    self.clear_mark() ;
     Ok(true)
   }
 
@@ -668,8 +650,17 @@ impl<R: BufRead> SmtParser<R> {
   #[inline]
   fn try_uint_indices(& self) -> SmtRes< Option<(usize, usize)> > {
     let mut end = self.cursor ;
+    let (mut zero_first, mut first) = (false, true) ;
     for c in self.buff[ self.cursor .. ].chars() {
       if c.is_numeric() {
+        if first {
+          first = false ;
+          if c == '0' {
+            zero_first = true
+          }
+        } else if zero_first {
+          return Ok(None)
+        }
         end += 1
       } else {
         break
@@ -717,10 +708,12 @@ impl<R: BufRead> SmtParser<R> {
   /// Only recognizes integers of the form
   ///
   /// ```bash
-  /// int   ::= usize
+  /// int   ::= usize             # Not followed by a '.'
   ///         | '(' '-' usize ')'
-  /// usize ::= [0-9][0-9]*
+  /// usize ::= '0' | [1-9][0-9]*
   /// ```
+  ///
+  /// # Examples
   ///
   /// ```
   /// # extern crate rsmt2 ;
@@ -738,32 +731,57 @@ impl<R: BufRead> SmtParser<R> {
   ///   666 (- 11) false; comment\n(+ 31) (= tru)\
   /// " ;
   /// let mut parser = SmtParser::of_str(txt) ;
+  /// println!("666") ;
   /// assert_eq!( parser.try_int(to_int).expect("int"), Some(666) ) ;
   /// assert_eq!(
   ///   parser.buff_rest(), " (- 11) false; comment\n"
   /// ) ;
+  ///
+  /// println!("- 11") ;
   /// assert_eq!( parser.try_int(to_int).expect("int"), Some(- 11) ) ;
   /// assert_eq!(
   ///   parser.buff_rest(), " false; comment\n"
   /// ) ;
+  ///
   /// assert_eq!( parser.try_int(to_int).expect("int"), None ) ;
   /// parser.tag("false").expect("tag") ;
+  ///
+  /// println!("31") ;
   /// assert_eq!( parser.try_int(to_int).expect("int"), Some(31) ) ;
   /// assert_eq!(
   ///   parser.buff_rest(), " (= tru)"
   /// ) ;
+  ///
   /// assert_eq!( parser.try_int(to_int).expect("int"), None ) ;
+  ///
+  /// let txt = " 7.0 " ;
+  /// println!("{}", txt) ;
+  /// let mut parser = SmtParser::of_str(txt) ;
+  /// assert_eq!( parser.try_int(to_int).expect("int"), None ) ;
+  /// assert_eq!(
+  ///   parser.buff_rest(), " 7.0 "
+  /// ) ;
+  ///
+  /// let txt = " 00 " ;
+  /// println!("{}", txt) ;
+  /// let mut parser = SmtParser::of_str(txt) ;
+  /// assert_eq!( parser.try_int(to_int).expect("int"), None ) ;
+  /// assert_eq!(
+  ///   parser.buff_rest(), " 00 "
+  /// ) ;
   /// # }
   /// ```
   pub fn try_int<F, T, Err>(& mut self, f: F) -> SmtRes< Option<T> >
   where F: FnOnce(& str, bool) -> Result<T, Err>, Err: ::std::fmt::Display {
+    let start_pos = self.pos() ;
     self.load_sexpr() ? ;
-    self.mark() ;
+
     let mut res = None ;
+
     if let Some((start, end)) = self.try_uint_indices() ? {
       self.cursor = end ;
       if self.try_tag(".") ? {
-        self.backtrack() ;
+        self.backtrack_to(start_pos) ;
         res = None
       } else {
         self.cursor = end ;
@@ -779,7 +797,7 @@ impl<R: BufRead> SmtParser<R> {
       } else if self.try_tag("+") ? {
         true
       } else {
-        self.backtrack() ;
+        self.backtrack_to(start_pos) ;
         return Ok(None)
       } ;
       if let Some(uint) = self.try_uint() ? {
@@ -796,11 +814,13 @@ impl<R: BufRead> SmtParser<R> {
       if ! (
         res.is_some() && self.try_tag(")") ?
       ) {
-        self.backtrack() ;
+        self.backtrack_to(start_pos) ;
         return Ok(None)
       }
     }
-    if res.is_none() { self.backtrack() } else { self.clear_mark() }
+    if res.is_none() {
+      self.backtrack_to(start_pos)
+    }
     Ok(res)
   }
 
@@ -819,7 +839,7 @@ impl<R: BufRead> SmtParser<R> {
   /// rat   ::= '(' '/' udec udec ')'
   ///         | '(' '-' '(' '/' udec udec ')' ')'
   ///         | idec
-  /// idec  ::= '(' '-' udec ')' | udec
+  /// idec  ::= '(' '-' udec '.' usize ')' | udec
   /// udec  ::= usize | usize.0
   /// usize ::= [0-9][0-9]*
   /// ```
@@ -869,16 +889,31 @@ impl<R: BufRead> SmtParser<R> {
   ///   parser.buff_rest(), " (- (/ 63 0)) (= tru)"
   /// ) ;
   /// assert_eq!( parser.try_rat(to_rat).expect("rat"), (Some((- 63, 0))) ) ;
+  ///
+  /// let txt = " 7 " ;
+  /// let mut parser = SmtParser::of_str(txt) ;
+  /// assert_eq!( parser.try_rat(to_rat).expect("rat"), None ) ;
+  /// assert_eq!(
+  ///   parser.buff_rest(), " 7 "
+  /// ) ;
+  ///
+  /// let txt = " (- 7) " ;
+  /// let mut parser = SmtParser::of_str(txt) ;
+  /// assert_eq!( parser.try_rat(to_rat).expect("rat"), None ) ;
+  /// assert_eq!(
+  ///   parser.buff_rest(), " (- 7) "
+  /// ) ;
   /// # }
   /// ```
   pub fn try_rat<F, T, Err>(& mut self, f: F) -> SmtRes<Option<T>>
   where F: Fn(& str, & str, bool) -> Result<T, Err>, Err: ::std::fmt::Display {
     let err = "error parsing rational" ;
+    let start_pos = self.pos() ;
     self.load_sexpr() ? ;
 
     let mut res = None ;
 
-    let pos = if self.try_tags( & [ "(", "-" ] ) ? {
+    let positive = if self.try_tags( & [ "(", "-" ] ) ? {
       self.spc_cmt() ;
       false
     } else {
@@ -890,7 +925,7 @@ impl<R: BufRead> SmtParser<R> {
       && & self.buff[ fst_end .. (fst_end + 2) ] == ".0" {
         try_apply!(
           f(
-            & self.buff[ fst_start .. fst_end ], "1", pos
+            & self.buff[ fst_start .. fst_end ], "1", positive
           ) => |okay| res = Some(okay), err
         ) ;
         self.cursor = fst_end + 2
@@ -910,7 +945,7 @@ impl<R: BufRead> SmtParser<R> {
           }
           try_apply!(
             f(
-              & num, & den, pos
+              & num, & den, positive
             ) => |okay| res = Some(okay), err
           ) ;
           self.cursor = snd_end
@@ -918,27 +953,20 @@ impl<R: BufRead> SmtParser<R> {
           bail!("ill-formed rational")
         }
       } else {
+        self.backtrack_to(start_pos) ;
         return Ok(None)
-        // self.cursor = fst_end
       }
-      // unimplemented!()
-      // try_apply!(
-      //   f(
-      //     & self.buff[fst_start..fst_end], "1", pos
-      //   ) => |okay| res = Some(okay), err
-      // )
     }
-    self.mark() ;
 
     if res.is_none() {
 
       if ! self.try_tag("(") ? {
-        self.backtrack() ;
+        self.backtrack_to(start_pos) ;
         return Ok(None)
       }
 
       if ! self.try_tag("/") ? {
-        self.backtrack() ;
+        self.backtrack_to(start_pos) ;
         return Ok(None)
       }
 
@@ -967,7 +995,7 @@ impl<R: BufRead> SmtParser<R> {
           match f(
             & self.buff[num_start .. num_end],
             & self.buff[den_start .. den_end],
-            pos
+            positive
           ) {
             Ok(res) => Some(res),
             Err(e) => bail!("error parsing rational: {}", e),
@@ -981,11 +1009,9 @@ impl<R: BufRead> SmtParser<R> {
     }
 
     if res.is_some() {
-      if ! pos { self.tag(")") ? }
-      self.clear_mark() ;
+      if ! positive { self.tag(")") ? }
       Ok(res)
     } else {
-      self.backtrack() ;
       Ok(None)
     }
   }
