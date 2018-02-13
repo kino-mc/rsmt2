@@ -29,9 +29,7 @@ pub trait Sort2Smt {
 
 /// Writes a string.
 #[inline(always)]
-pub fn write_str(
-  w: & mut io::Write, s: & str
-) -> SmtRes<()> {
+pub fn write_str(w: & mut io::Write, s: & str) -> SmtRes<()> {
   w.write_all( s.as_bytes() ) ? ;
   Ok(())
 }

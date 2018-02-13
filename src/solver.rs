@@ -302,9 +302,9 @@ impl<
     F: Fn(& mut BufWriter<& mut ChildStdin>) -> SmtRes<()>,
     FTee: Fn(& mut BufWriter<File>) -> SmtRes<()>,
   >(& mut self, f: F, f_tee: FTee) -> SmtRes<()> {
-    try!( f(& mut self.solver.stdin) ) ;
+    f(& mut self.solver.stdin) ? ;
     self.solver.stdin.flush() ? ;
-    write_str(& mut self.file, "\n") ? ;
+    // write_str(& mut self.file, "\n") ? ;
     f_tee(& mut self.file) ? ;
     self.file.flush() ? ;
     Ok(())
@@ -313,6 +313,8 @@ impl<
     for line in txt.lines() {
       write!(self.file, "\n;; {}", line) ?
     }
+    write!(self.file, "\n") ? ;
+    self.file.flush() ? ;
     Ok(())
   }
   fn solver(& mut self) -> & mut PlainSolver<'kid, Parser> {
