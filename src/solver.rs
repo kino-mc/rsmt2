@@ -234,8 +234,10 @@ impl<
   }
   fn has_actlits(& self) -> bool { self.actlit != 0 }
   fn reset_actlits(& mut self) { self.actlit = 0 }
-  fn parsers(& mut self) -> (& mut SmtParser<'kid>, Parser) {
-    (& mut self.smt_parser, self.parser)
+  fn parsers(& mut self) -> SmtRes<(& mut SmtParser<'kid>, Parser)> {
+    let smt_parser = & mut self.smt_parser ;
+    smt_parser.try_error() ? ;
+    Ok( (smt_parser, self.parser) )
   }
   // fn fetch(& mut self) -> SmtRes<()> {
   //   fetch!(self)
@@ -293,7 +295,7 @@ impl<
   }
   fn has_actlits(& self) -> bool { self.solver.has_actlits() }
   fn reset_actlits(& mut self) { self.solver.reset_actlits() }
-  fn parsers(& mut self) -> (& mut SmtParser<'kid>, Parser) {
+  fn parsers(& mut self) -> SmtRes<(& mut SmtParser<'kid>, Parser)> {
     self.solver.parsers()
   }
   fn write<
@@ -351,7 +353,7 @@ pub trait SolverBasic<'kid, Parser: Copy> {
   fn reset_actlits(& mut self) ;
   /// Accessor to the parser.
   #[inline]
-  fn parsers(& mut self) -> (& mut SmtParser<'kid>, Parser) ;
+  fn parsers(& mut self) -> SmtRes<(& mut SmtParser<'kid>, Parser)> ;
   /// Applies a function to the writer on the solver's stdin.
   fn write<
     F: Fn(& mut BufWriter<& mut ChildStdin>) -> SmtRes<()>,
@@ -1080,7 +1082,7 @@ pub trait Solver<
   Parser: for<'a> IdentParser<Ident, Type, & 'a mut SmtParser<'kid>> +
           for<'a> ValueParser<Value, & 'a mut SmtParser<'kid>> {
     let has_actlits = self.has_actlits() ;
-    let (smt_parser, parser) = self.parsers() ;
+    let (smt_parser, parser) = self.parsers()? ;
     smt_parser.get_model(has_actlits, parser)
   }
 
@@ -1103,7 +1105,7 @@ pub trait Solver<
   Parser: for<'a> IdentParser<Ident, Type, & 'a mut SmtParser<'kid>> +
           for<'a> ValueParser<Value, & 'a mut SmtParser<'kid>> {
     let has_actlits = self.has_actlits() ;
-    let (smt_parser, parser) = self.parsers() ;
+    let (smt_parser, parser) = self.parsers()? ;
     smt_parser.get_model_const(has_actlits, parser)
   }
 
@@ -1123,13 +1125,13 @@ pub trait Solver<
   /// Parse success.
   #[inline]
   fn parse_success(& mut self) -> SmtRes<()> {
-    self.parsers().0.success()
+    self.parsers()?.0.success()
   }
 
   /// Parse the result of a check-sat, turns `unknown` results into errors.
   #[inline(always)]
   fn parse_check_sat(& mut self) -> SmtRes<bool> {
-    if let Some(res) = self.parsers().0.check_sat() ? {
+    if let Some(res) = self.parsers()?.0.check_sat() ? {
       Ok(res)
     } else {
       Err( ErrorKind::Unknown.into() )
@@ -1139,7 +1141,7 @@ pub trait Solver<
   /// Parse the result of a check-sat, turns `unknown` results into `None`.
   #[inline(always)]
   fn parse_check_sat_or_unknown(& mut self) -> SmtRes< Option<bool> > {
-    self.parsers().0.check_sat()
+    self.parsers()?.0.check_sat()
   }
 
   /// Check-sat command, turns `unknown` results into errors.
@@ -1253,7 +1255,7 @@ pub trait Solver<
   Info: Copy,
   Parser: for<'a> ExprParser<Expr, Info, & 'a mut SmtParser<'kid>> +
           for<'a> ValueParser<Value, & 'a mut SmtParser<'kid>> {
-    let (smt_parser, parser) = self.parsers() ;
+    let (smt_parser, parser) = self.parsers()? ;
     smt_parser.get_values(parser, info)
   }
 

@@ -1089,6 +1089,65 @@ impl<R: BufRead> SmtParser<R> {
     self.tag("success")
   }
 
+  /// Parses an error.
+  ///
+  /// Returns `Ok(())` if no error was parsed, an error otherwise.
+  ///
+  /// # Examples
+  ///
+  /// ```
+  /// # extern crate rsmt2 ;
+  /// # use rsmt2::parse::SmtParser ;
+  /// # fn main() {
+  /// use rsmt2::parse::{ IdentParser, ValueParser } ;
+  /// use rsmt2::SmtRes ;
+  /// let txt = "\
+  ///   ( error \"huge panic\" )
+  /// " ;
+  /// let mut parser = SmtParser::of_str(txt) ;
+  /// if let Err(e) = parser.try_error() {
+  /// #  for e in e.iter() {
+  /// #    for line in format!("{}", e).lines() {
+  /// #      println!("{}", line)
+  /// #    }
+  /// #  }
+  ///   debug_assert! { e.description() == "huge panic" }
+  /// } else {
+  ///   panic!("expected error, got nothing :(")
+  /// }
+  /// # }
+  /// ```
+  pub fn try_error(& mut self) -> SmtRes<()> {
+    let start_pos = self.pos() ;
+    if self.try_tag("(") ? {
+      self.spc_cmt() ;
+      if self.try_tag("error") ? {
+        self.spc_cmt() ;
+        if self.try_tag("\"") ? {
+          let start = self.pos() ;
+          let mut end = start ;
+          loop {
+            if end < self.buff.len() && & self.buff[
+              end .. end + 1
+            ] != "\"" {
+              end += 1
+            } else {
+              break
+            }
+          }
+          self.cursor = end + 1 ;
+          self.spc_cmt() ;
+          self.tag(")").chain_err(
+            || "closing error message"
+          ) ? ;
+          bail!( & self.buff[ start .. end ] )
+        }
+      }
+      self.backtrack_to(start_pos)
+    }
+    Ok(())
+  }
+
 
 
   /// Parses the result of a check-sat.
