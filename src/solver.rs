@@ -311,9 +311,12 @@ impl<
   }
   fn comment(& mut self, txt: & str) -> SmtRes<()> {
     for line in txt.lines() {
-      write!(self.file, "\n;; {}", line) ?
+      if line.is_empty() {
+        writeln!(self.file, "") ?
+      } else {
+        writeln!(self.file, ";; {}", line) ?
+      }
     }
-    write!(self.file, "\n") ? ;
     self.file.flush() ? ;
     Ok(())
   }
