@@ -108,7 +108,13 @@
 use errors::* ;
 
 use std::io::{ BufRead, BufReader } ;
+use std::process::ChildStdout ;
 
+
+/// Alias for the underlying parser.
+pub type RSmtParser = SmtParser<
+  BufReader<ChildStdout>
+> ;
 
 
 /// Tries a user parser.

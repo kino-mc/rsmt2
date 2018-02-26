@@ -25,7 +25,7 @@ the list of changes.
 
 # Known projects using `rsmt2`
 
-- [kinō][kino], a model-checker for transition systems
+- [kinō][kino], a model-checker for transition systems (abandoned)
 - [hoice][hoice], a machine-learning-based predicate synthesizer for horn clauses
 
 # License

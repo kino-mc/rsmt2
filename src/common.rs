@@ -155,13 +155,11 @@ impl Logic {
 #[test]
 fn logic() {
   use conf::SolverConf ;
-  use { Logic, Kid, solver, Solver } ;
+  use Solver ;
 
   let conf = SolverConf::z3() ;
 
-  let mut kid = Kid::new(conf).expect("kid") ;
-
-  let mut solver = solver(& mut kid, ()).expect("solver") ;
+  let mut solver = Solver::new(conf, ()).expect("solver") ;
 
   solver.set_logic(Logic::QF_UF).expect("QF_UF") ;
   solver.reset().expect("reset") ;

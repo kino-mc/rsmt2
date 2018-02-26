@@ -1,4 +1,9 @@
+# v0.9.4
+
+- simplified the workflow significantly
+
 # v0.9.2
+
 - fixed problem in `get_values` result parsing
 
 # v0.9.1
