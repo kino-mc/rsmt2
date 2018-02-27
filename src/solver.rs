@@ -255,16 +255,31 @@ impl<Parser> Solver<Parser> {
   }
 
 
-  /// Prints a comment in the tee-ed file if any.
-  ///
-  /// Inserts a newline at the end of the comment.
+  /// Internal comment function.
   #[inline]
-  pub fn comment(& mut self, args: ::std::fmt::Arguments) -> SmtRes<()> {
+  fn cmt(file: & mut BufWriter<File>, blah: & str) -> SmtRes<()> {
+    for line in blah.lines() {
+      write!(file, "; {}\n", line) ?
+    }
+    file.flush() ? ;
+    Ok(())
+  }
+
+
+  /// Prints a comment in the tee-ed file if any.
+  #[inline]
+  pub fn comment_args(& mut self, args: ::std::fmt::Arguments) -> SmtRes<()> {
     if let Some(ref mut file) = self.tee {
-      file.write_all( "; ".as_bytes() ) ? ;
-      file.write_fmt(args) ? ;
-      file.write_all( "\n".as_bytes() ) ? ;
-      file.flush() ?
+      Self::cmt(file, & format!("{}", args)) ?
+    }
+    Ok(())
+  }
+
+  /// Prints a comment in the tee-ed file if any. String version.
+  #[inline]
+  pub fn comment(& mut self, blah: & str) -> SmtRes<()> {
+    if let Some(ref mut file) = self.tee {
+      Self::cmt(file, blah) ?
     }
     Ok(())
   }
