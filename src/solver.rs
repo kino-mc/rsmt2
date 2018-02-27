@@ -255,6 +255,21 @@ impl<Parser> Solver<Parser> {
   }
 
 
+  /// Prints a comment in the tee-ed file if any.
+  ///
+  /// Inserts a newline at the end of the comment.
+  #[inline]
+  pub fn comment(& mut self, args: ::std::fmt::Arguments) -> SmtRes<()> {
+    if let Some(ref mut file) = self.tee {
+      file.write_all( "; ".as_bytes() ) ? ;
+      file.write_fmt(args) ? ;
+      file.write_all( "\n".as_bytes() ) ? ;
+      file.flush() ?
+    }
+    Ok(())
+  }
+
+
 
 
   // |===| Introducing new symbols.
