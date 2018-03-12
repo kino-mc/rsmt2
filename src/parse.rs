@@ -156,6 +156,11 @@ impl<R: BufRead> SmtParser<R> {
     }
   }
 
+  /// Swaps the input source.
+  pub fn swap(& mut self, nu_input: & mut R) {
+    ::std::mem::swap(& mut self.input, nu_input)
+  }
+
   /// Immutable access to the buffer.
   pub fn buff(& self) -> & str {
     & self.buff

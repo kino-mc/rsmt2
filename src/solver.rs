@@ -5,7 +5,7 @@
 
 use std::fs::File ;
 use std::process::{
-  Child, ChildStdin, Command, Stdio
+  Child, ChildStdin, ChildStdout, Command, Stdio
 } ;
 use std::io::{ Write, BufWriter, BufReader } ;
 
@@ -68,6 +68,10 @@ pub struct Solver<Parser> {
   kid: Child,
   /// Solver's stdin.
   stdin: BufWriter<ChildStdin>,
+  /// Second solver process, if in free reset mode.
+  swap: Option<(
+    Child, BufWriter<ChildStdin>, BufReader<ChildStdout>
+  )>,
   /// Tee file writer.
   tee: Option< BufWriter<File> >,
   /// Parser on the solver's stdout.
@@ -99,11 +103,10 @@ impl<Parser> ::std::ops::Drop for Solver<Parser> {
 }
 
 impl<Parser> Solver<Parser> {
-  /// Constructor.
-  pub fn new(conf: SolverConf, parser: Parser) -> SmtRes<Self> {
-    let cmd = conf.get_cmd().to_string() ;
-
-    // Constructing command and spawning kid.
+  /// Spawns the solver kid.
+  fn spawn(conf: & SolverConf) -> SmtRes<
+    (Child, BufWriter<ChildStdin>, BufReader<ChildStdout>)
+  > {
     let mut kid = Command::new(
       // Command.
       conf.get_cmd()
@@ -118,7 +121,8 @@ impl<Parser> Solver<Parser> {
       Stdio::piped()
     ).spawn().chain_err::<_, ErrorKind>(
       || format!(
-        "While spawning child process with {}", cmd
+        "While spawning child process with {}",
+        conf.get_cmd().to_string()
       ).into()
     ) ? ;
 
@@ -134,18 +138,31 @@ impl<Parser> Solver<Parser> {
     let mut stdout_opt = None ;
     ::std::mem::swap( & mut stdout_opt, & mut kid.stdout ) ;
 
-    let smt_parser = if let Some(inner) = stdout_opt {
-      RSmtParser::new( BufReader::new(inner) )
+    let stdout = if let Some(inner) = stdout_opt {
+      BufReader::new(inner)
     } else {
-      bail!("could not retrieve solver's stdin")
+      bail!("could not retrieve solver's stdout")
     } ;
+
+    Ok((kid, stdin, stdout))
+  }
+
+  /// Constructor.
+  pub fn new(conf: SolverConf, parser: Parser) -> SmtRes<Self> {
+
+    // Constructing command and spawning kid.
+    let (kid, stdin, stdout) = Self::spawn(& conf) ? ;
+
+
+    let smt_parser = RSmtParser::new(stdout) ;
 
     let tee = None ;
     let actlit = 0 ;
 
     Ok(
       Solver {
-        kid, stdin, tee, conf, smt_parser, parser, actlit,
+        kid, stdin, swap: None,
+        tee, conf, smt_parser, parser, actlit,
       }
     )
   }
@@ -154,6 +171,16 @@ impl<Parser> Solver<Parser> {
   /// Mostly used in tests, same as `Self::new( SolverConf::z3(), parser )`.
   pub fn default(parser: Parser) -> SmtRes<Self> {
     Self::new( SolverConf::z3(), parser )
+  }
+
+  /// Activates free resets.
+  pub fn free_resets(& mut self) -> SmtRes<()> {
+    if self.swap.is_some() {
+      bail!("Can't activate free resets twice")
+    }
+    let kid_stuff = Self::spawn(& self.conf) ? ;
+    self.swap = Some((kid_stuff)) ;
+    Ok(())
   }
 
   /// Configuration of the solver.
@@ -181,9 +208,7 @@ impl<Parser> Solver<Parser> {
   /// else seems to cause problems.
   #[cfg(windows)]
   pub fn kill(& mut self) -> SmtRes<()> {
-    if let Some(stdin) = self.kid.stdin.as_mut() {
-      let _ = writeln!(stdin, "(exit)\n") ;
-    }
+    let _ = writeln!(self.stdin, "(exit)\n") ;
     Ok(())
   }
   /// Kills the solver kid.
@@ -192,9 +217,7 @@ impl<Parser> Solver<Parser> {
   /// else seems to cause problems.
   #[cfg(not(windows))]
   pub fn kill(& mut self) -> SmtRes<()> {
-    if let Some(stdin) = self.kid.stdin.as_mut() {
-      let _ = writeln!(stdin, "(exit)\n") ;
-    }
+    let _ = writeln!(self.stdin, "(exit)\n") ;
     if let None = self.kid.try_wait().chain_err(
       || "waiting for child process to exit"
     ) ? {
@@ -626,6 +649,13 @@ impl<Parser> Solver<Parser> {
     self.actlit = 0 ;
     wrt! {
       self, |w| write_str(w, "(reset)\n") ?
+    }
+    if let Some(
+      & mut (ref mut kid, ref mut stdin, ref mut stdout)
+    ) = self.swap.as_mut() {
+      ::std::mem::swap(kid, & mut self.kid) ;
+      ::std::mem::swap(stdin, & mut self.stdin) ;
+      self.smt_parser.swap(stdout)
     }
     Ok(())
   }
