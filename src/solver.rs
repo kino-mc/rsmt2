@@ -209,6 +209,9 @@ impl<Parser> Solver<Parser> {
   #[cfg(windows)]
   pub fn kill(& mut self) -> SmtRes<()> {
     let _ = writeln!(self.stdin, "(exit)\n") ;
+    if let Some(& mut (_, ref mut stdin, _)) = self.swap.as_mut() {
+      let _ = writeln!(stdin, "(exit)\n") ;
+    }
     Ok(())
   }
   /// Kills the solver kid.
@@ -224,6 +227,16 @@ impl<Parser> Solver<Parser> {
       self.kid.kill().chain_err::<_, ErrorKind>(
         || "while killing child process".into()
       ) ?
+    }
+    if let Some(& mut (ref mut kid, ref mut stdin, _)) = self.swap.as_mut() {
+      let _ = writeln!(stdin, "(exit)\n") ;
+      if let None = kid.try_wait().chain_err(
+        || "waiting for child process to exit"
+      ) ? {
+        kid.kill().chain_err::<_, ErrorKind>(
+          || "while killing child process".into()
+        ) ?
+      }
     }
     Ok(())
   }
