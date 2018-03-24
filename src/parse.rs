@@ -183,7 +183,7 @@ impl<R: BufRead> SmtParser<R> {
   /// Returns the next s-expression and positions the cursor directly after it.
   ///
   /// An s-expression is an ident, a constant with no parens (`42`, `false`,
-  /// *etc.*), or something between (nested) parens. 
+  /// *etc.*), or something between (nested) parens.
   ///
   /// ```
   /// # extern crate rsmt2 ;
@@ -227,13 +227,12 @@ impl<R: BufRead> SmtParser<R> {
   /// set at its beginning.
   fn load_sexpr(& mut self) -> SmtRes<usize> {
     self.spc_cmt() ;
-    // self.print("") ;
+
     let (mut op_paren, mut cl_paren) = (0, 0) ;
     let mut quoted_ident = false ;
     let mut start = self.cursor ;
     let mut end = start ;
 
-    // println!("  loading:") ;
     'load: loop {
       if start == self.buff.len() {
         let eof = ! self.read_line() ? ;
@@ -243,14 +242,13 @@ impl<R: BufRead> SmtParser<R> {
 
       'lines: for line in self.buff[start..].lines() {
         debug_assert!(op_paren >= cl_paren) ;
-        // println!("  > {}", line) ;
+
         let mut this_end = start ;
         let mut chars = line.chars() ;
         'this_line: while let Some(c) = chars.next() {
           debug_assert!(op_paren >= cl_paren) ;
           this_end += 1 ;
-          // println!("  '{}' {}/{} |{}|", c, op_paren, cl_paren, quoted_ident) ;
-          
+
           if quoted_ident {
             quoted_ident = c != '|' ;
             if ! quoted_ident && op_paren == 0 {
@@ -274,14 +272,8 @@ impl<R: BufRead> SmtParser<R> {
                 'token: for c in chars {
                   if c.is_whitespace() { break 'token }
                   match c {
-                    ')' | '(' | '|' | ';' => {
-                      // println!("` | {}", this_end) ;
-                      break 'token
-                    },
-                    _ => {
-                      // print!("{}[{}]", c, this_end) ;
-                      this_end += 1
-                    },
+                    ')' | '(' | '|' | ';' => break 'token,
+                    _ => this_end += 1,
                   }
                 }
                 end = this_end ;
@@ -297,8 +289,8 @@ impl<R: BufRead> SmtParser<R> {
       start = self.buff.len()
 
     }
+
     self.spc_cmt() ;
-    // println!("{} .. {}", self.cursor, end) ;
     Ok(end)
   }
 

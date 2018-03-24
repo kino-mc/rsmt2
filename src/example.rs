@@ -444,7 +444,7 @@ fn test_native() {
 #[test]
 fn test_unroll() {
   use self::SExpr::* ;
-  
+
   let mut solver = get_solver(Parser) ;
 
   let nsv_0 = Var::nsvar("non-stateful var") ;

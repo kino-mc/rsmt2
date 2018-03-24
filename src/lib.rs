@@ -1,44 +1,44 @@
 //! "A wrapper around an SMT Lib 2(.5)-compliant SMT solver.
-//! 
+//!
 //! See [`CHANGES.md`](https://github.com/kino-mc/rsmt2/blob/master/README.md)
 //! for the list of changes.
-//! 
+//!
 //! Solvers run in a separate process and communication is achieved *via*
 //! system pipes.
-//! 
+//!
 //! This library does **not** have a structure for S-expressions. It should be
 //! provided by the user, as well as the relevant printing and parsing
 //! functions. Print traits are in the [`to_smt` module][to smt mod], while the
 //! parse traits are in the [`parse` module][parse mod].
-//! 
+//!
 //! If you use this library consider contacting us on the
 //! [repository](https://github.com/kino-mc/rsmt2) so that we can add your
 //! project to the readme.
-//! 
+//!
 //! ## (A)synchronous commands.
-//! 
+//!
 //! The functions corresponding to SMT Lib 2 commands come in two flavors,
 //! asynchronous and synchronous.
-//! 
+//!
 //! *Synchronous* means that the command is printed on the solver's stdin, and
 //! the result is parsed **right away**. Users get control back whenever the
 //! solver is done working and parsing is done. In other words, synchronous
 //! commands are *blocking*.
-//! 
+//!
 //! *Asynchronous* means that after the command is printed and control is given
 //! back to the user. To retrieve the result, users must call the relevant
 //! `parse_...` function. For instance, `parse_sat` for `check_sat`. In other
 //! words, `print_` commands are *non-blocking*.
-//! 
-//! 
+//!
+//!
 //! The example below uses synchronous commands.
-//! 
-//! 
+//!
+//!
 //! ## Workflow
-//! 
+//!
 //! The workflow is introduced below on a simple example. We first define a few
 //! helper types we will use later for the expression type.
-//! 
+//!
 //! ```
 //! /// Operators. Just implements `Display`, never manipulated directly by the
 //! /// solver.
@@ -64,8 +64,8 @@
 //!     )
 //!   }
 //! }
-//! 
-//! 
+//!
+//!
 //! /// A constant.
 //! #[derive(Clone, Copy)]
 //! pub enum Cst {
@@ -94,37 +94,37 @@
 //!   }
 //! }
 //! ```
-//! 
+//!
 //! These types are defined in the [`simple_example` module][simple example
 //! mod], and will be imported from there in the rest of the explanation. We
 //! then define the expression type, and make it implement the [`Expr2Smt`
 //! trait][expr 2 smt] that writes it as an SMT-LIB 2 expression in a writer.
-//! 
+//!
 //! ## Print functions
-//! 
+//!
 //! Since the structure for S-expressions is provided by users, they also need
 //! to provide functions to print it in SMT Lib 2.
-//! 
+//!
 //! To use all SMT Lib 2 commands in a type-safe manner, the library requires
 //! printers over
-//! 
+//!
 //! * sorts: `Sort2Smt` trait (*e.g.* for `declare-fun`),
 //! * symbols: `Sym2Smt` trait (*e.g.* for `declare-fun`),
 //! * expressions: `Expr2Smt` trait (*e.g.* for `assert`).
-//! 
+//!
 //! All user-provided printing functions take some *information*. That way,
 //! users can pass some information to, say, `assert` that can modify printing.
 //! This is typically used when dealing with transition systems to perform
 //! "print-time unrolling". See the [`example` module][example mod] if you're
 //! interested; the example below will not use print-time information.
-//! 
+//!
 //! ```
 //! extern crate rsmt2 ;
-//! 
+//!
 //! use rsmt2::to_smt::Expr2Smt ;
 //! use rsmt2::SmtRes ;
 //! use rsmt2::example::simple::{ Op, Cst } ;
-//! 
+//!
 //! /// An example of expression.
 //! pub enum Expr {
 //!   /// A constant.
@@ -170,39 +170,39 @@
 //!     Ok(())
 //!   }
 //! }
-//! 
+//!
 //! # fn main() {}
 //! ```
-//! 
+//!
 //! For convenience, all the `...2Smt` traits are implemented for `& str`. This
 //! is useful for testing and maybe *very* simple application. Here, we won't
 //! implement `Sym2Smt` or `Sort2Smt` and rely on `& str` for symbols and
 //! sorts. Using a solver then boils down to creating a [`Solver`][solver]
 //! which wraps a z3 process and provides most of the SMT-LIB 2.5 commands.
-//! 
+//!
 //! ```
 //! extern crate rsmt2 ;
 //!
 //! use rsmt2::Solver ;
 //! use rsmt2::example::simple::{ Op, Cst, Expr } ;
 //! # fn main() {
-//! 
+//!
 //! let conf = ::rsmt2::conf::z3() ;
-//! 
+//!
 //! let mut solver = Solver::new(conf, ()).expect(
 //!   "could not spawn solver kid"
 //! ) ;
-//! 
+//!
 //! let v_1 = "v_1".to_string() ;
 //! let v_2 = "v_2".to_string() ;
-//! 
+//!
 //! solver.declare_const( & v_1, & "Bool" ).expect(
 //!   "while declaring v_1"
 //! ) ;
 //! solver.declare_const( & v_2, & "Int" ).expect(
 //!   "while declaring v_2"
 //! ) ;
-//! 
+//!
 //! let expr = Expr::O(
 //!   Op::Disj, vec![
 //!     Expr::O(
@@ -211,43 +211,43 @@
 //!     Expr::V( v_1.clone() )
 //!   ]
 //! ) ;
-//! 
+//!
 //! solver.assert( & expr ).expect(
 //!   "while asserting an expression"
 //! ) ;
-//! 
+//!
 //! if solver.check_sat().expect("during check sat") {
 //!   ()
 //! } else {
 //!   panic!("expected sat, got unsat")
 //! }
-//! 
+//!
 //! solver.kill().unwrap()
 //! # }
 //! ```
-//! 
+//!
 //! Note the `unit` parameter that we passed to the `solver` function:
 //! `solver(& mut kid, ())`. This is actually the parser the solver should use
 //! when it needs to parse values, symbols, types... In the example above, we
 //! only asked for the satisfiability of the assertions. If we had asked for a
 //! model, the compiler would have complained by saying that our parser `()`
 //! does not implement the right parsing traits.
-//! 
+//!
 //! ## The parser
-//! 
+//!
 //! This example will only use `get_model`, which only requires `IdentParser`
 //! and `ValueParser`. In most cases, an empty parser `struct` with the right
 //! implementations should be enough.
-//! 
+//!
 //! ```
 //! # #[macro_use]
 //! # extern crate error_chain ;
 //! extern crate rsmt2 ;
-//! 
+//!
 //! use rsmt2::SmtRes ;
 //! use rsmt2::parse::{ IdentParser, ValueParser } ;
 //! use rsmt2::example::simple::Cst ;
-//! 
+//!
 //! /// Empty parser structure, we will not maintain any context.
 //! #[derive(Clone, Copy)]
 //! pub struct Parser ;
@@ -292,17 +292,17 @@
 //! }
 //! # fn main() {}
 //! ```
-//! 
+//!
 //! As a side note, it would have been simpler to implement `ValueParser` with
 //! a [`& mut SmtParser`][smt parser], as it provides the parsers we needed.
-//! 
+//!
 //! ```
-//! 
+//!
 //! use rsmt2::SmtRes ;
 //! use rsmt2::parse::{ SmtParser, IdentParser, ValueParser } ;
 //! use rsmt2::example::simple::Cst ;
-//! 
-//! 
+//!
+//!
 //! #[derive(Clone, Copy)]
 //! struct Parser ;
 //! impl<'a, Br> ValueParser< Cst, & 'a mut SmtParser<Br> > for Parser
@@ -324,38 +324,38 @@
 //!   }
 //! }
 //! ```
-//! 
+//!
 //! Anyway, once we pass `Parser` to the solver creation function, and all
 //! conditions are met to ask the solver for a model.
-//! 
+//!
 //! ```
 //! # #[macro_use]
 //! # extern crate error_chain ;
 //! extern crate rsmt2 ;
-//! 
+//!
 //! use rsmt2::{ SmtRes, Solver } ;
 //! use rsmt2::conf::z3 ;
 //! use rsmt2::example::simple::{
 //!   Cst, Op, Expr, Parser
 //! } ;
-//! 
+//!
 //! # fn main() {
 //! let conf = z3() ;
-//! 
+//!
 //! let mut solver = Solver::new(conf, Parser).expect(
 //!   "could not spawn solver kid"
 //! ) ;
 //!
 //! let v_1 = "v_1".to_string() ;
 //! let v_2 = "v_2".to_string() ;
-//! 
+//!
 //! solver.declare_const( & v_1, & "Bool" ).expect(
 //!   "while declaring v_1"
 //! ) ;
 //! solver.declare_const( & v_2, & "Int" ).expect(
 //!   "while declaring v_2"
 //! ) ;
-//! 
+//!
 //! let expr = Expr::O(
 //!   Op::Disj, vec![
 //!     Expr::O(
@@ -364,17 +364,17 @@
 //!     Expr::V( v_1.clone() )
 //!   ]
 //! ) ;
-//! 
+//!
 //! solver.assert( & expr ).expect(
 //!   "while asserting an expression"
 //! ) ;
-//! 
+//!
 //! if solver.check_sat().expect("during check sat") {
-//! 
+//!
 //!   let model = solver.get_model_const().expect(
 //!     "while getting model"
 //!   ) ;
-//! 
+//!
 //!   let mut okay = false ;
 //!   for (ident, typ, value) in model {
 //!     if ident == v_1 {
@@ -397,15 +397,15 @@
 //!       }
 //!     }
 //!   }
-//! 
+//!
 //!   if ! okay {
 //!     panic!("got sat, but model is spurious")
 //!   }
-//! 
+//!
 //! } else {
 //!   panic!("expected sat, got unsat")
 //! }
-//! 
+//!
 //! solver.kill().unwrap()
 //! # }
 //! ```
@@ -461,6 +461,16 @@ pub mod errors {
       ParseError(msg: String, sexpr: String) {
         description("parse error")
         display("parse error: {} on `{}`", msg, sexpr)
+      }
+    }
+  }
+
+  impl ErrorKind {
+    /// True if the error is `Unknown`.
+    pub fn is_unknown(& self) -> bool {
+      match * self {
+        ErrorKind::Unknown => true,
+        _ => false,
       }
     }
   }
