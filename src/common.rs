@@ -104,6 +104,10 @@ impl Sort2Smt for String {
 
 
 /// SMT Lib 2 logics.
+///
+/// See [`Solver::set_logic`][logic].
+///
+/// [logic]: struct.Solver.html#method.set_logic
 #[allow(non_camel_case_types)]
 #[derive(Clone, Copy)]
 pub enum Logic {
@@ -154,10 +158,10 @@ impl Logic {
 
 #[test]
 fn logic() {
-  use conf::SolverConf ;
+  use conf::SmtConf ;
   use Solver ;
 
-  let conf = SolverConf::z3() ;
+  let conf = SmtConf::z3() ;
 
   let mut solver = Solver::new(conf, ()).expect("solver") ;
 

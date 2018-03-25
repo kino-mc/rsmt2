@@ -53,7 +53,7 @@
 //!
 //! But a parser taking `SmtParser` as input is "unsafe" in the sense that it
 //! has access to the whole input. Note that `SmtParser` provides helper
-//! parsing functions such as [`try_int`][try int] and [`try_sym`][try sym].
+//! parsing functions such as [`try_int`][try_int] and [`try_sym`][try_sym].
 //!
 //! ```
 //! # extern crate rsmt2 ;
@@ -102,8 +102,8 @@
 //! [nom]: https://crates.io/crates/nom (nom crate on crates.io)
 //! [regex]: https://crates.io/crates/regex (regex crate on crates.io)
 //! [parser]: struct.SmtParser.html (rsmt2's internal parser)
-//! [try int]: struct.SmtParser.html#method.try_int (try_int function)
-//! [try sym]: struct.SmtParser.html#method.try_sym (try_sym function)
+//! [try_int]: struct.SmtParser.html#method.try_int (try_int function)
+//! [try_sym]: struct.SmtParser.html#method.try_sym (try_sym function)
 
 use errors::* ;
 

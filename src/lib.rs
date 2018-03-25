@@ -1,428 +1,356 @@
-//! "A wrapper around an SMT Lib 2(.5)-compliant SMT solver.
+//! A wrapper around SMT Lib 2(.5)-compliant SMT solvers.
 //!
-//! See [`CHANGES.md`](https://github.com/kino-mc/rsmt2/blob/master/README.md)
-//! for the list of changes.
+//! See [`CHANGES.md`][changes] for the list of changes.
 //!
-//! Solvers run in a separate process and communication is achieved *via*
-//! system pipes.
+//! If you use this library consider contacting us on the [repository][rsmt2]
+//! so that we can add your project to the readme.
 //!
-//! This library does **not** have a structure for S-expressions. It should be
+//!
+//!
+//!
+//! # Description
+//!
+//!
+//! In rsmt2, solvers run in a separate process and communication is achieved
+//! *via* system pipes. For the moment, only [z3][z3] is officially supported.
+//! If you would like `rsmt2` to support other solvers, please open an issue on
+//! the [repository][rsmt2].
+//!
+//! **NB**: most of the tests and documentation examples in this crate will not
+//! work unless you have [z3][z3] in your path under the name `z3`.
+//!
+//! This library does **not** have a structure for S-expressions. It must be
 //! provided by the user, as well as the relevant printing and parsing
-//! functions. Print traits are in the [`to_smt` module][to smt mod], while the
-//! parse traits are in the [`parse` module][parse mod].
-//!
-//! If you use this library consider contacting us on the
-//! [repository](https://github.com/kino-mc/rsmt2) so that we can add your
-//! project to the readme.
-//!
-//! ## (A)synchronous commands.
-//!
-//! The functions corresponding to SMT Lib 2 commands come in two flavors,
-//! asynchronous and synchronous.
-//!
-//! *Synchronous* means that the command is printed on the solver's stdin, and
-//! the result is parsed **right away**. Users get control back whenever the
-//! solver is done working and parsing is done. In other words, synchronous
-//! commands are *blocking*.
-//!
-//! *Asynchronous* means that after the command is printed and control is given
-//! back to the user. To retrieve the result, users must call the relevant
-//! `parse_...` function. For instance, `parse_sat` for `check_sat`. In other
-//! words, `print_` commands are *non-blocking*.
+//! functions. Printing-related traits are discussed in the
+//! [`print`][print_mod] module, and parsing-related traits are in the
+//! [`parse`][parse_mod] module.
 //!
 //!
-//! The example below uses synchronous commands.
 //!
 //!
-//! ## Workflow
 //!
-//! The workflow is introduced below on a simple example. We first define a few
-//! helper types we will use later for the expression type.
 //!
-//! ```
-//! /// Operators. Just implements `Display`, never manipulated directly by the
-//! /// solver.
-//! #[derive(Copy, Clone)]
-//! pub enum Op {
-//!   Add, Sub, Mul, Conj, Disj, Eql, Ge, Gt, Lt, Le,
+//! # Very basic example
+//!
+//! String types already implement `rsmt2`'s SMT-printing traits. It's not a
+//! scalable approach, but it's useful for testing and explaining things. Let's
+//! create a solver first.
+//!
+//! ```rust
+//! fn do_smt_stuff() -> ::rsmt2::SmtRes<()> {
+//!   let parser = () ;
+//!   use rsmt2::SmtConf ;
+//!
+//!   let solver = SmtConf::z3().spawn(parser) ? ;
+//!
+//!   // Alternatively
+//!   use rsmt2::Solver ;
+//!   let _solver = Solver::new(SmtConf::z3(), parser) ? ;
+//!
+//!   // Another alternative, using the default configuration
+//!   let _solver = Solver::default(parser) ? ;
+//!   Ok(())
 //! }
-//! impl ::std::fmt::Display for Op {
-//!   fn fmt(& self, w: & mut ::std::fmt::Formatter) -> ::std::fmt::Result {
-//!     w.write_str(
-//!       match * self {
-//!         Op::Add => "+",
-//!         Op::Sub => "-",
-//!         Op::Mul => "*",
-//!         Op::Conj => "and",
-//!         Op::Disj => "or",
-//!         Op::Eql => "=",
-//!         Op::Ge => ">=",
-//!         Op::Gt => ">",
-//!         Op::Lt => "<",
-//!         Op::Le => "<=",
-//!       }
-//!     )
-//!   }
-//! }
-//!
-//!
-//! /// A constant.
-//! #[derive(Clone, Copy)]
-//! pub enum Cst {
-//!   /// Boolean constant.
-//!   B(bool),
-//!   /// Integer constant.
-//!   I(isize),
-//! }
-//! impl ::std::fmt::Display for Cst {
-//!   fn fmt(& self, w: & mut ::std::fmt::Formatter) -> ::std::fmt::Result {
-//!     match * self {
-//!       Cst::B(b) => write!(w, "{}", b),
-//!       Cst::I(i) if i >= 0 => write!(w, "{}", i),
-//!       Cst::I(i) => write!(w, "(- {})", - i),
-//!     }
-//!   }
-//! }
-//! impl From<bool> for Cst {
-//!   fn from(b: bool) -> Self {
-//!     Cst::B(b)
-//!   }
-//! }
-//! impl From<isize> for Cst {
-//!   fn from(i: isize) -> Self {
-//!     Cst::I(i)
-//!   }
-//! }
+//! do_smt_stuff().unwrap()
 //! ```
 //!
-//! These types are defined in the [`simple_example` module][simple example
-//! mod], and will be imported from there in the rest of the explanation. We
-//! then define the expression type, and make it implement the [`Expr2Smt`
-//! trait][expr 2 smt] that writes it as an SMT-LIB 2 expression in a writer.
+//! Notice that all three functions spawning a solver take a parser used to
+//! parse identifiers, values and/or expressions. `rsmt2` parses everything
+//! else (keywords and such), and lets users handle the important parts. See
+//! the [`parse`][parse_mod] module documentation for more details.
 //!
-//! ## Print functions
+//! Our current parser `()` is enough for this example. We can even perform
+//! `check-sat`s since, unlike `get-model` for instance, it does not require
+//! any user-data-structure-specific parsing. Let's declare a few symbols and
+//! perform a check-sat.
 //!
-//! Since the structure for S-expressions is provided by users, they also need
-//! to provide functions to print it in SMT Lib 2.
-//!
-//! To use all SMT Lib 2 commands in a type-safe manner, the library requires
-//! printers over
-//!
-//! * sorts: `Sort2Smt` trait (*e.g.* for `declare-fun`),
-//! * symbols: `Sym2Smt` trait (*e.g.* for `declare-fun`),
-//! * expressions: `Expr2Smt` trait (*e.g.* for `assert`).
-//!
-//! All user-provided printing functions take some *information*. That way,
-//! users can pass some information to, say, `assert` that can modify printing.
-//! This is typically used when dealing with transition systems to perform
-//! "print-time unrolling". See the [`example` module][example mod] if you're
-//! interested; the example below will not use print-time information.
-//!
-//! ```
-//! extern crate rsmt2 ;
-//!
-//! use rsmt2::to_smt::Expr2Smt ;
-//! use rsmt2::SmtRes ;
-//! use rsmt2::example::simple::{ Op, Cst } ;
-//!
-//! /// An example of expression.
-//! pub enum Expr {
-//!   /// A constant.
-//!   C(Cst),
-//!   /// Variable.
-//!   V(String),
-//!   /// Operator application.
-//!   O( Op, Vec<Expr> ),
-//! }
-//! impl Expr {
-//!   pub fn cst<C: Into<Cst>>(c: C) -> Self {
-//!     Expr::C( c.into() )
-//!   }
-//! }
-//! impl Expr2Smt<()> for Expr {
-//!   fn expr_to_smt2<Writer>(
-//!     & self, w: & mut Writer, _: ()
-//!   ) -> SmtRes<()>
-//!   where Writer: ::std::io::Write {
-//!     let mut stack = vec![ (false, vec![self], false) ] ;
-//!     while let Some((space, mut to_write, closing_paren)) = stack.pop() {
-//!       if let Some(next) = to_write.pop() {
-//!         if space {
-//!           write!(w, " ") ?
-//!         }
-//!         // We have something to print, push the rest back.
-//!         stack.push((space, to_write, closing_paren)) ;
-//!         match * next {
-//!           Expr::C(cst) => write!(w, "{}", cst) ?,
-//!           Expr::V(ref var) => write!(w, "{}", var) ?,
-//!           Expr::O(op, ref sub_terms) => {
-//!             write!(w, "({}", op) ? ;
-//!             stack.push((true, sub_terms.iter().rev().collect(), true))
-//!           },
-//!         }
-//!       } else {
-//!         // No more things to write at this level.
-//!         if closing_paren {
-//!           write!(w, ")") ?
-//!         }
-//!       }
-//!     }
-//!     Ok(())
-//!   }
-//! }
-//!
-//! # fn main() {}
-//! ```
-//!
-//! For convenience, all the `...2Smt` traits are implemented for `& str`. This
-//! is useful for testing and maybe *very* simple application. Here, we won't
-//! implement `Sym2Smt` or `Sort2Smt` and rely on `& str` for symbols and
-//! sorts. Using a solver then boils down to creating a [`Solver`][solver]
-//! which wraps a z3 process and provides most of the SMT-LIB 2.5 commands.
-//!
-//! ```
-//! extern crate rsmt2 ;
-//!
+//! ```rust
+//! # fn do_smt_stuff() -> ::rsmt2::SmtRes<()> {
 //! use rsmt2::Solver ;
-//! use rsmt2::example::simple::{ Op, Cst, Expr } ;
-//! # fn main() {
+//! let mut solver = Solver::default(()) ? ;
 //!
-//! let conf = ::rsmt2::conf::z3() ;
+//! solver.declare_const("n", "Int") ? ;
+//! //     ^^^^^^^^^^^^^~~~ same as `declare-fun` for a nullary symbol
+//! solver.declare_const("m", "Int") ? ;
+//! solver.assert("(= (+ (* n n) (* m m)) 7)") ? ;
 //!
-//! let mut solver = Solver::new(conf, ()).expect(
-//!   "could not spawn solver kid"
-//! ) ;
-//!
-//! let v_1 = "v_1".to_string() ;
-//! let v_2 = "v_2".to_string() ;
-//!
-//! solver.declare_const( & v_1, & "Bool" ).expect(
-//!   "while declaring v_1"
-//! ) ;
-//! solver.declare_const( & v_2, & "Int" ).expect(
-//!   "while declaring v_2"
-//! ) ;
-//!
-//! let expr = Expr::O(
-//!   Op::Disj, vec![
-//!     Expr::O(
-//!       Op::Ge, vec![ Expr::cst(-7), Expr::V( v_2.clone() ) ]
-//!     ),
-//!     Expr::V( v_1.clone() )
-//!   ]
-//! ) ;
-//!
-//! solver.assert( & expr ).expect(
-//!   "while asserting an expression"
-//! ) ;
-//!
-//! if solver.check_sat().expect("during check sat") {
-//!   ()
-//! } else {
-//!   panic!("expected sat, got unsat")
-//! }
-//!
-//! solver.kill().unwrap()
+//! let is_sat = solver.check_sat() ? ;
+//! assert! { ! is_sat }
+//! # Ok(())
 //! # }
+//! # do_smt_stuff().unwrap()
 //! ```
 //!
-//! Note the `unit` parameter that we passed to the `solver` function:
-//! `solver(& mut kid, ())`. This is actually the parser the solver should use
-//! when it needs to parse values, symbols, types... In the example above, we
-//! only asked for the satisfiability of the assertions. If we had asked for a
-//! model, the compiler would have complained by saying that our parser `()`
-//! does not implement the right parsing traits.
+//! We already knew there's no pair of integers the sum of the squares of which
+//! is equal to `7`, but now we **proved** it.
 //!
-//! ## The parser
 //!
-//! This example will only use `get_model`, which only requires `IdentParser`
-//! and `ValueParser`. In most cases, an empty parser `struct` with the right
-//! implementations should be enough.
 //!
-//! ```
-//! # #[macro_use]
-//! # extern crate error_chain ;
-//! extern crate rsmt2 ;
 //!
-//! use rsmt2::SmtRes ;
+//! # Parsing things
+//!
+//! If we want to be able to retrieve models, we need a parser that can parse
+//! two things: identifiers, types and values. That is, we need a parser that
+//! implements [`IdentParser`][ident_parser] (identifiers and types) and
+//! [`ValueParser`][value_parser] (values). The previous parser `()` doesn't,
+//! so `solver.get_model()` won't even compile.
+//!
+//! There's different ways to implement these traits, discussed in the
+//! [`parse`][parse_mod] module documentation. Let us be lazy and just have
+//! rsmt2 do the work for us. Note the (unnecessary) use of `define_fun`.
+//!
+//! ```rust
+//! use rsmt2::{ Solver, SmtRes } ;
 //! use rsmt2::parse::{ IdentParser, ValueParser } ;
-//! use rsmt2::example::simple::Cst ;
-//!
-//! /// Empty parser structure, we will not maintain any context.
-//! #[derive(Clone, Copy)]
-//! pub struct Parser ;
-//! impl<'a> IdentParser<String, String, & 'a str> for Parser {
-//!   fn parse_ident(self, input: & 'a str) -> SmtRes<String> {
-//!     Ok( input.to_string() )
-//!   }
-//!   fn parse_type(self, input: & 'a str) -> SmtRes<String> {
-//!     match input {
-//!       "Int" => Ok( "Int".into() ),
-//!       "Bool" => Ok( "Bool".into() ),
-//!       sort => bail!("unexpected sort `{}`", sort),
-//!     }
-//!   }
-//! }
-//! impl<'a> ValueParser<Cst, & 'a str> for Parser {
-//!   fn parse_value(self, input: & 'a str) -> SmtRes<Cst> {
-//!     match input.trim() {
-//!       "true" => Ok( Cst::B(true) ),
-//!       "false" => Ok( Cst::B(false) ),
-//!       int => {
-//!         use std::str::FromStr ;
-//!         let s = int.trim() ;
-//!         if let Ok(res) = isize::from_str(s) {
-//!           return Ok( Cst::I(res) )
-//!         } else if s.len() >= 4 {
-//!           if & s[0 .. 1] == "("
-//!           && & s[s.len() - 1 ..] == ")" {
-//!             let s = & s[1 .. s.len() - 1].trim() ;
-//!             if & s[0 .. 1] == "-" {
-//!               let s = & s[1..].trim() ;
-//!               if let Ok(res) = isize::from_str(s) {
-//!                 return Ok( Cst::I(- res) )
-//!               }
-//!             }
-//!           }
-//!         }
-//!         bail!("unexpected value `{}`", int)
-//!       },
-//!     }
-//!   }
-//! }
-//! # fn main() {}
-//! ```
-//!
-//! As a side note, it would have been simpler to implement `ValueParser` with
-//! a [`& mut SmtParser`][smt parser], as it provides the parsers we needed.
-//!
-//! ```
-//!
-//! use rsmt2::SmtRes ;
-//! use rsmt2::parse::{ SmtParser, IdentParser, ValueParser } ;
-//! use rsmt2::example::simple::Cst ;
-//!
 //!
 //! #[derive(Clone, Copy)]
 //! struct Parser ;
-//! impl<'a, Br> ValueParser< Cst, & 'a mut SmtParser<Br> > for Parser
-//! where Br: ::std::io::BufRead {
-//!   fn parse_value(self, input: & 'a mut SmtParser<Br>) -> SmtRes<Cst> {
-//!     use std::str::FromStr ;
-//!     if let Some(b) = input.try_bool() ? {
-//!       Ok( Cst::B(b) )
-//!     } else if let Some(int) = input.try_int(
-//!       |int, pos| match isize::from_str(int) {
-//!         Ok(int) => if pos { Ok(int) } else { Ok(- int) },
-//!         Err(e) => Err(e),
-//!       }
-//!     ) ? {
-//!       Ok( Cst::I(int) )
-//!     } else {
-//!       input.fail_with("unexpected value")
-//!     }
+//!
+//!   //       Types ~~~~~~~~~~~~vvvvvv
+//! impl<'a> IdentParser<String, String, & 'a str> for Parser {
+//!   // Identifiers ~~~~^^^^^^          ^^^^^^^^~~~~ Input
+//!   fn parse_ident(self, input: & 'a str) -> SmtRes<String> {
+//!     Ok(input.into())
+//!   }
+//!   fn parse_type(self, input: & 'a str) -> SmtRes<String> {
+//!     Ok(input.into())
 //!   }
 //! }
-//! ```
 //!
-//! Anyway, once we pass `Parser` to the solver creation function, and all
-//! conditions are met to ask the solver for a model.
+//! impl<'a> ValueParser<String, & 'a str> for Parser {
+//!   // Values ~~~~~~~~~^^^^^^  ^^^^^^^^~~~~ Input
+//!   fn parse_value(self, input: & 'a str) -> SmtRes<String> {
+//!     Ok(input.into())
+//!   }
+//! }
 //!
-//! ```
-//! # #[macro_use]
-//! # extern crate error_chain ;
-//! extern crate rsmt2 ;
+//! # fn do_smt_stuff() -> ::rsmt2::SmtRes<()> {
+//! let mut solver = Solver::default(Parser) ? ;
 //!
-//! use rsmt2::{ SmtRes, Solver } ;
-//! use rsmt2::conf::z3 ;
-//! use rsmt2::example::simple::{
-//!   Cst, Op, Expr, Parser
-//! } ;
+//! solver.define_fun(
+//!        "sq", & [ ("n", "Int") ], "Int", "(* n n)"
+//!   // fn sq        (n:   Int)  ->  Int   { n * n }
+//! ) ? ;
+//! solver.declare_const("n", "Int") ? ;
+//! solver.declare_const("m", "Int") ? ;
 //!
-//! # fn main() {
-//! let conf = z3() ;
-//!
-//! let mut solver = Solver::new(conf, Parser).expect(
-//!   "could not spawn solver kid"
-//! ) ;
-//!
-//! let v_1 = "v_1".to_string() ;
-//! let v_2 = "v_2".to_string() ;
-//!
-//! solver.declare_const( & v_1, & "Bool" ).expect(
-//!   "while declaring v_1"
-//! ) ;
-//! solver.declare_const( & v_2, & "Int" ).expect(
-//!   "while declaring v_2"
-//! ) ;
-//!
-//! let expr = Expr::O(
-//!   Op::Disj, vec![
-//!     Expr::O(
-//!       Op::Ge, vec![ Expr::cst(-7), Expr::V( v_2.clone() ) ]
-//!     ),
-//!     Expr::V( v_1.clone() )
+//! solver.assert("(= (+ (sq n) (sq m)) 29)") ? ;
+//! solver.assert("(and (< n 5) (> n 0) (> m 0))") ? ;
+//! 
+//! let is_sat = solver.check_sat() ? ;
+//! assert! { is_sat }
+//! let mut model = solver.get_model() ? ;
+//! model.sort() ; // Order might vary, sorting for assert below.
+//! assert_eq! {
+//!   model,
+//!   vec![
+//!     ("m".into(), vec![], "Int".into(), "5".into()),
+//!     ("n".into(), vec![], "Int".into(), "2".into()),
 //!   ]
-//! ) ;
-//!
-//! solver.assert( & expr ).expect(
-//!   "while asserting an expression"
-//! ) ;
-//!
-//! if solver.check_sat().expect("during check sat") {
-//!
-//!   let model = solver.get_model_const().expect(
-//!     "while getting model"
-//!   ) ;
-//!
-//!   let mut okay = false ;
-//!   for (ident, typ, value) in model {
-//!     if ident == v_1 {
-//!       assert_eq!( typ, "Bool" ) ;
-//!       match value {
-//!         Cst::B(true) => okay = true,
-//!         Cst::B(false) => (),
-//!         Cst::I(int) => panic!(
-//!           "value for v_1 is `{}`, expected boolean", int
-//!         ),
-//!       }
-//!     } else if ident == v_2 {
-//!       assert_eq!( typ, "Int" ) ;
-//!       match value {
-//!         Cst::I(i) if -7 >= i => okay = true,
-//!         Cst::I(_) => (),
-//!         Cst::B(b) => panic!(
-//!           "value for v_2 is `{}`, expected isize", b
-//!         ),
-//!       }
-//!     }
-//!   }
-//!
-//!   if ! okay {
-//!     panic!("got sat, but model is spurious")
-//!   }
-//!
-//! } else {
-//!   panic!("expected sat, got unsat")
 //! }
-//!
-//! solver.kill().unwrap()
+//! # Ok(())
 //! # }
+//! # do_smt_stuff().unwrap()
 //! ```
 //!
 //!
+//!
+//!
+//!
+//! # Asynchronous check-sats.
+//!
+//! The check-sat command above is blocking, in that the caller cannot do
+//! anything until the backend solver answers. Using the `print_check_sat...`
+//! and `parse_check_sat...` functions, users can issue the check-sat command,
+//! work on something else, and get the result later on.
+//!
+//! The `print_check_sat...` functions return a [`FutureCheckSat`][future]
+//! required by the `parse_check_sat...` functions to guarantee statically that
+//! the parse request makes sense. `FutureCheckSat` is equivalent to unit and
+//! exists only at compile time.
+//!
+//! Rewriting the previous example in an asynchronous fashion yields (omitting
+//! most of the unmodified code):
+//!
+//! ```rust
+//! # use rsmt2::{ Solver, SmtRes } ;
+//! # use rsmt2::parse::{ IdentParser, ValueParser } ;
+//! # #[derive(Clone, Copy)]
+//! # struct Parser ;
+//! # impl<'a> IdentParser<String, String, & 'a str> for Parser {
+//! #   fn parse_ident(self, input: & 'a str) -> SmtRes<String> {
+//! #     Ok(input.into())
+//! #   }
+//! #   fn parse_type(self, input: & 'a str) -> SmtRes<String> {
+//! #     Ok(input.into())
+//! #   }
+//! # }
+//! # impl<'a> ValueParser<String, & 'a str> for Parser {
+//! #   fn parse_value(self, input: & 'a str) -> SmtRes<String> {
+//! #     Ok(input.into())
+//! #   }
+//! # }
+//! # fn do_smt_stuff() -> ::rsmt2::SmtRes<()> {
+//! # let mut solver = Solver::default(Parser) ? ;
+//! solver.define_fun(
+//!        "sq", & [ ("n", "Int") ], "Int", "(* n n)"
+//! ) ? ;
+//! solver.declare_const("n", "Int") ? ;
+//! solver.declare_const("m", "Int") ? ;
+//!
+//! solver.assert("(= (+ (sq n) (sq m)) 29)") ? ;
+//! solver.assert("(and (< n 5) (> n 0) (> m 0))") ? ;
+//!
+//! let my_check_sat = solver.print_check_sat() ? ;
+//! // Solver is working, we can do other things.
+//! let is_sat = solver.parse_check_sat(my_check_sat) ? ;
+//! assert! { is_sat }
+//! # Ok(())
+//! # }
+//! # do_smt_stuff().unwrap()
+//! ```
+//!
+//!
+//!
+//! # Other SMT-LIB 2 commands
+//!
+//! Refer to [`Solver`][solver]'s documentation for the complete list of
+//! SMT-LIB 2 commands.
+//!
+//!
+//!
+//!
+//!
+//!
+//! # Activation literals
+//!
+//! Module [`actlit`][actlit_mod] discusses rsmt2's API for *activation
+//! literals*, a alternative to [`push`][push]/[`pop`][pop] that's more limited
+//! but more efficient.
+//!
+//!
+//!
+//!
+//!
+//!
+//!
+//!
+//!
+//!
+//! # Custom data structures
+//!
+//! Module [`example::simple`][simple_mod]'s documentation discusses in detail
+//! how to use rsmt2 with a custom data structure. This includes implementing
+//! the [print traits][print_mod] and writing a more evolved parser.
+//!
+//!
+//!
+//!
+//!
+//!
+//!
+//!
+//! # Print-time information
+//!
+//! Module [`example::print_time`][print_time_mod]'s documentation showcases
+//! print-time information. Proper documentation is somewhat lacking as it is a
+//! rather advanced topic, and no one asked for more details about it.
+//!
+//! Print-time information is the reason for
+//!
+//! - the `Info` type parameter in the [`...2Smt`][print_mod] traits,
+//! - all the `..._with` solver functions, such as `assert_with`.
+//!
+//! Users can call these functions to pass information down to their own
+//! printers as commands are written on the solver's input. The typical
+//! use-case is *print-time unrolling* when working with transition systems.
+//! Given a transition relation `T` over a current and next state `s[0]` and
+//! `s[1]`, *unrolling* consists in creating a sequence of states `s[0]`,
+//! `s[1]`, `s[2]`, ... such that `T(s[0], s[1]) and T(s[1], s[2]) and ...`.
+//! Such a sequence is called a *trace*.
+//!
+//! Say the state `s` is some variables `(x, y)` and the transition relation is
+//! `T(s[0], s[1]) = (x[1] == x[0] + 1) && (y[1] == 2 * y[0])`. Then in
+//! SMT-LIB, unrolling `T` twice looks like
+//!
+//! ```lisp
+//! (define-fun trans ( (x_0 Int) (y_0 Int) (x_1 Int) (y_1 Int) ) Bool
+//!   (and (= x_1 (+ x_0 1)) (= y_1 (* 2 y_0)) )
+//! )
+//!
+//! (declare-fun x_0 () Int)
+//! (declare-fun y_0 () Int)
+//!
+//! (declare-fun x_1 () Int)
+//! (declare-fun y_1 () Int)
+//!
+//! (assert (trans x_0 y_0 x_1 y_1))
+//!
+//! (declare-fun x_2 () Int)
+//! (declare-fun y_2 () Int)
+//!
+//! (assert (trans x_1 y_1 x_2 y_2))
+//! ```
+//!
+//! In a model-checker, at each point of the unrolling one wants to
+//! (conditionally) assert terms about a state, or a pair of succeeding states,
+//! but never more. Also, the "same" term will typically be asserted for many
+//! different states / pair of states.
+//!
+//! Notice that if we want to assert `P(s) = x > 0` for `s[0]` and `s[1]`, then
+//! in theory we have to create two terms `x_0 > 0` and `x_1 > 0`. By
+//! extension, these are called *unrollings* of `P`. Now, these terms can end
+//! up being pretty big, and memory can become a problem, even with
+//! [hashconsing][hashconsing].
+//!
+//! Creating a different term for each unrolling of `P`, asserting it, and then
+//! (usually) discarding them right away is not practical time- and
+//! memory-wise. It is better if the term structure has a notion of "current
+//! `x`" (`x_0`) and "next `x`" (`x_1`), and to decide how to print them *at
+//! print-time* by passing an *offset* that's essentially an integer. It
+//! represents the offset for the "current" state.
+//!
+//! So, from the term `x_1 > x_0` for instance, passing an offset of `3` to the
+//! printer would cause `x_0` to be printed as `x_3` and `x_1` as `x_4`.
+//! Without creating anything, just from the original term.
+//!
+//! This is the workflow showcased (but only partially explained) by
+//! [`example::print_time`][print_time_mod].
+//!
+//!
+//!
+//!
+//!
+//!
+//! [rsmt2]: https://github.com/kino-mc/rsmt2
+//! (rsmt2 github repository)
+//! [z3]: https://github.com/Z3Prover/z3
+//! (z3 github repository)
+//! [changes]: https://github.com/kino-mc/rsmt2/blob/master/CHANGES.md
+//! (List of changes on github)
 //! [solver]: struct.Solver.html (Solver type)
-//! [parse mod]: parse/index.html (parse module)
-//! [to smt mod]: to_smt/index.html (to_smt module)
-//! [smt parser]: parse/struct.SmtParser.html (SmtParser structure)
-//! [simple example mod]: example/simple/index.html
-//! [expr 2 smt]: to_smt/trait.Expr2Smt.html
-//! [example mod]: example/index.html
+//! [push]: struct.Solver.html#method.push (Solver's push function)
+//! [pop]: struct.Solver.html#method.pop (Solver's pop function)
+//! [ident_parser]: parse/trait.IdentParser.html
+//! (IdentParser trait)
+//! [value_parser]: parse/trait.ValueParser.html
+//! (ValueParser trait)
+//! [parse_mod]: parse/index.html (parse module)
+//! [print_mod]: print/index.html (print module)
+//! [simple_mod]: example/simple/index.html (rsmt2 simple example)
+//! [print_time_mod]: example/print_time/index.html (rsmt2 complex example)
+//! [actlit_mod]: actlit/index.html (rsmt2 complex example)
+//! [hashconsing]: https://crates.io/crates/hashconsing
+//! (hashconsing crate on crates.io)
+//! [future]: future/struct.FutureCheckSat.html
+//! (FutureCheckSat struct)
 
 #[macro_use]
 extern crate error_chain ;
 
-/// Errors of this library.
+/// Errors.
+///
+/// Aggregates I/O errors and `rsmt2` specific errors.
 pub mod errors {
   error_chain!{
     types {
@@ -478,26 +406,27 @@ pub mod errors {
 
 #[macro_use]
 mod common ;
-pub mod conf ;
+mod conf ;
 pub mod parse ;
 mod solver ;
 pub mod actlit ;
 
 pub use errors::SmtRes ;
-
+pub use conf::SmtConf ;
 pub use common::Logic ;
-pub use solver::Solver ;
+pub use solver::{ Solver } ;
+
+/// Promises for future results on ongoing computations.
+pub mod future {
+  pub use solver::{
+    FutureCheckSat
+  } ;
+}
 
 pub mod example ;
 
-// /// Internal traits used to build solvers.
-// pub mod internals {
-//   pub use parse::SmtParser ;
-//   pub use solver::SolverBasic ;
-// }
-
 /// Traits your types must implement so that `rsmt2` can use them.
-pub mod to_smt {
+pub mod print {
   pub use common::{ Expr2Smt, Sort2Smt, Sym2Smt } ;
 }
 

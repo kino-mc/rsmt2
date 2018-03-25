@@ -12,7 +12,7 @@ use std::io::{ Write, BufWriter, BufReader } ;
 use errors::* ;
 
 use common::* ;
-use conf::SolverConf ;
+use conf::SmtConf ;
 use parse::{ IdentParser, ValueParser, ExprParser, RSmtParser } ;
 
 
@@ -52,6 +52,13 @@ impl ::std::ops::Deref for Actlit {
   }
 }
 
+/// Promise for an asynchronous check-sat.
+pub struct FutureCheckSat {
+  _nothing: ()
+}
+fn future_check_sat() -> FutureCheckSat {
+  FutureCheckSat { _nothing: () }
+}
 
 
 
@@ -64,7 +71,7 @@ impl ::std::ops::Deref for Actlit {
 /// [tee fun]: #method.tee (tee function)
 pub struct Solver<Parser> {
   /// Solver configuration.
-  conf: SolverConf,
+  conf: SmtConf,
   /// Actual solver process.
   kid: Child,
   /// Solver's stdin.
@@ -105,7 +112,7 @@ impl<Parser> ::std::ops::Drop for Solver<Parser> {
 impl<Parser> Solver<Parser> {
 
   /// Spawns the solver kid.
-  fn spawn(conf: & SolverConf) -> SmtRes<
+  fn spawn(conf: & SmtConf) -> SmtRes<
     (Child, BufWriter<ChildStdin>, BufReader<ChildStdout>)
   > {
     let mut kid = Command::new(
@@ -149,7 +156,7 @@ impl<Parser> Solver<Parser> {
   }
 
   /// Constructor.
-  pub fn new(conf: SolverConf, parser: Parser) -> SmtRes<Self> {
+  pub fn new(conf: SmtConf, parser: Parser) -> SmtRes<Self> {
 
     // Constructing command and spawning kid.
     let (kid, stdin, stdout) = Self::spawn(& conf) ? ;
@@ -168,13 +175,13 @@ impl<Parser> Solver<Parser> {
   }
   /// Creates a solver kid with the default configuration.
   ///
-  /// Mostly used in tests, same as `Self::new( SolverConf::z3(), parser )`.
+  /// Mostly used in tests, same as `Self::new( SmtConf::z3(), parser )`.
   pub fn default(parser: Parser) -> SmtRes<Self> {
-    Self::new( SolverConf::z3(), parser )
+    Self::new( SmtConf::z3(), parser )
   }
 
   /// Returns the configuration of the solver.
-  pub fn conf(& self) -> & SolverConf { & self.conf }
+  pub fn conf(& self) -> & SmtConf { & self.conf }
 
   /// Forces the solver to write all communications to a file.
   ///
@@ -286,10 +293,10 @@ impl<Parser> Solver<Parser> {
   /// # See also
   ///
   /// - [`print_check_sat`][print]
-  /// - [`get_check_sat`][get]
+  /// - [`parse_check_sat`][get]
   ///
   /// If you want a more natural way to handle unknown results, see
-  /// `get_check_sat_or_unk`.
+  /// `parse_check_sat_or_unk`.
   ///
   /// # Examples
   ///
@@ -319,18 +326,18 @@ impl<Parser> Solver<Parser> {
   ///
   /// [print]: #method.print_check_sat
   /// (print_check_sat function)
-  /// [get]: #method.get_check_sat
-  /// (get_check_sat function)
+  /// [get]: #method.parse_check_sat
+  /// (parse_check_sat function)
   pub fn check_sat(& mut self) -> SmtRes<bool> {
-    self.print_check_sat() ? ;
-    self.get_check_sat()
+    let future = self.print_check_sat() ? ;
+    self.parse_check_sat(future)
   }
 
   /// Check-sat command, turns `unknown` results in `None`.
   ///
   /// # See also
   ///
-  /// - [`get_check_sat_or_unk`][get]
+  /// - [`parse_check_sat_or_unk`][get]
   ///
   /// # Examples
   ///
@@ -352,11 +359,11 @@ impl<Parser> Solver<Parser> {
   /// assert_eq! { maybe_sat, None }
   /// ```
   ///
-  /// [get]: #method.get_check_sat_or_unk
-  /// (get_check_sat_or_unk function)
+  /// [get]: #method.parse_check_sat_or_unk
+  /// (parse_check_sat_or_unk function)
   pub fn check_sat_or_unk(& mut self) -> SmtRes< Option<bool> > {
-    self.print_check_sat() ? ;
-    self.get_check_sat_or_unk()
+    let future = self.print_check_sat() ? ;
+    self.parse_check_sat_or_unk(future)
   }
 
 
@@ -755,8 +762,8 @@ impl<Parser> Solver<Parser> {
   ) -> SmtRes<bool>
   where
   Actlits: Copy + IntoIterator<Item = & 'a Actlit> {
-    self.print_check_sat_act(actlits) ? ;
-    self.get_check_sat()
+    let future = self.print_check_sat_act(actlits) ? ;
+    self.parse_check_sat(future)
   }
 
   /// Check-sat command with activation literals, turns `unknown` results in
@@ -766,9 +773,262 @@ impl<Parser> Solver<Parser> {
   ) -> SmtRes< Option<bool> >
   where
   Actlits: Copy + IntoIterator<Item = & 'a Actlit> {
-    self.print_check_sat_act(actlits) ? ;
-    self.get_check_sat_or_unk()
+    let future = self.print_check_sat_act(actlits) ? ;
+    self.parse_check_sat_or_unk(future)
   }
+}
+
+
+
+
+
+/// # SMT-LIB asynchronous commands.
+impl<Parser> Solver<Parser> {
+
+  /// Prints a check-sat command.
+  ///
+  /// Allows to print the `check-sat` and get the result later, *e.g.* with
+  /// [`parse_check_sat`][parse]. 
+  ///
+  /// # Examples
+  ///
+  /// ```
+  /// use rsmt2::Solver ;
+  ///
+  /// let mut solver = Solver::default(()).unwrap() ;
+  ///
+  /// solver.declare_const("x", "Int").unwrap() ;
+  /// solver.declare_const("y", "Int").unwrap() ;
+  ///
+  /// solver.assert("(= (+ x y) 0)").unwrap() ;
+  ///
+  /// let future = solver.print_check_sat().unwrap() ;
+  /// // Do stuff while the solver works.
+  /// let sat = solver.parse_check_sat(future).unwrap() ;
+  /// assert! { sat }
+  /// ```
+  ///
+  /// [parse]: #method.parse_check_sat
+  /// (parse_check_sat function for Solver)
+  #[inline]
+  pub fn print_check_sat(& mut self) -> SmtRes<FutureCheckSat> {
+    wrt! {
+      self, |w| write_str(w, "(check-sat)\n") ?
+    }
+    Ok(future_check_sat())
+  }
+
+  /// Check-sat command, with actlits.
+  ///
+  /// See the [`actlit`'s module doc][actlits] for more details.
+  ///
+  /// [actlits]: actlit/index.html
+  /// (actlit module documentation)
+  #[inline]
+  pub fn print_check_sat_act<'a, Actlits>(
+    & mut self, actlits: Actlits
+  ) -> SmtRes<FutureCheckSat>
+  where
+  Actlits: Copy + IntoIterator<Item = & 'a Actlit> {
+    wrt! {
+      self, |w| {
+        write_str(w, "(check-sat") ? ;
+        for actlit in actlits {
+          write!(w, " ") ? ;
+          actlit.write(w) ?
+        }
+        write_str(w, ")\n") ?
+      }
+    }
+    Ok(future_check_sat())
+  }
+
+
+  /// Parse the result of a check-sat, turns `unknown` results into errors.
+  #[inline]
+  pub fn parse_check_sat(
+    & mut self, _: FutureCheckSat
+  ) -> SmtRes<bool> {
+    if let Some(res) = self.smt_parser.check_sat() ? {
+      Ok(res)
+    } else {
+      Err( ErrorKind::Unknown.into() )
+    }
+  }
+
+  /// Parse the result of a check-sat, turns `unknown` results into `None`.
+  #[inline]
+  pub fn parse_check_sat_or_unk(
+    & mut self, _: FutureCheckSat
+  ) -> SmtRes< Option<bool> > {
+    self.smt_parser.check_sat()
+  }
+
+
+
+  /// Get-model command.
+  #[inline]
+  fn print_get_model(& mut self) -> SmtRes<()> {
+    wrt! {
+      self, |w| write_str(w, "(get-model)\n") ?
+    }
+    Ok(())
+  }
+
+  /// Get-assertions command.
+  #[allow(dead_code)]
+  fn print_get_assertions(& mut self) -> SmtRes<()> {
+    wrt! {
+      self, |w| write_str(w, "(get-assertions)\n") ?
+    }
+    Ok(())
+  }
+  /// Get-assignment command.
+  #[allow(dead_code)]
+  fn print_get_assignment(& mut self) -> SmtRes<()> {
+    wrt! {
+      self, |w| write_str(w, "(get-assignment)\n") ?
+    }
+    Ok(())
+  }
+  /// Get-unsat-assumptions command.
+  #[allow(dead_code)]
+  fn print_get_unsat_assumptions(& mut self) -> SmtRes<()> {
+    wrt! {
+      self, |w| write_str(w, "(get-unsat-assumptions)\n") ?
+    }
+    Ok(())
+  }
+  /// Get-proof command.
+  #[allow(dead_code)]
+  fn print_get_proof(& mut self) -> SmtRes<()> {
+    wrt! {
+      self, |w| write_str(w, "(get-proof)\n") ?
+    }
+    Ok(())
+  }
+  /// Get-unsat-core command.
+  #[allow(dead_code)]
+  fn print_get_unsat_core(& mut self) -> SmtRes<()> {
+    wrt! {
+      self, |w| write_str(w, "(get-unsat-core)\n") ?
+    }
+    Ok(())
+  }
+
+  /// Get-values command.
+  fn print_get_values_with<'a, Info, Expr, Exprs>(
+    & mut self, exprs: Exprs, info: Info
+  ) -> SmtRes<()>
+  where
+  Info: Copy,
+  Expr: ?Sized + Expr2Smt< Info > + 'a,
+  Exprs: Clone + IntoIterator< Item = & 'a Expr > {
+    wrt! {
+      self, |w| {
+        write!(w, "(get-value (") ? ;
+        for e in exprs.clone() {
+          write_str(w, "\n  ") ? ;
+          e.expr_to_smt2(w, info) ?
+        }
+        write_str(w, "\n) )\n") ?
+      }
+    }
+    Ok(())
+  }
+
+  /// Check-sat with assumptions command with unit info.
+  pub fn print_check_sat_assuming<'a, Ident, Idents>(
+    & mut self, bool_vars: Idents
+  ) -> SmtRes<FutureCheckSat>
+  where
+  Ident: ?Sized + Sym2Smt<()> + 'a,
+  Idents: Copy + IntoIterator< Item = & 'a Ident > {
+    self.print_check_sat_assuming_with(bool_vars, ())
+  }
+
+  /// Check-sat with assumptions command.
+  pub fn print_check_sat_assuming_with<'a, Info, Ident, Idents>(
+    & mut self, bool_vars: Idents, info: Info
+  ) -> SmtRes<FutureCheckSat>
+  where
+  Info: Copy,
+  Ident: ?Sized + Sym2Smt<Info> + 'a,
+  Idents: Copy + IntoIterator< Item = & 'a Ident > {
+    match self.conf.get_check_sat_assuming() {
+      Some(ref cmd) => {
+        wrt! {
+          self, |w| {
+            write!(w, "({}\n ", cmd) ? ;
+            for sym in bool_vars {
+              write_str(w, " ") ? ;
+              sym.sym_to_smt2(w, info) ?
+            } ;
+            write_str(w, "\n)\n") ?
+          }
+        }
+        Ok(future_check_sat())
+      },
+      _ => Err(
+        format!(
+          "{} does not support check-sat-assuming", self.conf.desc()
+        ).into()
+      ),
+    }
+  }
+
+  /// Parse the result of a get-model.
+  fn parse_get_model<Ident, Type, Value>(
+    & mut self
+  ) -> SmtRes<Vec<(Ident, Vec<Type>, Type, Value)>>
+  where
+  Parser: for<'a> IdentParser<Ident, Type, & 'a mut RSmtParser> +
+          for<'a> ValueParser<Value, & 'a mut RSmtParser> {
+    let has_actlits = self.has_actlits() ;
+    self.smt_parser.get_model(has_actlits, self.parser)
+  }
+
+  /// Parse the result of a get-model where all the symbols are nullary.
+  fn parse_get_model_const<Ident, Type, Value>(
+    & mut self
+  ) -> SmtRes<Vec<(Ident, Type, Value)>>
+  where
+  Parser: for<'a> IdentParser<Ident, Type, & 'a mut RSmtParser> +
+          for<'a> ValueParser<Value, & 'a mut RSmtParser> {
+    let has_actlits = self.has_actlits() ;
+    self.smt_parser.get_model_const(has_actlits, self.parser)
+  }
+
+  /// Parse the result of a get-values.
+  fn parse_get_values_with<Info, Expr, Value>(
+    & mut self, info: Info
+  ) -> SmtRes<Vec<(Expr, Value)>>
+  where
+  Info: Copy,
+  Parser: for<'a> ExprParser<Expr, Info, & 'a mut RSmtParser> +
+          for<'a> ValueParser<Value, & 'a mut RSmtParser> {
+    self.smt_parser.get_values(self.parser, info)
+  }
+
+  /// Get-values command.
+  ///
+  /// Notice that the input expression type and the output one have no reason
+  /// to be the same.
+  fn get_values_with<
+    'a, Info, Expr, Exprs, PExpr, PValue
+  >(
+    & mut self, exprs: Exprs, info: Info
+  ) -> SmtRes<Vec<(PExpr, PValue)>>
+  where
+  Info: Copy,
+  Parser: for<'b> ExprParser<PExpr, Info, & 'b mut RSmtParser> +
+          for<'b> ValueParser<PValue, & 'b mut RSmtParser>,
+  Expr: ?Sized + Expr2Smt<Info> + 'a,
+  Exprs: Copy + IntoIterator< Item = & 'a Expr > {
+    self.print_get_values_with( exprs, info.clone() ) ? ;
+    self.parse_get_values_with(info)
+  }
+
 }
 
 
@@ -1136,8 +1396,8 @@ impl<Parser> Solver<Parser> {
   Info: Copy,
   Ident: ?Sized + Sym2Smt<Info> + 'a,
   Idents: Copy + IntoIterator< Item = & 'a Ident > {
-    self.print_check_sat_assuming_with(idents, info) ? ;
-    self.get_check_sat()
+    let future = self.print_check_sat_assuming_with(idents, info) ? ;
+    self.parse_check_sat(future)
   }
 
   /// Check-sat assuming command, turns `unknown` results into `None`.
@@ -1148,287 +1408,14 @@ impl<Parser> Solver<Parser> {
   Info: Copy,
   Ident: ?Sized + Sym2Smt<Info> + 'a,
   Idents: Copy + IntoIterator< Item = & 'a Ident > {
-    self.print_check_sat_assuming_with(idents, info) ? ;
-    self.get_check_sat_or_unk()
+    let future = self.print_check_sat_assuming_with(idents, info) ? ;
+    self.parse_check_sat_or_unk(future)
   }
 
 }
 
 
-
-
-
-/// # Basic SMT-LIB asynchronous commands.
-impl<Parser> Solver<Parser> {
-
-  /// Prints a check-sat command.
-  ///
-  /// Allows to print the `check-sat` and get the result later, *e.g.* with
-  /// [`get_check_sat`][parse].
-  ///
-  /// # Examples
-  ///
-  /// ```
-  /// use rsmt2::Solver ;
-  ///
-  /// let mut solver = Solver::default(()).unwrap() ;
-  ///
-  /// solver.declare_const("x", "Int").unwrap() ;
-  /// solver.declare_const("y", "Int").unwrap() ;
-  ///
-  /// solver.assert("(= (+ x y) 0)").unwrap() ;
-  ///
-  /// solver.print_check_sat().unwrap() ;
-  /// // Do stuff while the solver works.
-  /// let sat = solver.get_check_sat().unwrap() ;
-  /// assert! { sat }
-  /// ```
-  ///
-  /// [parse]: #method.get_check_sat
-  /// (get_check_sat function for Solver)
-  #[inline]
-  pub fn print_check_sat(& mut self) -> SmtRes<()> {
-    wrt! {
-      self, |w| write_str(w, "(check-sat)\n") ?
-    }
-    Ok(())
-  }
-
-  /// Check-sat command, with actlits.
-  ///
-  /// See the [`actlit`'s module doc][actlits] for more details.
-  ///
-  /// [actlits]: actlit/index.html
-  /// (actlit module documentation)
-  #[inline]
-  pub fn print_check_sat_act<'a, Actlits>(
-    & mut self, actlits: Actlits
-  ) -> SmtRes<()>
-  where
-  Actlits: Copy + IntoIterator<Item = & 'a Actlit> {
-    wrt! {
-      self, |w| {
-        write_str(w, "(check-sat") ? ;
-        for actlit in actlits {
-          write!(w, " ") ? ;
-          actlit.write(w) ?
-        }
-        write_str(w, ")\n") ?
-      }
-    }
-    Ok(())
-  }
-
-
-  /// Parse the result of a check-sat, turns `unknown` results into errors.
-  #[inline]
-  pub fn get_check_sat(& mut self) -> SmtRes<bool> {
-    if let Some(res) = self.smt_parser.check_sat() ? {
-      Ok(res)
-    } else {
-      Err( ErrorKind::Unknown.into() )
-    }
-  }
-
-  /// Parse the result of a check-sat, turns `unknown` results into `None`.
-  #[inline]
-  pub fn get_check_sat_or_unk(& mut self) -> SmtRes< Option<bool> > {
-    self.smt_parser.check_sat()
-  }
-
-
-
-  /// Get-model command.
-  #[inline]
-  pub fn print_get_model(& mut self) -> SmtRes<()> {
-    wrt! {
-      self, |w| write_str(w, "(get-model)\n") ?
-    }
-    Ok(())
-  }
-
-  /// Get-assertions command.
-  pub fn print_get_assertions(& mut self) -> SmtRes<()> {
-    wrt! {
-      self, |w| write_str(w, "(get-assertions)\n") ?
-    }
-    Ok(())
-  }
-  /// Get-assignment command.
-  pub fn print_get_assignment(& mut self) -> SmtRes<()> {
-    wrt! {
-      self, |w| write_str(w, "(get-assignment)\n") ?
-    }
-    Ok(())
-  }
-  /// Get-unsat-assumptions command.
-  pub fn print_get_unsat_assumptions(& mut self) -> SmtRes<()> {
-    wrt! {
-      self, |w| write_str(w, "(get-unsat-assumptions)\n") ?
-    }
-    Ok(())
-  }
-  /// Get-proof command.
-  pub fn print_get_proof(& mut self) -> SmtRes<()> {
-    wrt! {
-      self, |w| write_str(w, "(get-proof)\n") ?
-    }
-    Ok(())
-  }
-  /// Get-unsat-core command.
-  pub fn print_get_unsat_core(& mut self) -> SmtRes<()> {
-    wrt! {
-      self, |w| write_str(w, "(get-unsat-core)\n") ?
-    }
-    Ok(())
-  }
-
-  /// Get-values command.
-  pub fn print_get_values<'a, Expr, Exprs>(
-    & mut self, exprs: Exprs
-  ) -> SmtRes<()>
-  where
-  Expr: ?Sized + Expr2Smt<()> + 'a,
-  Exprs: Clone + IntoIterator< Item = & 'a Expr > {
-    self.print_get_values_with(exprs, ())
-  }
-
-  /// Get-values command.
-  pub fn print_get_values_with<'a, Info, Expr, Exprs>(
-    & mut self, exprs: Exprs, info: Info
-  ) -> SmtRes<()>
-  where
-  Info: Copy,
-  Expr: ?Sized + Expr2Smt< Info > + 'a,
-  Exprs: Clone + IntoIterator< Item = & 'a Expr > {
-    wrt! {
-      self, |w| {
-        write!(w, "(get-value (") ? ;
-        for e in exprs.clone() {
-          write_str(w, "\n  ") ? ;
-          e.expr_to_smt2(w, info) ?
-        }
-        write_str(w, "\n) )\n") ?
-      }
-    }
-    Ok(())
-  }
-
-  /// Check-sat with assumptions command with unit info.
-  pub fn print_check_sat_assuming<'a, Ident, Idents>(
-    & mut self, bool_vars: Idents
-  ) -> SmtRes<()>
-  where
-  Ident: ?Sized + Sym2Smt<()> + 'a,
-  Idents: Copy + IntoIterator< Item = & 'a Ident > {
-    self.print_check_sat_assuming_with(bool_vars, ())
-  }
-
-  /// Check-sat with assumptions command.
-  pub fn print_check_sat_assuming_with<'a, Info, Ident, Idents>(
-    & mut self, bool_vars: Idents, info: Info
-  ) -> SmtRes<()>
-  where
-  Info: Copy,
-  Ident: ?Sized + Sym2Smt<Info> + 'a,
-  Idents: Copy + IntoIterator< Item = & 'a Ident > {
-    match * self.conf.get_check_sat_assuming() {
-      Some(ref cmd) => {
-        wrt! {
-          self, |w| {
-            write!(w, "({}\n ", cmd) ? ;
-            for sym in bool_vars {
-              write_str(w, " ") ? ;
-              sym.sym_to_smt2(w, info) ?
-            } ;
-            write_str(w, "\n)\n") ?
-          }
-        }
-        Ok(())
-      },
-      _ => Err(
-        format!(
-          "check-sat-assuming is not supported for {}",
-          self.conf.style()
-        ).into()
-      ),
-    }
-  }
-
-}
-
-
-
-
-/// # SMT-LIB asynchronous functions using the user's parser.
-impl<Parser: Copy> Solver<Parser> {
-
-  /// Parse the result of a get-model.
-  pub fn parse_get_model<Ident, Type, Value>(
-    & mut self
-  ) -> SmtRes<Vec<(Ident, Vec<Type>, Type, Value)>>
-  where
-  Parser: for<'a> IdentParser<Ident, Type, & 'a mut RSmtParser> +
-          for<'a> ValueParser<Value, & 'a mut RSmtParser> {
-    let has_actlits = self.has_actlits() ;
-    self.smt_parser.get_model(has_actlits, self.parser)
-  }
-
-  /// Parse the result of a get-model where all the symbols are nullary.
-  pub fn parse_get_model_const<Ident, Type, Value>(
-    & mut self
-  ) -> SmtRes<Vec<(Ident, Type, Value)>>
-  where
-  Parser: for<'a> IdentParser<Ident, Type, & 'a mut RSmtParser> +
-          for<'a> ValueParser<Value, & 'a mut RSmtParser> {
-    let has_actlits = self.has_actlits() ;
-    self.smt_parser.get_model_const(has_actlits, self.parser)
-  }
-
-  /// Parse the result of a get-values.
-  pub fn parse_get_values<Expr, Value>(
-    & mut self
-  ) -> SmtRes<Vec<(Expr, Value)>>
-  where
-  Parser: for<'a> ExprParser<Expr, (), & 'a mut RSmtParser> +
-          for<'a> ValueParser<Value, & 'a mut RSmtParser> {
-    self.parse_get_values_with(())
-  }
-
-  /// Parse the result of a get-values.
-  pub fn parse_get_values_with<Info, Expr, Value>(
-    & mut self, info: Info
-  ) -> SmtRes<Vec<(Expr, Value)>>
-  where
-  Info: Copy,
-  Parser: for<'a> ExprParser<Expr, Info, & 'a mut RSmtParser> +
-          for<'a> ValueParser<Value, & 'a mut RSmtParser> {
-    self.smt_parser.get_values(self.parser, info)
-  }
-
-  /// Get-values command.
-  ///
-  /// Notice that the input expression type and the output one have no reason
-  /// to be the same.
-  pub fn get_values_with<
-    'a, Info, Expr, Exprs, PExpr, PValue
-  >(
-    & mut self, exprs: Exprs, info: Info
-  ) -> SmtRes<Vec<(PExpr, PValue)>>
-  where
-  Info: Copy,
-  Parser: for<'b> ExprParser<PExpr, Info, & 'b mut RSmtParser> +
-          for<'b> ValueParser<PValue, & 'b mut RSmtParser>,
-  Expr: ?Sized + Expr2Smt<Info> + 'a,
-  Exprs: Copy + IntoIterator< Item = & 'a Expr > {
-    self.print_get_values_with( exprs, info.clone() ) ? ;
-    self.parse_get_values_with(info)
-  }
-
-}
-
-
-/// # Commands that are either untested or not useful right now.
+/// # Other commands (either untested or not useful right now).
 impl<Parser> Solver<Parser> {
 
 
