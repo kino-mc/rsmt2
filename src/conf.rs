@@ -165,6 +165,7 @@ impl SmtConf {
   ///
   /// ```
   /// # use rsmt2::SmtConf ;
+  /// let conf = SmtConf::z3() ;
   /// assert! {
   ///   conf.get_cmd() == "z3" || conf.get_cmd() == "z3.exe"
   /// }
