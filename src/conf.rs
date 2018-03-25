@@ -122,7 +122,9 @@ impl SmtConf {
   /// ```
   /// # use rsmt2::SmtConf ;
   /// let conf = SmtConf::z3() ;
-  /// assert_eq! { conf.get_cmd(), "z3" }
+  /// assert! {
+  ///   conf.get_cmd() == "z3" || conf.get_cmd() == "z3.exe"
+  /// }
   /// ```
   #[inline]
   pub fn z3() -> Self { Z3.default() }
@@ -163,7 +165,9 @@ impl SmtConf {
   ///
   /// ```
   /// # use rsmt2::SmtConf ;
-  /// assert_eq! { SmtConf::z3().get_cmd(), "z3" }
+  /// assert! {
+  ///   conf.get_cmd() == "z3" || conf.get_cmd() == "z3.exe"
+  /// }
   /// ```
   #[inline]
   pub fn get_cmd(& self) -> & str { & self.cmd }
