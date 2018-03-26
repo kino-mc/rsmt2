@@ -637,9 +637,11 @@ impl<Parser> Solver<Parser> {
 
   /// Declares mutually recursive datatypes.
   ///
+  /// A relatively recent version of z3 is recommended.
+  ///
   /// # Examples
   ///
-  /// ```rust
+  /// ```norun
   /// # use rsmt2::Solver ;
   /// let mut solver = Solver::default(()).unwrap() ;
   /// solver.declare_datatypes( & [
@@ -657,7 +659,7 @@ impl<Parser> Solver<Parser> {
   /// solver.assert("(not (value t2))").unwrap() ;
   ///
   /// let sat = solver.check_sat().unwrap() ;
-  /// assert! { sat }
+  /// assert! { sat } panic! { "aaa" }
   /// ```
   pub fn declare_datatypes<
     'a, Sort, Param, ParamList, Def, DefList, All
