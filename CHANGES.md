@@ -1,6 +1,9 @@
-# v0.9.4
+# v0.9.7
 
 - simplified the workflow significantly
+- all solver commands that take info, like `assert`, now take no info; use
+  `..._with`, like `assert_with`, to pass down information
+- added `declare-datatypes`
 
 # v0.9.2
 
