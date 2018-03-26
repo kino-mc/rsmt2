@@ -34,25 +34,30 @@ pub fn write_str(w: & mut io::Write, s: & str) -> SmtRes<()> {
   Ok(())
 }
 
-impl<'a, T> Sym2Smt<T> for & 'a str {
+impl<'a, T, Info> Sym2Smt<Info> for & 'a T
+where T: Sym2Smt<Info> + ?Sized {
   fn sym_to_smt2<Writer>(
-    & self, writer: & mut Writer, _: T
+    & self, writer: & mut Writer, info: Info
   ) -> SmtRes<()> where Writer: io::Write {
-    write_str(writer, self)
+    (* self).sym_to_smt2(writer, info)
   }
 }
-impl<'a, T> Expr2Smt<T> for & 'a str {
+
+impl<'a, T, Info> Expr2Smt<Info> for & 'a T
+where T: Expr2Smt<Info> + ?Sized {
   fn expr_to_smt2<Writer>(
-    & self, writer: & mut Writer, _: T
+    & self, writer: & mut Writer, info: Info
   ) -> SmtRes<()> where Writer: io::Write {
-    write_str(writer, self)
+    (* self).expr_to_smt2(writer, info)
   }
 }
-impl<'a> Sort2Smt for & 'a str {
+
+impl<'a, T> Sort2Smt for & 'a T
+where T: Sort2Smt + ?Sized {
   fn sort_to_smt2<Writer>(
     & self, writer: & mut Writer
   ) -> SmtRes<()> where Writer: io::Write {
-    write_str(writer, self)
+    (* self).sort_to_smt2(writer)
   }
 }
 

@@ -18,7 +18,7 @@ fn supported(keyword: & 'static str) -> ConfItem { Some(keyword) }
 
 
 /// Solver styles.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 #[allow(dead_code)]
 pub enum SolverStyle {
   /// Z3-style smt solver.
@@ -56,9 +56,10 @@ impl SolverStyle {
       },
     }
   }
+
   /// A solver style from a string.
   #[allow(dead_code)]
-  pub fn of_str(s: & str) -> Option<SolverStyle> {
+  pub fn of_str(s: & str) -> Option<Self> {
     match s {
       "z3" | "Z3" => Some(Z3),
       "cvc4" | "CVC4" => Some(CVC4),

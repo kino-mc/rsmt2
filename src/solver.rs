@@ -431,6 +431,30 @@ impl<Parser> Solver<Parser> {
     self.declare_fun_with(symbol, args, out, ())
   }
 
+
+  // /// Declares a new function symbol.
+  // ///
+  // /// ```
+  // /// # use rsmt2::Solver ;
+  // /// let mut solver = Solver::default(()).unwrap() ;
+  // /// solver.nu_declare_fun("my_symbol")
+  // ///   "my_symbol", & [ "Int", "Real", "Bool" ], "Bool"
+  // /// ).unwrap()
+  // /// ```
+  // pub fn nu_declare_fun<FunSym>(
+  //   & mut self, sym: & FunSym
+  // ) -> DeclareFun<Parser>
+  // where FunSym: ?Sized + Sym2Smt<()> {
+  //   self.nu_declare_fun_with(sym, ())
+  // }
+
+  // pub fn nu_declare_fun_with<FunSym, Info>(
+  //   & mut self, sym: & FunSym, info: Info
+  // ) -> DeclareFun<Parser>
+  // where FunSym: ?Sized + Sym2Smt<Info>, Info: Copy {
+  //   DeclareFun::new(self, sym, info)
+  // }
+
   /// Defines a new function symbol.
   ///
   /// # Examples
@@ -595,7 +619,7 @@ impl<Parser> Solver<Parser> {
   pub fn define_funs_rec<
     'a, FunSym, ArgSym, ArgSort, Args, ArgsRef, OutSort, Body, Funs
   >(
-    & mut self, funs: Funs
+    & mut self, funs: Funs,
   ) -> SmtRes<()>
   where
   FunSym: Sym2Smt<()> + 'a,
@@ -610,6 +634,91 @@ impl<Parser> Solver<Parser> {
     self.define_funs_rec_with(funs, ())
   }
 
+
+  /// Declares mutually recursive datatypes.
+  ///
+  /// # Examples
+  ///
+  /// ```rust
+  /// # use rsmt2::Solver ;
+  /// let mut solver = Solver::default(()).unwrap() ;
+  /// solver.declare_datatypes( & [
+  ///   ( "Tree", 1, ["T"],
+  ///     [ "leaf", "(node (value T) (children (TreeList T)))" ] ),
+  ///   ( "TreeList", 1, ["T"],
+  ///     [ "nil", "(cons (car (Tree T)) (cdr (TreeList T)))" ]),
+  /// ] ).unwrap() ;
+  ///
+  /// solver.declare_const( "t1", "(Tree Int)" ).unwrap() ;
+  /// solver.declare_const( "t2", "(Tree Bool)" ).unwrap() ;
+  ///
+  /// solver.assert("(> (value t1) 20)").unwrap() ;
+  /// solver.assert("(not (is-leaf t2))").unwrap() ;
+  /// solver.assert("(not (value t2))").unwrap() ;
+  ///
+  /// let sat = solver.check_sat().unwrap() ;
+  /// assert! { sat }
+  /// ```
+  pub fn declare_datatypes<
+    'a, Sort, Param, ParamList, Def, DefList, All
+  >(
+    & mut self, defs: All,
+  ) -> SmtRes<()>
+  where
+  Sort: Sort2Smt + 'a,
+
+  Param: Sort2Smt + 'a,
+  & 'a ParamList: IntoIterator< Item = & 'a Param > + 'a,
+
+  Def: Sort2Smt + 'a,
+  & 'a DefList: IntoIterator<
+    Item = & 'a Def
+  > + 'a,
+  All: Copy + IntoIterator<
+    Item = & 'a (Sort, usize, ParamList, DefList)
+  > + 'a {
+
+    wrt! {
+      self, |w| {
+        write!(w, "(declare-datatypes (") ? ;
+        for & (ref sort, arity, _, _) in defs {
+          write!(w, " (") ? ;
+          sort.sort_to_smt2(w) ? ;
+          write!(w, " {})", arity) ? ;
+        }
+        write!(w, " ) (") ? ;
+
+        for & (_, arity, ref params, ref defs) in defs {
+          write!(w, " (") ? ;
+
+          if arity > 0 {
+            write!(w, "par (") ? ;
+            for param in params {
+              write!(w, " ") ? ;
+              param.sort_to_smt2(w) ? ;
+            }
+            write!(w, " ) (") ?
+          }
+
+          for def in defs {
+            write!(w, " ") ? ;
+            def.sort_to_smt2(w) ? ;
+          }
+
+          write!(w, " )") ? ;
+
+          if arity > 0 {
+            write!(w, " )") ?
+          }
+        }
+
+        write!(w, " ) )\n") ? ;
+      }
+    }
+
+    Ok(())
+
+  }
 
 
 }
@@ -1500,3 +1609,90 @@ impl<Parser> Solver<Parser> {
   }
 
 }
+
+
+
+
+
+
+
+
+
+
+// pub struct DeclareFun<'a, Parser: 'a> {
+//   inner: & 'a mut Solver<Parser>,
+//   err: Option<Error>,
+// }
+// impl<'a, Parser: 'a> DeclareFun<'a, Parser> {
+//   fn new<FunSym, Info>(
+//     inner: & 'a mut Solver<Parser>, sym: & FunSym, info: Info
+//   ) -> Self
+//   where FunSym: ?Sized + Sym2Smt<Info>, Info: Copy {
+//     let err = Self::init(inner, sym, info).err() ;
+//     DeclareFun { inner, err }
+//   }
+
+//   fn init<FunSym, Info>(
+//     inner: & 'a mut Solver<Parser>, sym: & FunSym, info: Info
+//   ) -> SmtRes<()>
+//   where FunSym: ?Sized + Sym2Smt<Info>, Info: Copy {
+//     wrt! {
+//       inner, |w| {
+//         write!(w, "(declare-fun ") ? ;
+//         sym.sym_to_smt2(w, info) ? ;
+//         write!(w, " ") ? ;
+//       }
+//     }
+//     Ok(())
+//   }
+
+//   pub fn arg<ArgSort: ?Sized + Sort2Smt>(
+//     & mut self, arg: & ArgSort
+//   ) -> & mut Self {
+//     if self.err.is_none() {
+//       let err = self.res_arg(arg).err() ;
+//       self.err = err
+//     }
+//     self
+//   }
+
+//   pub fn out<OutSort: ?Sized + Sort2Smt>(
+//     mut self, out: & OutSort
+//   ) -> SmtRes<()> {
+//     if self.err.is_none() {
+//       let err = self.res_out(out).err() ;
+//       self.err = err
+//     }
+
+//     if let Some(e) = self.err {
+//       Err(e)
+//     } else {
+//       Ok(())
+//     }
+//   }
+
+//   pub fn res_arg<ArgSort: ?Sized + Sort2Smt>(
+//     & mut self, arg: & ArgSort
+//   ) -> SmtRes<()> {
+//     wrt! {
+//       self.inner, |w| {
+//         write!(w, " ") ? ;
+//         arg.sort_to_smt2(w) ? ;
+//       }
+//     }
+//     Ok(())
+//   }
+//   pub fn res_out<OutSort: ?Sized + Sort2Smt>(
+//     & mut self, out: & OutSort
+//   ) -> SmtRes<()> {
+//     wrt! {
+//       self.inner, |w| {
+//         write!(w, " )") ? ;
+//         write!(w, " ") ? ;
+//         out.sort_to_smt2(w) ? ;
+//         write!(w,")") ?
+//       }
+//     }
+//     Ok(())
+//   }
+// }
