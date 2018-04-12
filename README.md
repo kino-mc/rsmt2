@@ -17,7 +17,7 @@ See [`CHANGES.md`](https://github.com/kino-mc/rsmt2/blob/master/README.md) for
 the list of changes.
 
 
-# Missing features (if requested)
+# Future features (if requested)
 
 - support for solvers other than z3
 - `get-proof`
