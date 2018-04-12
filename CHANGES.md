@@ -1,4 +1,4 @@
-# v0.9.7
+# v0.9.5
 
 - simplified the workflow significantly
 - all solver commands that take info, like `assert`, now take no info; use
