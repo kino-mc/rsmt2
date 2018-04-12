@@ -431,29 +431,29 @@ impl<Parser> Solver<Parser> {
     self.declare_fun_with(symbol, args, out, ())
   }
 
-
-  // /// Declares a new function symbol.
-  // ///
-  // /// ```
-  // /// # use rsmt2::Solver ;
-  // /// let mut solver = Solver::default(()).unwrap() ;
-  // /// solver.nu_declare_fun("my_symbol")
-  // ///   "my_symbol", & [ "Int", "Real", "Bool" ], "Bool"
-  // /// ).unwrap()
-  // /// ```
-  // pub fn nu_declare_fun<FunSym>(
-  //   & mut self, sym: & FunSym
-  // ) -> DeclareFun<Parser>
-  // where FunSym: ?Sized + Sym2Smt<()> {
-  //   self.nu_declare_fun_with(sym, ())
-  // }
-
-  // pub fn nu_declare_fun_with<FunSym, Info>(
-  //   & mut self, sym: & FunSym, info: Info
-  // ) -> DeclareFun<Parser>
-  // where FunSym: ?Sized + Sym2Smt<Info>, Info: Copy {
-  //   DeclareFun::new(self, sym, info)
-  // }
+  /// Defines a new constant function symbol.
+  ///
+  /// # Examples
+  ///
+  /// ```
+  /// # use rsmt2::Solver ;
+  /// let mut solver = Solver::default(()).unwrap() ;
+  /// solver.define_const(
+  ///   "seven", "Int", "7"
+  /// ).unwrap()
+  /// ```
+  #[inline]
+  pub fn define_const<
+    'a, FunSym, OutSort, Body
+  >(
+    & mut self, symbol: & FunSym, out: & OutSort, body: & Body
+  ) -> SmtRes<()>
+  where
+  OutSort: ?Sized + Sort2Smt,
+  FunSym: ?Sized + Sym2Smt<()>,
+  Body: ?Sized + Expr2Smt<()> {
+    self.define_const_with(symbol, out, body, ())
+  }
 
   /// Defines a new function symbol.
   ///
@@ -1307,6 +1307,30 @@ impl<Parser> Solver<Parser> {
         }
         write_str(w, ") ") ? ;
         out.sort_to_smt2(w) ? ;
+        write_str(w, ")\n") ?
+      }
+    }
+    Ok(())
+  }
+
+  /// Defines a new constant.
+  #[inline]
+  pub fn define_const_with<Info, Sym, Sort, Body> (
+    & mut self, symbol: & Sym, out_sort: & Sort, body: & Body, info: Info
+  ) -> SmtRes<()>
+  where
+  Info: Copy,
+  Sym: ?Sized + Sym2Smt<Info>,
+  Sort: ?Sized + Sort2Smt,
+  Body: ?Sized + Expr2Smt<Info> {
+    wrt! {
+      self, |w| {
+        write_str(w, "(define-const ") ? ;
+        symbol.sym_to_smt2(w, info) ? ;
+        write_str(w, " ") ? ;
+        out_sort.sort_to_smt2(w) ? ;
+        write_str(w, " ") ? ;
+        body.expr_to_smt2(w, info) ? ;
         write_str(w, ")\n") ?
       }
     }

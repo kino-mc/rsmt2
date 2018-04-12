@@ -1,3 +1,7 @@
+# v0.9.6
+
+- `define_const` and `define_const_with`
+
 # v0.9.5
 
 - simplified the workflow significantly
