@@ -86,18 +86,21 @@ pub struct Solver<Parser> {
   actlit: usize,
 }
 
-/// Tries to write something in the solver.
-macro_rules! wrt {
+
+/// Writes something in both the solver and the teed output.
+macro_rules! tee_write {
   ($slf:expr, |$w:ident| $($tail:tt)*) => ({
     if let Some(ref mut $w) = $slf.tee {
-      { $($tail)* }
+      $($tail)* ;
       $w.flush() ?
     }
     let $w = & mut $slf.stdin ;
-    { $($tail)* }
+    $($tail)* ;
     $w.flush() ?
   }) ;
 }
+
+
 
 impl<Parser> ::std::ops::Drop for Solver<Parser> {
   fn drop(& mut self) {
@@ -418,7 +421,7 @@ impl<Parser> Solver<Parser> {
     & mut self
   ) -> SmtRes<()> {
     self.actlit = 0 ;
-    wrt! {
+    tee_write! {
       self, |w| write_str(w, "(reset)\n") ?
     }
     Ok(())
@@ -538,7 +541,7 @@ impl<Parser> Solver<Parser> {
   /// ```
   #[inline]
   pub fn push(& mut self, n: u8) -> SmtRes<()> {
-    wrt! {
+    tee_write! {
       self, |w| write!(w, "(push {})\n", n) ?
     }
     Ok(())
@@ -552,7 +555,7 @@ impl<Parser> Solver<Parser> {
   /// (push function for solver)
   #[inline]
   pub fn pop(& mut self, n: u8) -> SmtRes<()> {
-    wrt! {
+    tee_write! {
       self, |w| write!(w, "(pop {})\n", n) ?
     }
     Ok(())
@@ -593,7 +596,7 @@ impl<Parser> Solver<Parser> {
   pub fn set_logic(
     & mut self, logic: Logic
   ) -> SmtRes<()> {
-    wrt! {
+    tee_write! {
       self, |w| {
         write_str(w, "(set-logic ") ? ;
         logic.to_smt2(w, ()) ? ;
@@ -712,17 +715,26 @@ impl<Parser> Solver<Parser> {
     Item = & 'a (Sort, usize, ParamList, DefList)
   > + 'a {
 
-    wrt! {
-      self, |w| {
-        write!(w, "(declare-datatypes (") ? ;
-        for & (ref sort, arity, _, _) in defs {
+    tee_write! {
+      self, |w| write!(w, "(declare-datatypes (") ?
+    }
+    for & (ref sort, arity, _, _) in defs {
+      tee_write! {
+        self, |w| {
           write!(w, " (") ? ;
           sort.sort_to_smt2(w) ? ;
-          write!(w, " {})", arity) ? ;
+          write!(w, " {})", arity) ?
         }
-        write!(w, " ) (") ? ;
+      }
+    }
 
-        for & (_, arity, ref params, ref defs) in defs {
+    tee_write! {
+      self, |w| write!(w, " ) (") ?
+    }
+
+    for & (_, arity, ref params, ref defs) in defs {
+      tee_write! {
+        self, |w| {
           write!(w, " (") ? ;
 
           if arity > 0 {
@@ -733,21 +745,31 @@ impl<Parser> Solver<Parser> {
             }
             write!(w, " ) (") ?
           }
+        }
+      }
 
-          for def in defs {
+      for def in defs {
+        tee_write! {
+          self, |w| {
             write!(w, " ") ? ;
-            def.sort_to_smt2(w) ? ;
+            def.sort_to_smt2(w) ?
           }
+        }
+      }
 
+      tee_write! {
+        self, |w| {
           write!(w, " )") ? ;
 
           if arity > 0 {
             write!(w, " )") ?
           }
         }
-
-        write!(w, " ) )\n") ? ;
       }
+    }
+
+    tee_write! {
+      self, |w| write!(w, " ) )\n") ?
     }
 
     Ok(())
@@ -834,7 +856,7 @@ impl<Parser> Solver<Parser> {
     let id = self.actlit ;
     self.actlit += 1 ;
     let next_actlit = Actlit { id } ;
-    wrt! {
+    tee_write! {
       self, |w| write!(
         w, "(declare-fun {}{}{} () Bool)\n",
         actlit_pref, next_actlit.id, actlit_suff
@@ -865,7 +887,7 @@ impl<Parser> Solver<Parser> {
   pub fn set_actlit(
     & mut self, actlit: Actlit, b: bool
   ) -> SmtRes<()> {
-    wrt! {
+    tee_write! {
       self, |w| {
         if b {
           write!(w, "(assert ") ?
@@ -955,7 +977,7 @@ impl<Parser> Solver<Parser> {
   /// (parse_check_sat function for Solver)
   #[inline]
   pub fn print_check_sat(& mut self) -> SmtRes<FutureCheckSat> {
-    wrt! {
+    tee_write! {
       self, |w| write_str(w, "(check-sat)\n") ?
     }
     Ok(future_check_sat())
@@ -973,15 +995,19 @@ impl<Parser> Solver<Parser> {
   ) -> SmtRes<FutureCheckSat>
   where
   Actlits: Copy + IntoIterator<Item = & 'a Actlit> {
-    wrt! {
-      self, |w| {
-        write_str(w, "(check-sat-assuming (") ? ;
-        for actlit in actlits {
+    tee_write! {
+      self, |w| write_str(w, "(check-sat-assuming (") ?
+    }
+    for actlit in actlits {
+      tee_write! {
+        self, |w| {
           write!(w, " ") ? ;
           actlit.write(w) ?
         }
-        write_str(w, ") )\n") ?
       }
+    }
+    tee_write! {
+      self, |w| write_str(w, " ) )\n") ?
     }
     Ok(future_check_sat())
   }
@@ -1012,7 +1038,7 @@ impl<Parser> Solver<Parser> {
   /// Get-model command.
   #[inline]
   fn print_get_model(& mut self) -> SmtRes<()> {
-    wrt! {
+    tee_write! {
       self, |w| write_str(w, "(get-model)\n") ?
     }
     Ok(())
@@ -1021,7 +1047,7 @@ impl<Parser> Solver<Parser> {
   /// Get-assertions command.
   #[allow(dead_code)]
   fn print_get_assertions(& mut self) -> SmtRes<()> {
-    wrt! {
+    tee_write! {
       self, |w| write_str(w, "(get-assertions)\n") ?
     }
     Ok(())
@@ -1029,7 +1055,7 @@ impl<Parser> Solver<Parser> {
   /// Get-assignment command.
   #[allow(dead_code)]
   fn print_get_assignment(& mut self) -> SmtRes<()> {
-    wrt! {
+    tee_write! {
       self, |w| write_str(w, "(get-assignment)\n") ?
     }
     Ok(())
@@ -1037,7 +1063,7 @@ impl<Parser> Solver<Parser> {
   /// Get-unsat-assumptions command.
   #[allow(dead_code)]
   fn print_get_unsat_assumptions(& mut self) -> SmtRes<()> {
-    wrt! {
+    tee_write! {
       self, |w| write_str(w, "(get-unsat-assumptions)\n") ?
     }
     Ok(())
@@ -1045,7 +1071,7 @@ impl<Parser> Solver<Parser> {
   /// Get-proof command.
   #[allow(dead_code)]
   fn print_get_proof(& mut self) -> SmtRes<()> {
-    wrt! {
+    tee_write! {
       self, |w| write_str(w, "(get-proof)\n") ?
     }
     Ok(())
@@ -1053,7 +1079,7 @@ impl<Parser> Solver<Parser> {
   /// Get-unsat-core command.
   #[allow(dead_code)]
   fn print_get_unsat_core(& mut self) -> SmtRes<()> {
-    wrt! {
+    tee_write! {
       self, |w| write_str(w, "(get-unsat-core)\n") ?
     }
     Ok(())
@@ -1067,15 +1093,19 @@ impl<Parser> Solver<Parser> {
   Info: Copy,
   Expr: ?Sized + Expr2Smt< Info > + 'a,
   Exprs: Clone + IntoIterator< Item = & 'a Expr > {
-    wrt! {
-      self, |w| {
-        write!(w, "(get-value (") ? ;
-        for e in exprs.clone() {
+    tee_write! {
+      self, |w| write!(w, "(get-value (") ?
+    }
+    for e in exprs.clone() {
+      tee_write! {
+        self, |w| {
           write_str(w, "\n  ") ? ;
           e.expr_to_smt2(w, info) ?
         }
-        write_str(w, "\n) )\n") ?
       }
+    }
+    tee_write! {
+      self, |w| write_str(w, "\n) )\n") ?
     }
     Ok(())
   }
@@ -1100,15 +1130,19 @@ impl<Parser> Solver<Parser> {
   Idents: Copy + IntoIterator< Item = & 'a Ident > {
     match self.conf.get_check_sat_assuming() {
       Some(ref cmd) => {
-        wrt! {
-          self, |w| {
-            write!(w, "({}\n ", cmd) ? ;
-            for sym in bool_vars {
+        tee_write! {
+          self, |w| write!(w, "({}\n ", cmd) ?
+        }
+        for sym in bool_vars {
+          tee_write! {
+            self, |w| {
               write_str(w, " ") ? ;
               sym.sym_to_smt2(w, info) ?
-            } ;
-            write_str(w, "\n)\n") ?
+            }
           }
+        } ;
+        tee_write! {
+          self, |w| write_str(w, "\n)\n") ?
         }
         Ok(future_check_sat())
       },
@@ -1234,7 +1268,7 @@ impl<Parser> Solver<Parser> {
     & mut self, sort: & Sort, arity: u8
   ) -> SmtRes<()>
   where Sort: ?Sized + Sort2Smt {
-    wrt! {
+    tee_write! {
       self, |w| {
         write_str(w, "(declare-sort ") ? ;
         sort.sort_to_smt2(w) ? ;
@@ -1282,15 +1316,23 @@ impl<Parser> Solver<Parser> {
   Arg: ?Sized + Sort2Smt + 'a,
   Body: ?Sized + Sort2Smt,
   Args: Copy + IntoIterator< Item = & 'a Arg > {
-    wrt!{
+    tee_write!{
       self, |w| {
         write_str(w, "( define-sort ") ? ;
         sort.sort_to_smt2(w) ? ;
         write_str(w, "\n   ( ") ? ;
-        for arg in args {
+      }
+    }
+    for arg in args {
+      tee_write! {
+        self, |w| {
           arg.sort_to_smt2(w) ? ;
           write_str(w, " ") ?
         }
+      }
+    }
+    tee_write! {
+      self, |w| {
         write_str(w, ")\n   ") ? ;
         body.sort_to_smt2(w) ? ;
         write_str(w, "\n)\n") ?
@@ -1335,7 +1377,7 @@ impl<Parser> Solver<Parser> {
   Info: Copy,
   Sym: ?Sized + Sym2Smt<Info>,
   Sort: ?Sized + Sort2Smt {
-    wrt! {
+    tee_write! {
       self, |w| {
         write_str(w, "(declare-const ") ? ;
         symbol.sym_to_smt2(w, info) ? ;
@@ -1358,15 +1400,23 @@ impl<Parser> Solver<Parser> {
   ArgSort: ?Sized + Sort2Smt + 'a,
   OutSort: ?Sized + Sort2Smt,
   Args: Copy + IntoIterator< Item = & 'a ArgSort > {
-    wrt! {
+    tee_write! {
       self, |w| {
         write_str(w, "(declare-fun ") ? ;
         symbol.sym_to_smt2(w, info) ? ;
-        write_str(w, " ( ") ? ;
-        for arg in args.into_iter() {
+        write_str(w, " ( ") ?
+      }
+    }
+    for arg in args.into_iter() {
+      tee_write! {
+        self, |w| {
           arg.sort_to_smt2(w) ? ;
           write_str(w, " ") ?
         }
+      }
+    }
+    tee_write! {
+      self, |w| {
         write_str(w, ") ") ? ;
         out.sort_to_smt2(w) ? ;
         write_str(w, ")\n") ?
@@ -1385,7 +1435,7 @@ impl<Parser> Solver<Parser> {
   Sym: ?Sized + Sym2Smt<Info>,
   Sort: ?Sized + Sort2Smt,
   Body: ?Sized + Expr2Smt<Info> {
-    wrt! {
+    tee_write! {
       self, |w| {
         write_str(w, "(define-const ") ? ;
         symbol.sym_to_smt2(w, info) ? ;
@@ -1415,19 +1465,27 @@ impl<Parser> Solver<Parser> {
   ArgSym: Sym2Smt<Info> + 'a,
   Body: ?Sized + Expr2Smt<Info>,
   Args: Copy + IntoIterator< Item = & 'a (ArgSym, ArgSort) > {
-    wrt! {
+    tee_write! {
       self, |w| {
         write_str(w, "(define-fun ") ? ;
         symbol.sym_to_smt2(w, info) ? ;
-        write_str(w, " ( ") ? ;
-        for arg in args {
-          let (ref sym, ref sort) = * arg ;
+        write_str(w, " ( ") ?
+      }
+    }
+    for arg in args {
+      let (ref sym, ref sort) = * arg ;
+      tee_write! {
+        self, |w| {
           write_str(w, "(") ? ;
           sym.sym_to_smt2(w, info) ? ;
           write_str(w, " ") ? ;
           sort.sort_to_smt2(w) ? ;
           write_str(w, ") ") ?
         }
+      }
+    }
+    tee_write! {
+      self, |w| {
         write_str(w, ") ") ? ;
         out.sort_to_smt2(w) ? ;
         write_str(w, "\n   ") ? ;
@@ -1456,18 +1514,27 @@ impl<Parser> Solver<Parser> {
   Args: ?Sized,
   ArgsRef: 'a + AsRef<Args>,
   Funs: Copy + IntoIterator< Item = & 'a (FunSym, ArgsRef, OutSort, Body) > {
-    wrt! {
-      self, |w| {
-        // Header.
-        write_str(w, "(define-funs-rec (\n") ? ;
 
-        // Signatures.
-        for fun in funs {
-          let (ref sym, ref args, ref out, _) = * fun ;
+    // Header.
+    tee_write! {
+      self, |w| write_str(w, "(define-funs-rec (\n") ?
+    }
+
+    // Signatures.
+    for fun in funs {
+      let (ref sym, ref args, ref out, _) = * fun ;
+
+      tee_write! {
+        self, |w| {
           write_str(w, "   (") ? ;
           sym.sym_to_smt2(w, info) ? ;
-          write_str(w, " ( ") ? ;
-          for arg in args.as_ref() {
+          write_str(w, " ( ") ?
+        }
+      }
+
+      for arg in args.as_ref() {
+        tee_write! {
+          self, |w| {
             let (ref sym, ref sort) = * arg ;
             write_str(w, "(") ? ;
             sym.sym_to_smt2(w, info) ? ;
@@ -1475,18 +1542,33 @@ impl<Parser> Solver<Parser> {
             sort.sort_to_smt2(w) ? ;
             write_str(w, ") ") ?
           }
+        }
+      }
+
+      tee_write! {
+        self, |w| {
           write_str(w, ") ") ? ;
           out.sort_to_smt2(w) ? ;
           write_str(w, ")\n") ?
         }
-        write_str(w, " ) (") ? ;
+      }
+    }
+    tee_write! {
+      self, |w| write_str(w, " ) (") ?
+    }
 
-        // Bodies
-        for fun in funs {
-          let (_, _, _, ref body) = * fun ;
+    // Bodies
+    for fun in funs {
+      let (_, _, _, ref body) = * fun ;
+      tee_write! {
+        self, |w| {
           write_str(w, "\n   ") ? ;
           body.expr_to_smt2(w, info) ?
         }
+      }
+    }
+    tee_write! {
+      self, |w| {
         write_str(w, "\n )\n)\n") ?
       }
     }
@@ -1509,23 +1591,36 @@ impl<Parser> Solver<Parser> {
   ArgSym: Sym2Smt<Info> + 'a,
   Body: ?Sized + Expr2Smt<Info>,
   Args: Copy + IntoIterator< Item = & 'a (ArgSym, ArgSort) > {
-    wrt! {
-      self, |w| {
-        // Header.
-        write_str(w, "(define-fun-rec (\n") ? ;
 
+    // Header.
+    tee_write! {
+      self, |w| write_str(w, "(define-fun-rec (\n") ?
+    }
+
+    tee_write! {
+      self, |w| {
         // Signature.
         write_str(w, "   (") ? ;
         symbol.sym_to_smt2(w, info) ? ;
-        write_str(w, " ( ") ? ;
-        for arg in args {
-          let (ref sym, ref sort) = * arg ;
+        write_str(w, " ( ") ?
+      }
+    }
+
+    for arg in args {
+      let (ref sym, ref sort) = * arg ;
+      tee_write! {
+        self, |w| {
           write_str(w, "(") ? ;
           sym.sym_to_smt2(w, info) ? ;
           write_str(w, " ") ? ;
           sort.sort_to_smt2(w) ? ;
           write_str(w, ") ") ?
         }
+      }
+    }
+
+    tee_write! {
+      self, |w| {
         write_str(w, ") ") ? ;
         out.sort_to_smt2(w) ? ;
         write_str(w, ")\n") ? ;
@@ -1554,7 +1649,7 @@ impl<Parser> Solver<Parser> {
   where
   Info: Copy,
   Expr: ?Sized + Expr2Smt<Info>, {
-    wrt! {
+    tee_write! {
       self, |w| {
         write_str(w, "(assert\n  (=>\n    ") ? ;
         actlit.write(w) ? ;
@@ -1575,7 +1670,7 @@ impl<Parser> Solver<Parser> {
   where
   Info: Copy,
   Expr: ?Sized + Expr2Smt<Info> {
-    wrt! {
+    tee_write! {
       self, |w| {
         write_str(w, "(assert\n  ") ? ;
         expr.expr_to_smt2(w, info) ? ;
@@ -1631,7 +1726,7 @@ impl<Parser> Solver<Parser> {
       ),
       _ => (),
     } ;
-    wrt! {
+    tee_write! {
       self, |w| write!(
         w, "(set-option {} {})\n", option, value
       ) ?
@@ -1649,7 +1744,7 @@ impl<Parser> Solver<Parser> {
   /// Resets the assertions in the solver.
   #[inline]
   pub fn reset_assertions(& mut self) -> SmtRes<()> {
-    wrt! {
+    tee_write! {
       self, |w| write_str(w, "(reset-assertions)\n") ?
     }
     Ok(())
@@ -1661,7 +1756,7 @@ impl<Parser> Solver<Parser> {
   /// Get info command.
   #[inline]
   pub fn get_info(& mut self, flag: & str) -> SmtRes<()> {
-    wrt! {
+    tee_write! {
       self, |w| write!(w, "(get-info {})\n", flag) ?
     }
     Ok(())
@@ -1669,7 +1764,7 @@ impl<Parser> Solver<Parser> {
   /// Get option command.
   #[inline]
   pub fn get_option(& mut self, option: & str) -> SmtRes<()> {
-    wrt! {
+    tee_write! {
       self, |w| write!(w, "(get-option {})\n", option) ?
     }
     Ok(())
@@ -1682,7 +1777,7 @@ impl<Parser> Solver<Parser> {
   /// Set info command.
   #[inline]
   pub fn set_info(& mut self, attribute: & str) -> SmtRes<()> {
-    wrt! {
+    tee_write! {
       self, |w| write!(w, "(set-info {})\n", attribute) ?
     }
     Ok(())
@@ -1690,7 +1785,7 @@ impl<Parser> Solver<Parser> {
   /// Echo command.
   #[inline]
   pub fn echo(& mut self, text: & str) -> SmtRes<()> {
-    wrt! {
+    tee_write! {
       self, |w| write!(w, "(echo \"{}\")\n", text) ?
     }
     Ok(())
@@ -1724,7 +1819,7 @@ impl<Parser> Solver<Parser> {
 //     inner: & 'a mut Solver<Parser>, sym: & FunSym, info: Info
 //   ) -> SmtRes<()>
 //   where FunSym: ?Sized + Sym2Smt<Info>, Info: Copy {
-//     wrt! {
+//     tee_write! {
 //       inner, |w| {
 //         write!(w, "(declare-fun ") ? ;
 //         sym.sym_to_smt2(w, info) ? ;
@@ -1762,7 +1857,7 @@ impl<Parser> Solver<Parser> {
 //   pub fn res_arg<ArgSort: ?Sized + Sort2Smt>(
 //     & mut self, arg: & ArgSort
 //   ) -> SmtRes<()> {
-//     wrt! {
+//     tee_write! {
 //       self.inner, |w| {
 //         write!(w, " ") ? ;
 //         arg.sort_to_smt2(w) ? ;
@@ -1773,7 +1868,7 @@ impl<Parser> Solver<Parser> {
 //   pub fn res_out<OutSort: ?Sized + Sort2Smt>(
 //     & mut self, out: & OutSort
 //   ) -> SmtRes<()> {
-//     wrt! {
+//     tee_write! {
 //       self.inner, |w| {
 //         write!(w, " )") ? ;
 //         write!(w, " ") ? ;

@@ -1,7 +1,6 @@
 //! Basic types used by the library.
 
-use std::io ;
-use std::fmt ;
+use std::{ io, fmt } ;
 
 use errors::* ;
 
@@ -58,6 +57,33 @@ where T: Sort2Smt + ?Sized {
     & self, writer: & mut Writer
   ) -> SmtRes<()> where Writer: io::Write {
     (* self).sort_to_smt2(writer)
+  }
+}
+
+impl<T, Info> Sym2Smt<Info> for AsRef<T>
+where T: Sym2Smt<Info> {
+  fn sym_to_smt2<Writer>(
+    & self, writer: & mut Writer, info: Info
+  ) -> SmtRes<()> where Writer: io::Write {
+    self.as_ref().sym_to_smt2(writer, info)
+  }
+}
+
+impl<T, Info> Expr2Smt<Info> for AsRef<T>
+where T: Expr2Smt<Info> + ?Sized {
+  fn expr_to_smt2<Writer>(
+    & self, writer: & mut Writer, info: Info
+  ) -> SmtRes<()> where Writer: io::Write {
+    self.as_ref().expr_to_smt2(writer, info)
+  }
+}
+
+impl<T> Sort2Smt for AsRef<T>
+where T: Sort2Smt + ?Sized {
+  fn sort_to_smt2<Writer>(
+    & self, writer: & mut Writer
+  ) -> SmtRes<()> where Writer: io::Write {
+    self.as_ref().sort_to_smt2(writer)
   }
 }
 
