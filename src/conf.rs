@@ -1,10 +1,14 @@
 //! Solver configuration, contains backend-solver-specific info.
+//!
+//! Do **NOT** use wildcards when matching over `SmtStyle`. We want the code to
+//! fail to compile whenever we add a solver. Likewise, do not use `if let`
+//! with `SmtStyle`.
 
 use std::fmt ;
 
 use { SmtRes, Solver } ;
 
-use self::SolverStyle::* ;
+use self::SmtStyle::* ;
 
 /// A configuration item is either a keyword or unsupported.
 pub type ConfItem = Option<& 'static str> ;
@@ -20,7 +24,7 @@ fn supported(keyword: & 'static str) -> ConfItem { Some(keyword) }
 /// Solver styles.
 #[derive(Debug, Clone, Copy)]
 #[allow(dead_code)]
-pub enum SolverStyle {
+pub enum SmtStyle {
   /// Z3-style smt solver.
   Z3,
   /// CVC4-style smt solver.
@@ -29,7 +33,7 @@ pub enum SolverStyle {
   CVC4,
 }
 
-impl SolverStyle {
+impl SmtStyle {
   /// Default configuration for a solver style.
   pub fn default(self) -> SmtConf {
     let cmd = self.cmd() ;
@@ -38,8 +42,10 @@ impl SolverStyle {
         style: self,
         cmd: cmd,
         options: vec![
-          "-in", "-smt2"
+          "-in".into(), "-smt2".into()
         ],
+        models: true,
+        incremental: true,
         parse_success: false,
         unsat_cores: false,
         check_sat_assuming: supported("check-sat"),
@@ -48,8 +54,11 @@ impl SolverStyle {
         style: self,
         cmd: cmd,
         options: vec![
-          "--smtlib-strict", "-qqqqq", "--interactive"
+          "-q".into(), "--interactive".into(),
+          "--lang".into(), "smt2".into(),
         ],
+        models: false,
+        incremental: false,
         parse_success: false,
         unsat_cores: false,
         check_sat_assuming: unsupported(),
@@ -76,19 +85,21 @@ impl SolverStyle {
   #[cfg( not(windows) )]
   pub fn cmd(& self) -> String {
     match * self {
-      Z3 => "z3".to_string(), CVC4 => "cvc4".to_string(),
+      Z3 => "z3".to_string(),
+      CVC4 => "cvc4".to_string(),
     }
   }
   /// Default command for a solver style.
   #[cfg( windows )]
   pub fn cmd(& self) -> String {
     match * self {
-      Z3 => "z3.exe".to_string(), CVC4 => "cvc4.exe".to_string(),
+      Z3 => "z3.exe".to_string(),
+      CVC4 => "cvc4.exe".to_string(),
     }
   }
 }
 
-impl fmt::Display for SolverStyle {
+impl fmt::Display for SmtStyle {
   fn fmt(& self, fmt: & mut fmt::Formatter) -> fmt::Result {
     match * self {
       Z3 => write!(fmt, "z3"),
@@ -102,11 +113,15 @@ impl fmt::Display for SolverStyle {
 #[derive(Debug, Clone)]
 pub struct SmtConf {
   /// Solver style.
-  style: SolverStyle,
+  style: SmtStyle,
   /// Solver command.
   cmd: String,
   /// Options to call the solver with.
-  options: Vec<& 'static str>,
+  options: Vec<String>,
+  /// Model production.
+  models: bool,
+  /// Incrementality.
+  incremental: bool,
   /// Parse success.
   parse_success: bool,
   /// Triggers unsat-core production.
@@ -129,6 +144,20 @@ impl SmtConf {
   /// ```
   #[inline]
   pub fn z3() -> Self { Z3.default() }
+
+  /// Creates a new cvc4-like solver configuration.
+  ///
+  /// # Examples
+  ///
+  /// ```
+  /// # use rsmt2::SmtConf ;
+  /// let conf = SmtConf::cvc4() ;
+  /// assert! {
+  ///   conf.get_cmd() == "cvc4" || conf.get_cmd() == "cvc4.exe"
+  /// }
+  /// ```
+  #[inline]
+  pub fn cvc4() -> Self { CVC4.default() }
 
 
   /// Spawns the solver.
@@ -160,6 +189,40 @@ impl SmtConf {
     }
   }
 
+  /// Model production.
+  pub fn get_models(& self) -> bool {
+    self.models
+  }
+  /// Activates model production.
+  pub fn models(& mut self) {
+    if self.models {
+      return ()
+    } else {
+      self.models = true
+    }
+    match self.style {
+      CVC4 => self.options.push( "--produce-models".into() ),
+      Z3 => (),
+    }
+  }
+
+  /// Incrementality.
+  pub fn get_incremental(& self) -> bool {
+    self.incremental
+  }
+  /// Activates incrementality (push/pop, check-sat-assuming).
+  pub fn incremental(& mut self) {
+    if self.incremental {
+      return ()
+    } else {
+      self.incremental = true
+    }
+    match self.style {
+      CVC4 => self.options.push( "--incremental".into() ),
+      Z3 => (),
+    }
+  }
+
   /// Solver command.
   ///
   /// # Examples
@@ -185,7 +248,7 @@ impl SmtConf {
   /// }
   /// ```
   #[inline]
-  pub fn get_options(& self) -> & [& 'static str] { & self.options }
+  pub fn get_options(& self) -> & [ String ] { & self.options }
 
   /// Indicates if print success is active.
   ///
@@ -238,8 +301,9 @@ impl SmtConf {
   /// }
   /// ```
   #[inline]
-  pub fn option(& mut self, o: & 'static str) {
-    self.options.push(o)
+  pub fn option<S: Into<String>>(& mut self, o: S) -> & mut Self {
+    self.options.push( o.into() ) ;
+    self
   }
 
   /// Sets the command for the solver.
@@ -253,8 +317,24 @@ impl SmtConf {
   /// assert_eq! { conf.get_cmd(), "my_custom_z3_command" }
   /// ```
   #[inline]
-  pub fn cmd<S: Into<String>>(& mut self, cmd: S) {
-    self.cmd = cmd.into()
+  pub fn cmd<S: Into<String>>(& mut self, cmd: S) -> & mut Self {
+    let cmd = cmd.into() ;
+    let mut iter = cmd.split(" ") ;
+
+    'set_cmd: while let Some(cmd) = iter.next() {
+      if ! cmd.is_empty() {
+        self.cmd = cmd.into() ;
+        break 'set_cmd
+      }
+    }
+
+    for option in iter {
+      if ! option.is_empty() {
+        self.options.push( option.into() )
+      }
+    }
+
+    self
   }
 
   /// Activates parse sucess.

@@ -412,7 +412,15 @@ impl<R: BufRead> SmtParser<R> {
     loop {
       self.spc_cmt() ;
       if self.cursor + tag.len() >= self.buff.len() + 1 {
-        // println!("reading ({})", tag) ;
+        if self.cursor < self.buff.len() {
+          if self.buff[
+            self.cursor .. self.buff.len()
+          ] != tag[ 0 .. self.buff.len() - self.cursor ] {
+            return Ok(false)
+          } else {
+            ()
+          }
+        }
         let eof = ! self.read_line() ? ;
         self.spc_cmt() ;
         if eof { return Ok(false) }
@@ -570,10 +578,27 @@ impl<R: BufRead> SmtParser<R> {
     Ok(())
   }
 
+  /// Parses the annoying CVC4 prompt. Can't fail.
+  pub fn prompt(& mut self) -> SmtRes<()> {
+    loop {
+      let start_pos = self.pos() ;
+      self.spc_cmt() ;
+      if self.try_tag(">") ? || self.try_tag("CVC4>") ? {
+        ()
+      } else if self.try_tag("...") ? {
+        ()
+      } else {
+        self.backtrack_to(start_pos) ;
+        break
+      }
+    }
+    Ok(())
+  }
+
 
   /// Generates a failure at the current position.
   pub fn fail_with<T, Str: Into<String>>(& mut self, msg: Str) -> SmtRes<T> {
-    self.print("") ;
+    self.try_error() ? ;
     let sexpr = match self.get_sexpr() {
       Ok(e) => Some( e.to_string() ),
       _ => None,
@@ -1114,7 +1139,7 @@ impl<R: BufRead> SmtParser<R> {
   /// #      println!("{}", line)
   /// #    }
   /// #  }
-  ///   debug_assert! { e.description() == "huge panic" }
+  ///   assert_eq! { & format!("{}", e), "solver error: \"huge panic\"" }
   /// } else {
   ///   panic!("expected error, got nothing :(")
   /// }
@@ -1143,7 +1168,11 @@ impl<R: BufRead> SmtParser<R> {
           self.tag(")").chain_err(
             || "closing error message"
           ) ? ;
-          bail!( & self.buff[ start .. end ] )
+          bail!(
+            ErrorKind::SolverError(
+              self.buff[ start .. end ].into()
+            )
+          )
         }
       }
       self.backtrack_to(start_pos)
@@ -1155,6 +1184,8 @@ impl<R: BufRead> SmtParser<R> {
 
   /// Parses the result of a check-sat.
   pub fn check_sat(& mut self) -> SmtRes< Option<bool> > {
+    self.prompt() ? ;
+    self.spc_cmt() ;
     if self.try_tag("sat") ? {
       Ok(Some(true))
     } else if self.try_tag("unsat") ? {
@@ -1162,6 +1193,7 @@ impl<R: BufRead> SmtParser<R> {
     } else if self.try_tag("unknown") ? {
       Ok(None)
     } else {
+      self.try_error() ? ;
       self.fail_with("expected `sat` or `unsat`")
     }
   }
@@ -1185,8 +1217,14 @@ impl<R: BufRead> SmtParser<R> {
     & mut self, prune_actlits: bool, parser: Parser
   ) -> SmtRes< Vec<(Ident, Type, Value)> >
   where
-  Parser: for<'a> IdentParser<Ident, Type, & 'a mut Self> +
-          for<'a> ValueParser<Value, & 'a mut Self> {
+  Parser: for<'a> IdentParser<
+    Ident, Type, & 'a mut Self
+  > + for<'a> ValueParser<
+    Value, & 'a mut Self
+  > {
+    self.prompt() ? ;
+    self.spc_cmt() ;
+    self.try_error() ? ;
     let mut model = Vec::new() ;
     self.tags( & ["(", "model"] ) ? ;
     while ! self.try_tag(")") ? {
@@ -1216,8 +1254,14 @@ impl<R: BufRead> SmtParser<R> {
     & mut self, prune_actlits: bool, parser: Parser
   ) -> SmtRes< Vec<(Ident, Vec<Type>, Type, Value)> >
   where
-  Parser: for<'a> IdentParser<Ident, Type, & 'a mut Self> +
-          for<'a> ValueParser<Value, & 'a mut Self> {
+  Parser: for<'a> IdentParser<
+    Ident, Type, & 'a mut Self
+  > + for<'a> ValueParser<
+    Value, & 'a mut Self
+  > {
+    self.prompt() ? ;
+    self.spc_cmt() ;
+    self.try_error() ? ;
     let mut model = Vec::new() ;
     self.tags( &["(", "model"] ) ? ;
     while ! self.try_tag(")") ? {
@@ -1251,8 +1295,14 @@ impl<R: BufRead> SmtParser<R> {
     & mut self, parser: Parser, info: Info
   ) -> SmtRes< Vec<(Expr, Value)> >
   where
-  Parser: for<'a> ValueParser<Value, & 'a mut Self> +
-          for<'a> ExprParser<Expr, Info, & 'a mut Self> {
+  Parser: for<'a> ValueParser<
+    Value, & 'a mut Self
+  > + for<'a> ExprParser<
+    Expr, Info, & 'a mut Self
+  > {
+    self.prompt() ? ;
+    self.spc_cmt() ;
+    self.try_error() ? ;
     let mut values = Vec::new() ;
     self.tag("(") ? ;
     while ! self.try_tag(")") ? {

@@ -412,7 +412,7 @@ mod solver ;
 pub mod actlit ;
 
 pub use errors::SmtRes ;
-pub use conf::SmtConf ;
+pub use conf::{ SmtConf, SmtStyle } ;
 pub use common::Logic ;
 pub use solver::{ Solver } ;
 

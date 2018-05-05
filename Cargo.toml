@@ -1,6 +1,6 @@
 [package]
 name = "rsmt2"
-version = "0.9.6"
+version = "0.9.9"
 authors = ["Adrien Champion <adrien.champion@email.com>"]
 description = "Wrapper for SMT-LIB 2 compliant SMT solvers."
 documentation = "https://docs.rs/rsmt2"
@@ -18,3 +18,4 @@ codecov = { repository = "kino-mc/rsmt2", service = "github" }
 
 [dependencies]
 error-chain = "^0"
+hashconsing = "*"

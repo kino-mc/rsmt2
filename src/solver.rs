@@ -179,6 +179,18 @@ impl<Parser> Solver<Parser> {
   pub fn default(parser: Parser) -> SmtRes<Self> {
     Self::new( SmtConf::z3(), parser )
   }
+  /// Creates a solver kid with the default z3 configuration.
+  ///
+  /// Mostly used in tests, same as `Self::new( SmtConf::z3(), parser )`.
+  pub fn default_z3(parser: Parser) -> SmtRes<Self> {
+    Self::new( SmtConf::z3(), parser )
+  }
+  /// Creates a solver kid with the default cvc4 configuration.
+  ///
+  /// Mostly used in tests, same as `Self::new( SmtConf::z3(), parser )`.
+  pub fn default_cvc4(parser: Parser) -> SmtRes<Self> {
+    Self::new( SmtConf::cvc4(), parser )
+  }
 
   /// Returns the configuration of the solver.
   pub fn conf(& self) -> & SmtConf { & self.conf }
@@ -190,10 +202,30 @@ impl<Parser> Solver<Parser> {
     if self.tee.is_some() {
       bail!("Trying to tee a solver that's already tee-ed")
     }
-    self.tee = Some(
-      BufWriter::with_capacity(1000, file)
-    ) ;
+    let mut tee = BufWriter::with_capacity(1000, file) ;
+    write!(tee, "; Command:\n; > {}", self.conf.get_cmd()) ? ;
+    for option in self.conf.get_options() {
+      write!(tee, " {}", option) ?
+    }
+    write!(tee, "\n\n") ? ;
+    self.tee = Some(tee) ;
     Ok(())
+  }
+
+  /// Forces the solver to write all communications to a file.
+  ///
+  /// Opens `file` with `create` and `write`.
+  pub fn path_tee<P>(& mut self, path: P) -> SmtRes<()>
+  where P: AsRef<::std::path::Path> {
+    use std::fs::OpenOptions ;
+
+    let path: & ::std::path::Path = path.as_ref() ;
+    let file = OpenOptions::new().create(true).write(true).open(
+      path
+    ).chain_err(
+      || format!("while opening tee file `{}`", path.to_string_lossy())
+    ) ? ;
+    self.tee(file)
   }
 
   /// True if the solver is tee-ed.
@@ -943,12 +975,12 @@ impl<Parser> Solver<Parser> {
   Actlits: Copy + IntoIterator<Item = & 'a Actlit> {
     wrt! {
       self, |w| {
-        write_str(w, "(check-sat") ? ;
+        write_str(w, "(check-sat-assuming (") ? ;
         for actlit in actlits {
           write!(w, " ") ? ;
           actlit.write(w) ?
         }
-        write_str(w, ")\n") ?
+        write_str(w, ") )\n") ?
       }
     }
     Ok(future_check_sat())
@@ -1096,7 +1128,17 @@ impl<Parser> Solver<Parser> {
   Parser: for<'a> IdentParser<Ident, Type, & 'a mut RSmtParser> +
           for<'a> ValueParser<Value, & 'a mut RSmtParser> {
     let has_actlits = self.has_actlits() ;
-    self.smt_parser.get_model(has_actlits, self.parser)
+    let res = self.smt_parser.get_model(has_actlits, self.parser) ;
+    if res.is_err() && self.conf.get_models() {
+      res.chain_err(
+        || "\
+          Note: model production is not active \
+          for this SmtConf (`conf.models()`)\
+        "
+      )
+    } else {
+      res
+    }
   }
 
   /// Parse the result of a get-model where all the symbols are nullary.
@@ -1107,7 +1149,17 @@ impl<Parser> Solver<Parser> {
   Parser: for<'a> IdentParser<Ident, Type, & 'a mut RSmtParser> +
           for<'a> ValueParser<Value, & 'a mut RSmtParser> {
     let has_actlits = self.has_actlits() ;
-    self.smt_parser.get_model_const(has_actlits, self.parser)
+    let res = self.smt_parser.get_model_const(has_actlits, self.parser) ;
+    if res.is_err() && self.conf.get_models() {
+      res.chain_err(
+        || "\
+          Note: model production is not active \
+          for this SmtConf (`conf.models()`)\
+        "
+      )
+    } else {
+      res
+    }
   }
 
   /// Parse the result of a get-values.
@@ -1118,7 +1170,17 @@ impl<Parser> Solver<Parser> {
   Info: Copy,
   Parser: for<'a> ExprParser<Expr, Info, & 'a mut RSmtParser> +
           for<'a> ValueParser<Value, & 'a mut RSmtParser> {
-    self.smt_parser.get_values(self.parser, info)
+    let res = self.smt_parser.get_values(self.parser, info) ;
+    if res.is_err() && self.conf.get_models() {
+      res.chain_err(
+        || "\
+          Note: model production is not active \
+          for this SmtConf (`conf.models()`)\
+        "
+      )
+    } else {
+      res
+    }
   }
 
   /// Get-values command.

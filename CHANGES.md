@@ -1,3 +1,9 @@
+# v0.9.9
+
+- improved `SmtConf` to support `String` options and commands with options
+- `Solver::path_tee` tees the solver to file given by path
+- fixed/improved solver-level error handling
+
 # v0.9.6
 
 - `define_const` and `define_const_with`
