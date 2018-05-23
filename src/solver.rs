@@ -1163,7 +1163,7 @@ impl<Parser> Solver<Parser> {
           for<'a> ValueParser<Value, & 'a mut RSmtParser> {
     let has_actlits = self.has_actlits() ;
     let res = self.smt_parser.get_model(has_actlits, self.parser) ;
-    if res.is_err() && self.conf.get_models() {
+    if res.is_err() && ! self.conf.get_models() {
       res.chain_err(
         || "\
           Note: model production is not active \
@@ -1184,7 +1184,7 @@ impl<Parser> Solver<Parser> {
           for<'a> ValueParser<Value, & 'a mut RSmtParser> {
     let has_actlits = self.has_actlits() ;
     let res = self.smt_parser.get_model_const(has_actlits, self.parser) ;
-    if res.is_err() && self.conf.get_models() {
+    if res.is_err() && ! self.conf.get_models() {
       res.chain_err(
         || "\
           Note: model production is not active \
@@ -1205,7 +1205,7 @@ impl<Parser> Solver<Parser> {
   Parser: for<'a> ExprParser<Expr, Info, & 'a mut RSmtParser> +
           for<'a> ValueParser<Value, & 'a mut RSmtParser> {
     let res = self.smt_parser.get_values(self.parser, info) ;
-    if res.is_err() && self.conf.get_models() {
+    if res.is_err() && ! self.conf.get_models() {
       res.chain_err(
         || "\
           Note: model production is not active \
