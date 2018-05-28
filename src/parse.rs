@@ -3,12 +3,13 @@
 //! Depending on the commands you plan to use, your parser will need to
 //! implement
 //!
-//! |                                         | for                         |
-//! |:---------------------------------------:|:---------------------------:|
-//! | [`IdentParser`](trait.IdentParser.html) | `get-model`                 |
-//! | [`ValueParser`](trait.ValueParser.html) | `get-model` and `get-value` |
-//! | [`ExprParser`](trait.ExprParser.html)   | `get-value`                 |
-//! | [`ProofParser`](trait.ExprParser.html)  | *currently unused*          |
+//! |                                         | for                |
+//! |:---------------------------------------:|:------------------:|
+//! | [`IdentParser`](trait.IdentParser.html) | `get-model`        |
+//! | [`ModelParser`](trait.ModelParser.html) | `get-model`        |
+//! | [`ValueParser`](trait.ValueParser.html) | `get-model`        |
+//! | [`ExprParser`](trait.ExprParser.html)   | `get-value`        |
+//! | [`ProofParser`](trait.ExprParser.html)  | *currently unused* |
 //!
 //! You can choose the kind of input you want to parse, between
 //!
@@ -24,7 +25,7 @@
 //! # extern crate rsmt2 ;
 //! # use rsmt2::parse::SmtParser ;
 //! # fn main() {
-//! use rsmt2::parse::{ IdentParser, ValueParser } ;
+//! use rsmt2::parse::{ IdentParser, ModelParser } ;
 //! use rsmt2::SmtRes ;
 //! let txt = "\
 //!   ( model (define-fun a () Int (- 17)) )
@@ -32,8 +33,13 @@
 //! let mut parser = SmtParser::of_str(txt) ;
 //!
 //! struct Parser ;
-//! impl<'a, 'b> ValueParser<String, & 'a str> for & 'b Parser {
-//!   fn parse_value(self, input: & 'a str) -> SmtRes<String> {
+//! impl<'a, 'b> ModelParser<
+//!   String, String, String, & 'a str
+//! > for & 'b Parser {
+//!   fn parse_value(
+//!     self, input: & 'a str,
+//!     _: & String, _: & Vec<(String, String)>, _: & String,
+//!   ) -> SmtRes<String> {
 //!     Ok(input.into())
 //!   }
 //! }
@@ -59,7 +65,7 @@
 //! # extern crate rsmt2 ;
 //! # use rsmt2::parse::SmtParser ;
 //! # fn main() {
-//! use rsmt2::parse::{ IdentParser, ValueParser } ;
+//! use rsmt2::parse::{ IdentParser, ModelParser } ;
 //! use rsmt2::errors::SmtRes ;
 //! let txt = "\
 //!   ( model (define-fun a () Int (- 17)) )
@@ -67,10 +73,13 @@
 //! let mut parser = SmtParser::of_str(txt) ;
 //!
 //! struct Parser ;
-//! impl<'a, 'b, Br: ::std::io::BufRead> ValueParser<
-//!   String, & 'a mut SmtParser<Br>
+//! impl<'a, 'b, Br: ::std::io::BufRead> ModelParser<
+//!   String, String, String, & 'a mut SmtParser<Br>
 //! > for & 'b Parser {
-//!   fn parse_value(self, input: & 'a mut SmtParser<Br>) -> SmtRes<String> {
+//!   fn parse_value(
+//!     self, input: & 'a mut SmtParser<Br>,
+//!     _: & String, _: & Vec<(String, String)>, _: & String,
+//!   ) -> SmtRes<String> {
 //!     input.tag("(- 17))") ? ; Ok( "-17".into() )
 //!     //               ^~~~~ eating more input than we should...
 //!   }
@@ -1219,8 +1228,8 @@ impl<R: BufRead> SmtParser<R> {
   where
   Parser: for<'a> IdentParser<
     Ident, Type, & 'a mut Self
-  > + for<'a> ValueParser<
-    Value, & 'a mut Self
+  > + for<'a> ModelParser<
+    Ident, Type, Value, & 'a mut Self
   > {
     self.prompt() ? ;
     self.spc_cmt() ;
@@ -1239,7 +1248,7 @@ impl<R: BufRead> SmtParser<R> {
         let id = parser.parse_ident(self) ? ;
         self.tags( & ["(", ")"] ) ? ;
         let typ = parser.parse_type(self) ? ;
-        let value = parser.parse_value(self) ? ;
+        let value = parser.parse_value(self, & id, & vec![], & typ) ? ;
         model.push( (id, typ, value) ) ;
       }
       self.tag(")") ?
@@ -1252,12 +1261,12 @@ impl<R: BufRead> SmtParser<R> {
   /// Parses the result of a get-model.
   pub fn get_model<Ident, Value, Type, Parser>(
     & mut self, prune_actlits: bool, parser: Parser
-  ) -> SmtRes< Vec<(Ident, Vec<Type>, Type, Value)> >
+  ) -> SmtRes< Vec<(Ident, Vec<(Ident, Type)>, Type, Value)> >
   where
   Parser: for<'a> IdentParser<
     Ident, Type, & 'a mut Self
-  > + for<'a> ValueParser<
-    Value, & 'a mut Self
+  > + for<'a> ModelParser<
+    Ident, Type, Value, & 'a mut Self
   > {
     self.prompt() ? ;
     self.spc_cmt() ;
@@ -1277,11 +1286,13 @@ impl<R: BufRead> SmtParser<R> {
         self.tag("(") ? ;
         let mut args = Vec::new() ;
         while ! self.try_tag(")") ? {
+          let id = parser.parse_ident(self) ? ;
+          self.spc_cmt() ;
           let typ = parser.parse_type(self) ? ;
-          args.push(typ)
+          args.push( (id, typ) )
         }
         let typ = parser.parse_type(self) ? ;
-        let value = parser.parse_value(self) ? ;
+        let value = parser.parse_value(self, & id, & args, & typ) ? ;
         model.push( (id, args, typ, value) ) ;
       }
       self.tag(")") ? ;
@@ -1353,7 +1364,42 @@ where T: IdentParser<Ident, Type, & 'a str>, Br: BufRead {
   }
 }
 
-/// Can parse values. Used for `get-model` and `get-value`.
+
+
+/// Can parse models. Used for `get-model`.
+///
+/// For more information refer to the [module-level documentation].
+///
+/// [module-level documentation]: index.html
+pub trait ModelParser<Ident, Type, Value, Input>: Copy {
+  fn parse_value(
+    self, Input, & Ident, & Vec<(Ident, Type)>, & Type
+  ) -> SmtRes<Value> ;
+}
+impl<'a, Ident, Type, Value, T> ModelParser<Ident, Type, Value, & 'a str> for T
+where T: ModelParser<Ident, Type, Value, & 'a [u8]> {
+  fn parse_value(
+    self, input: & 'a str, name: & Ident,
+    inputs: & Vec<(Ident, Type)>, output: & Type
+  ) -> SmtRes<Value> {
+    self.parse_value( input.as_bytes(), name, inputs, output )
+  }
+}
+impl<'a, Ident, Type, Value, T, Br> ModelParser<
+  Ident, Type, Value, & 'a mut SmtParser<Br>
+> for T where
+T: ModelParser<Ident, Type, Value, & 'a str>, Br: BufRead {
+  fn parse_value(
+    self, input: & 'a mut SmtParser<Br>, name: & Ident,
+    inputs: & Vec<(Ident, Type)>, output: & Type
+  ) -> SmtRes<Value> {
+    self.parse_value( input.get_sexpr() ?, name, inputs, output )
+  }
+}
+
+
+
+/// Can parse values. Used for `get-value`.
 ///
 /// For more information refer to the [module-level documentation].
 ///

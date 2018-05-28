@@ -92,7 +92,7 @@
 //! If we want to be able to retrieve models, we need a parser that can parse
 //! two things: identifiers, types and values. That is, we need a parser that
 //! implements [`IdentParser`][ident_parser] (identifiers and types) and
-//! [`ValueParser`][value_parser] (values). The previous parser `()` doesn't,
+//! [`ModelParser`][model_parser] (values). The previous parser `()` doesn't,
 //! so `solver.get_model()` won't even compile.
 //!
 //! There's different ways to implement these traits, discussed in the
@@ -101,14 +101,14 @@
 //!
 //! ```rust
 //! use rsmt2::{ Solver, SmtRes } ;
-//! use rsmt2::parse::{ IdentParser, ValueParser } ;
+//! use rsmt2::parse::{ IdentParser, ModelParser } ;
 //!
 //! #[derive(Clone, Copy)]
 //! struct Parser ;
 //!
 //!   //       Types ~~~~~~~~~~~~vvvvvv
 //! impl<'a> IdentParser<String, String, & 'a str> for Parser {
-//!   // Identifiers ~~~~^^^^^^          ^^^^^^^^~~~~ Input
+//!   // Idents ~~~~~~~~~^^^^^^          ^^^^^^^^~~~~ Input
 //!   fn parse_ident(self, input: & 'a str) -> SmtRes<String> {
 //!     Ok(input.into())
 //!   }
@@ -117,9 +117,13 @@
 //!   }
 //! }
 //!
-//! impl<'a> ValueParser<String, & 'a str> for Parser {
-//!   // Values ~~~~~~~~~^^^^^^  ^^^^^^^^~~~~ Input
-//!   fn parse_value(self, input: & 'a str) -> SmtRes<String> {
+//!   // Types ~~~~~~~~~~~~~~~~~~vvvvvv  vvvvvv~~~~~~~~~~~~~~ Values
+//! impl<'a> ModelParser<String, String, String, & 'a str> for Parser {
+//!   // Idents ~~~~~~~~~^^^^^^                  ^^^^^^^^~~~~ Input
+//!   fn parse_value(
+//!     self, input: & 'a str,
+//!     ident: & String, params: & Vec<(String, String)>, typ: & String,
+//!   ) -> SmtRes<String> {
 //!     Ok(input.into())
 //!   }
 //! }
@@ -333,7 +337,7 @@
 //! [pop]: struct.Solver.html#method.pop (Solver's pop function)
 //! [ident_parser]: parse/trait.IdentParser.html
 //! (IdentParser trait)
-//! [value_parser]: parse/trait.ValueParser.html
+//! [model_parser]: parse/trait.ModelParser.html
 //! (ValueParser trait)
 //! [parse_mod]: parse/index.html (parse module)
 //! [print_mod]: print/index.html (print module)

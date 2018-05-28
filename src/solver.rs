@@ -13,7 +13,9 @@ use errors::* ;
 
 use common::* ;
 use conf::SmtConf ;
-use parse::{ IdentParser, ValueParser, ExprParser, RSmtParser } ;
+use parse::{
+  IdentParser, ModelParser, ValueParser, ExprParser, RSmtParser
+} ;
 
 
 
@@ -787,10 +789,10 @@ impl<Parser: Copy> Solver<Parser> {
   /// Get-model command.
   pub fn get_model<Ident, Type, Value>(
     & mut self
-  ) -> SmtRes<Vec<(Ident, Vec<Type>, Type, Value)>>
+  ) -> SmtRes<Vec<(Ident, Vec<(Ident, Type)>, Type, Value)>>
   where
   Parser: for<'a> IdentParser<Ident, Type, & 'a mut RSmtParser> +
-          for<'a> ValueParser<Value, & 'a mut RSmtParser> {
+          for<'a> ModelParser<Ident, Type, Value, & 'a mut RSmtParser> {
     self.print_get_model() ? ;
     self.parse_get_model()
   }
@@ -801,7 +803,7 @@ impl<Parser: Copy> Solver<Parser> {
   ) -> SmtRes<Vec<(Ident, Type, Value)>>
   where
   Parser: for<'a> IdentParser<Ident, Type, & 'a mut RSmtParser> +
-          for<'a> ValueParser<Value, & 'a mut RSmtParser> {
+          for<'a> ModelParser<Ident, Type, Value, & 'a mut RSmtParser> {
     self.print_get_model() ? ;
     self.parse_get_model_const()
   }
@@ -1157,10 +1159,10 @@ impl<Parser> Solver<Parser> {
   /// Parse the result of a get-model.
   fn parse_get_model<Ident, Type, Value>(
     & mut self
-  ) -> SmtRes<Vec<(Ident, Vec<Type>, Type, Value)>>
+  ) -> SmtRes<Vec<(Ident, Vec<(Ident, Type)>, Type, Value)>>
   where
   Parser: for<'a> IdentParser<Ident, Type, & 'a mut RSmtParser> +
-          for<'a> ValueParser<Value, & 'a mut RSmtParser> {
+          for<'a> ModelParser<Ident, Type, Value, & 'a mut RSmtParser> {
     let has_actlits = self.has_actlits() ;
     let res = self.smt_parser.get_model(has_actlits, self.parser) ;
     if res.is_err() && ! self.conf.get_models() {
@@ -1181,7 +1183,7 @@ impl<Parser> Solver<Parser> {
   ) -> SmtRes<Vec<(Ident, Type, Value)>>
   where
   Parser: for<'a> IdentParser<Ident, Type, & 'a mut RSmtParser> +
-          for<'a> ValueParser<Value, & 'a mut RSmtParser> {
+          for<'a> ModelParser<Ident, Type, Value, & 'a mut RSmtParser> {
     let has_actlits = self.has_actlits() ;
     let res = self.smt_parser.get_model_const(has_actlits, self.parser) ;
     if res.is_err() && ! self.conf.get_models() {

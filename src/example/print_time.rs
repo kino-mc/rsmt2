@@ -279,9 +279,15 @@ impl<'a> IdentParser< (Var, Option<usize>), Type, & 'a str > for Parser {
 
 use parse::SmtParser ;
 
-impl<'a, Br> ValueParser< Const, & 'a mut SmtParser<Br> > for Parser
+impl<'a, Br> ModelParser<
+  (Var, Option<usize>), Type, Const, & 'a mut SmtParser<Br>
+> for Parser
 where Br: ::std::io::BufRead {
-  fn parse_value(self, input: & 'a mut SmtParser<Br>) -> SmtRes<Const> {
+  fn parse_value(
+    self, input: & 'a mut SmtParser<Br>,
+    _: & (Var, Option<usize>), _: & Vec<((Var, Option<usize>), Type)>,
+    _: & Type
+  ) -> SmtRes<Const> {
     use std::str::FromStr ;
     if let Some(b) = input.try_bool() ? {
       Ok( Const::BConst(b) )

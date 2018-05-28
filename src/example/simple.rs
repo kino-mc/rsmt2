@@ -143,7 +143,7 @@
 //! ## The parser
 //!
 //! This example will only use `get_model`, which only requires `IdentParser`
-//! and `ValueParser`. In most cases, an empty parser `struct` with the right
+//! and `ModelParser`. In most cases, an empty parser `struct` with the right
 //! implementations should be enough.
 //!
 //! ```rust
@@ -152,7 +152,7 @@
 //! extern crate rsmt2 ;
 //!
 //! use rsmt2::SmtRes ;
-//! use rsmt2::parse::{ IdentParser, ValueParser } ;
+//! use rsmt2::parse::{ IdentParser, ModelParser } ;
 //! use rsmt2::example::simple::Cst ;
 //!
 //! /// Empty parser structure, we will not maintain any context.
@@ -170,8 +170,11 @@
 //!     }
 //!   }
 //! }
-//! impl<'a> ValueParser<Cst, & 'a str> for Parser {
-//!   fn parse_value(self, input: & 'a str) -> SmtRes<Cst> {
+//! impl<'a> ModelParser<String, String, Cst, & 'a str> for Parser {
+//!   fn parse_value(
+//!     self, input: & 'a str,
+//!     _ident: & String, _signature: & Vec<(String, String)>, _type: & String,
+//!   ) -> SmtRes<Cst> {
 //!     match input.trim() {
 //!       "true" => Ok( Cst::B(true) ),
 //!       "false" => Ok( Cst::B(false) ),
@@ -200,21 +203,26 @@
 //! # fn main() {}
 //! ```
 //!
-//! As a side note, it would have been simpler to implement `ValueParser` with
+//! As a side note, it would have been simpler to implement `ModelParser` with
 //! a [`& mut SmtParser`][smt_parser], as it provides the parsers we needed.
 //!
 //! ```rust
 //!
 //! use rsmt2::SmtRes ;
-//! use rsmt2::parse::{ SmtParser, IdentParser, ValueParser } ;
+//! use rsmt2::parse::{ SmtParser, IdentParser, ModelParser } ;
 //! use rsmt2::example::simple::Cst ;
 //!
 //!
 //! #[derive(Clone, Copy)]
 //! struct Parser ;
-//! impl<'a, Br> ValueParser< Cst, & 'a mut SmtParser<Br> > for Parser
+//! impl<'a, Br> ModelParser<
+//!   String, String, Cst, & 'a mut SmtParser<Br>
+//! > for Parser
 //! where Br: ::std::io::BufRead {
-//!   fn parse_value(self, input: & 'a mut SmtParser<Br>) -> SmtRes<Cst> {
+//!   fn parse_value(
+//!     self, input: & 'a mut SmtParser<Br>,
+//!     _ident: & String, _signature: & Vec<(String, String)>, _type: & String
+//!   ) -> SmtRes<Cst> {
 //!     use std::str::FromStr ;
 //!     if let Some(b) = input.try_bool() ? {
 //!       Ok( Cst::B(b) )
@@ -327,7 +335,7 @@
 
 
 use print::Expr2Smt ;
-use parse::{ IdentParser, ValueParser } ;
+use parse::{ IdentParser, ModelParser } ;
 use errors::SmtRes ;
 
 #[cfg(test)]
@@ -450,8 +458,11 @@ impl<'a> IdentParser<String, String, & 'a str> for Parser {
     }
   }
 }
-impl<'a> ValueParser<Cst, & 'a str> for Parser {
-  fn parse_value(self, input: & 'a str) -> SmtRes<Cst> {
+impl<'a> ModelParser<String, String, Cst, & 'a str> for Parser {
+  fn parse_value(
+    self, input: & 'a str,
+    _: & String, _: & Vec<(String, String)>, _: & String
+  ) -> SmtRes<Cst> {
     match input.trim() {
       "true" => Ok( Cst::B(true) ),
       "false" => Ok( Cst::B(false) ),

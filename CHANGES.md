@@ -1,3 +1,8 @@
+# v0.9.10
+
+- separated `ValueParser` and `ModelParser` ; this fixes model parsing which
+  wasn't making sense when parsing function definitions
+
 # v0.9.9
 
 - improved `SmtConf` to support `String` options and commands with options
