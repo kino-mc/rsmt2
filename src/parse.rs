@@ -1285,13 +1285,19 @@ impl<R: BufRead> SmtParser<R> {
         let id = parser.parse_ident(self) ? ;
         self.tag("(") ? ;
         let mut args = Vec::new() ;
-        while ! self.try_tag(")") ? {
+        while self.try_tag("(") ? {
+          self.spc_cmt() ;
           let id = parser.parse_ident(self) ? ;
           self.spc_cmt() ;
           let typ = parser.parse_type(self) ? ;
+          self.spc_cmt() ;
+          self.tag(")") ? ;
           args.push( (id, typ) )
         }
+        self.tag(")") ? ;
+        self.spc_cmt() ;
         let typ = parser.parse_type(self) ? ;
+        self.spc_cmt() ;
         let value = parser.parse_value(self, & id, & args, & typ) ? ;
         model.push( (id, args, typ, value) ) ;
       }
