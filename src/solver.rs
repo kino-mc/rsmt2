@@ -47,6 +47,12 @@ impl Actlit {
     Ok(())
   }
 }
+impl Expr2Smt<()> for Actlit {
+  fn expr_to_smt2<Writer>(& self, w: & mut Writer, _: ()) -> SmtRes<()>
+  where Writer: ::std::io::Write {
+    self.write(w)
+  }
+}
 impl ::std::ops::Deref for Actlit {
   type Target = usize ;
   fn deref(& self) -> & usize {
