@@ -95,6 +95,22 @@ pub struct Solver<Parser> {
 }
 
 
+impl<Parser> Write for Solver<Parser> {
+  fn write(& mut self, buf: & [u8]) -> ::std::io::Result<usize> {
+    if let Some(tee) = self.tee.as_mut() {
+      let _ = tee.write(buf) ;
+    }
+    self.stdin.write(buf)
+  }
+  fn flush(& mut self) -> ::std::io::Result<()> {
+    if let Some(tee) = self.tee.as_mut() {
+      let _ = tee.flush() ;
+    }
+    self.stdin.flush()
+  }
+}
+
+
 /// Writes something in both the solver and the teed output.
 macro_rules! tee_write {
   ($slf:expr, |$w:ident| $($tail:tt)*) => ({
@@ -218,7 +234,7 @@ impl<Parser> Solver<Parser> {
     for option in self.conf.get_options() {
       write!(tee, " {}", option) ?
     }
-    write!(tee, "\n\n") ? ;
+    writeln!(tee, "\n") ? ;
     self.tee = Some(tee) ;
     Ok(())
   }
