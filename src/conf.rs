@@ -39,8 +39,7 @@ impl SmtStyle {
     let cmd = self.cmd() ;
     match self {
       Z3 => SmtConf {
-        style: self,
-        cmd: cmd,
+        style: self, cmd,
         options: vec![
           "-in".into(), "-smt2".into()
         ],
@@ -51,8 +50,7 @@ impl SmtStyle {
         check_sat_assuming: supported("check-sat"),
       },
       CVC4 => SmtConf {
-        style: self,
-        cmd: cmd,
+        style: self, cmd,
         options: vec![
           "-q".into(), "--interactive".into(),
           "--lang".into(), "smt2".into(),
@@ -83,16 +81,16 @@ impl SmtStyle {
 
   /// Default command for a solver style.
   #[cfg( not(windows) )]
-  pub fn cmd(& self) -> String {
-    match * self {
+  pub fn cmd(self) -> String {
+    match self {
       Z3 => "z3".to_string(),
       CVC4 => "cvc4".to_string(),
     }
   }
   /// Default command for a solver style.
   #[cfg( windows )]
-  pub fn cmd(& self) -> String {
-    match * self {
+  pub fn cmd(self) -> String {
+    match self {
       Z3 => "z3.exe".to_string(),
       CVC4 => "cvc4.exe".to_string(),
     }
@@ -319,7 +317,7 @@ impl SmtConf {
   #[inline]
   pub fn cmd<S: Into<String>>(& mut self, cmd: S) -> & mut Self {
     let cmd = cmd.into() ;
-    let mut iter = cmd.split(" ") ;
+    let mut iter = cmd.split(' ') ;
 
     'set_cmd: while let Some(cmd) = iter.next() {
       if ! cmd.is_empty() {

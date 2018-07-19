@@ -34,6 +34,7 @@ pub static actlit_suff: & str = "|" ;
 ///
 /// [get actlit]: ../trait.Solver.html#method.get_actlit
 /// (get_actlit documentation)
+#[derive(Debug)]
 pub struct Actlit {
   /// ID of the actlit.
   id: usize,
@@ -116,6 +117,7 @@ macro_rules! tee_write {
   ($slf:expr, |$w:ident| $($tail:tt)*) => ({
     if let Some(ref mut $w) = $slf.tee {
       $($tail)* ;
+      writeln!($w) ? ;
       $w.flush() ?
     }
     let $w = & mut $slf.stdin ;
@@ -280,9 +282,10 @@ impl<Parser> Solver<Parser> {
   pub fn kill(& mut self) -> SmtRes<()> {
     let _ = writeln!(self.stdin, "(exit)") ;
     let _ = self.stdin.flush() ;
-    if let None = self.kid.try_wait().chain_err(
+    let join = self.kid.try_wait().chain_err(
       || "waiting for child process to exit"
-    ) ? {
+    ) ? ;
+    if join.is_none() {
       self.kid.kill().chain_err::<_, ErrorKind>(
         || "while killing child process".into()
       ) ?
@@ -297,7 +300,7 @@ impl<Parser> Solver<Parser> {
   #[inline]
   fn cmt(file: & mut BufWriter<File>, blah: & str) -> SmtRes<()> {
     for line in blah.lines() {
-      write!(file, "; {}\n", line) ?
+      writeln!(file, "; {}", line) ?
     }
     file.flush() ? ;
     Ok(())
@@ -503,7 +506,7 @@ impl<Parser> Solver<Parser> {
   /// ```
   #[inline]
   pub fn define_const<
-    'a, FunSym, OutSort, Body
+    FunSym, OutSort, Body
   >(
     & mut self, symbol: & FunSym, out: & OutSort, body: & Body
   ) -> SmtRes<()>
@@ -566,7 +569,7 @@ impl<Parser> Solver<Parser> {
   #[inline]
   pub fn push(& mut self, n: u8) -> SmtRes<()> {
     tee_write! {
-      self, |w| write!(w, "(push {})\n", n) ?
+      self, |w| writeln!(w, "(push {})", n) ?
     }
     Ok(())
   }
@@ -580,7 +583,7 @@ impl<Parser> Solver<Parser> {
   #[inline]
   pub fn pop(& mut self, n: u8) -> SmtRes<()> {
     tee_write! {
-      self, |w| write!(w, "(pop {})\n", n) ?
+      self, |w| writeln!(w, "(pop {})", n) ?
     }
     Ok(())
   }
@@ -793,7 +796,7 @@ impl<Parser> Solver<Parser> {
     }
 
     tee_write! {
-      self, |w| write!(w, " ) )\n") ?
+      self, |w| writeln!(w, " ) )") ?
     }
 
     Ok(())
@@ -811,7 +814,7 @@ impl<Parser: Copy> Solver<Parser> {
   /// Get-model command.
   pub fn get_model<Ident, Type, Value>(
     & mut self
-  ) -> SmtRes<Vec<(Ident, Vec<(Ident, Type)>, Type, Value)>>
+  ) -> SmtRes< Model<Ident, Type, Value> >
   where
   Parser: for<'a> IdentParser<Ident, Type, & 'a mut RSmtParser> +
           for<'a> ModelParser<Ident, Type, Value, & 'a mut RSmtParser> {
@@ -881,8 +884,8 @@ impl<Parser> Solver<Parser> {
     self.actlit += 1 ;
     let next_actlit = Actlit { id } ;
     tee_write! {
-      self, |w| write!(
-        w, "(declare-fun {}{}{} () Bool)\n",
+      self, |w| writeln!(
+        w, "(declare-fun {}{}{} () Bool)",
         actlit_pref, next_actlit.id, actlit_suff
       ) ?
     }
@@ -920,12 +923,13 @@ impl<Parser> Solver<Parser> {
         }
         actlit.write(w) ? ;
         if b {
-          write!(w, ")\n") ?
+          writeln!(w, ")") ?
         } else {
-          write!(w, ") )\n") ?
+          writeln!(w, ") )") ?
         }
       }
     }
+    ::std::mem::drop(actlit) ;
     Ok(())
   }
 
@@ -1120,7 +1124,7 @@ impl<Parser> Solver<Parser> {
     tee_write! {
       self, |w| write!(w, "(get-value (") ?
     }
-    for e in exprs.clone() {
+    for e in exprs {
       tee_write! {
         self, |w| {
           write_str(w, "\n  ") ? ;
@@ -1181,7 +1185,7 @@ impl<Parser> Solver<Parser> {
   /// Parse the result of a get-model.
   fn parse_get_model<Ident, Type, Value>(
     & mut self
-  ) -> SmtRes<Vec<(Ident, Vec<(Ident, Type)>, Type, Value)>>
+  ) -> SmtRes< Model<Ident, Type, Value> >
   where
   Parser: for<'a> IdentParser<Ident, Type, & 'a mut RSmtParser> +
           for<'a> ModelParser<Ident, Type, Value, & 'a mut RSmtParser> {
@@ -1256,7 +1260,7 @@ impl<Parser> Solver<Parser> {
           for<'b> ValueParser<PValue, & 'b mut RSmtParser>,
   Expr: ?Sized + Expr2Smt<Info> + 'a,
   Exprs: Copy + IntoIterator< Item = & 'a Expr > {
-    self.print_get_values_with( exprs, info.clone() ) ? ;
+    self.print_get_values_with(exprs, info) ? ;
     self.parse_get_values_with(info)
   }
 
@@ -1296,7 +1300,7 @@ impl<Parser> Solver<Parser> {
       self, |w| {
         write_str(w, "(declare-sort ") ? ;
         sort.sort_to_smt2(w) ? ;
-        write!(w, " {})\n", arity) ?
+        writeln!(w, " {})", arity) ?
       }
     }
     Ok(())
@@ -1377,7 +1381,7 @@ impl<Parser> Solver<Parser> {
   /// [def]: #method.define_sort
   /// (define_sort function)
   #[inline]
-  pub fn define_null_sort<'a, Sort, Body>(
+  pub fn define_null_sort<Sort, Body>(
     & mut self, sort: & Sort, body: & Body
   ) -> SmtRes<()>
   where
@@ -1431,7 +1435,7 @@ impl<Parser> Solver<Parser> {
         write_str(w, " ( ") ?
       }
     }
-    for arg in args.into_iter() {
+    for arg in args {
       tee_write! {
         self, |w| {
           arg.sort_to_smt2(w) ? ;
@@ -1592,9 +1596,7 @@ impl<Parser> Solver<Parser> {
       }
     }
     tee_write! {
-      self, |w| {
-        write_str(w, "\n )\n)\n") ?
-      }
+      self, |w| write_str(w, "\n )\n)\n") ?
     }
     Ok(())
   }
@@ -1751,8 +1753,8 @@ impl<Parser> Solver<Parser> {
       _ => (),
     } ;
     tee_write! {
-      self, |w| write!(
-        w, "(set-option {} {})\n", option, value
+      self, |w| writeln!(
+        w, "(set-option {} {})", option, value
       ) ?
     }
     Ok(())
@@ -1781,7 +1783,7 @@ impl<Parser> Solver<Parser> {
   #[inline]
   pub fn get_info(& mut self, flag: & str) -> SmtRes<()> {
     tee_write! {
-      self, |w| write!(w, "(get-info {})\n", flag) ?
+      self, |w| writeln!(w, "(get-info {})", flag) ?
     }
     Ok(())
   }
@@ -1789,7 +1791,7 @@ impl<Parser> Solver<Parser> {
   #[inline]
   pub fn get_option(& mut self, option: & str) -> SmtRes<()> {
     tee_write! {
-      self, |w| write!(w, "(get-option {})\n", option) ?
+      self, |w| writeln!(w, "(get-option {})", option) ?
     }
     Ok(())
   }
@@ -1802,7 +1804,7 @@ impl<Parser> Solver<Parser> {
   #[inline]
   pub fn set_info(& mut self, attribute: & str) -> SmtRes<()> {
     tee_write! {
-      self, |w| write!(w, "(set-info {})\n", attribute) ?
+      self, |w| writeln!(w, "(set-info {})", attribute) ?
     }
     Ok(())
   }
@@ -1810,7 +1812,7 @@ impl<Parser> Solver<Parser> {
   #[inline]
   pub fn echo(& mut self, text: & str) -> SmtRes<()> {
     tee_write! {
-      self, |w| write!(w, "(echo \"{}\")\n", text) ?
+      self, |w| writeln!(w, "(echo \"{}\")", text) ?
     }
     Ok(())
   }

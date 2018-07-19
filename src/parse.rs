@@ -38,7 +38,7 @@
 //! > for & 'b Parser {
 //!   fn parse_value(
 //!     self, input: & 'a str,
-//!     _: & String, _: & Vec<(String, String)>, _: & String,
+//!     _: & String, _: & [ (String, String) ], _: & String,
 //!   ) -> SmtRes<String> {
 //!     Ok(input.into())
 //!   }
@@ -78,7 +78,7 @@
 //! > for & 'b Parser {
 //!   fn parse_value(
 //!     self, input: & 'a mut SmtParser<Br>,
-//!     _: & String, _: & Vec<(String, String)>, _: & String,
+//!     _: & String, _: & [ (String, String) ], _: & String,
 //!   ) -> SmtRes<String> {
 //!     input.tag("(- 17))") ? ; Ok( "-17".into() )
 //!     //               ^~~~~ eating more input than we should...
@@ -115,6 +115,7 @@
 //! [try_sym]: struct.SmtParser.html#method.try_sym (try_sym function)
 
 use errors::* ;
+use common::* ;
 
 use std::io::{ BufRead, BufReader } ;
 use std::process::ChildStdout ;
@@ -249,7 +250,7 @@ impl<R: BufRead> SmtParser<R> {
       }
       debug_assert!(op_paren >= cl_paren) ;
 
-      'lines: for line in self.buff[start..].lines() {
+      for line in self.buff[start..].lines() {
         debug_assert!(op_paren >= cl_paren) ;
 
         let mut this_end = start ;
@@ -433,14 +434,14 @@ impl<R: BufRead> SmtParser<R> {
         let eof = ! self.read_line() ? ;
         self.spc_cmt() ;
         if eof { return Ok(false) }
+      } else if & self.buff[
+        self.cursor .. self.cursor + tag.len()
+      ] == tag {
+        self.cursor += tag.len() ;
+        return Ok(true)
       } else {
-        if & self.buff[ self.cursor .. self.cursor + tag.len() ] == tag {
-          self.cursor += tag.len() ;
-          return Ok(true)
-        } else {
-          self.spc_cmt() ;
-          return Ok(false)
-        }
+        self.spc_cmt() ;
+        return Ok(false)
       }
     }
   }
@@ -592,9 +593,9 @@ impl<R: BufRead> SmtParser<R> {
     loop {
       let start_pos = self.pos() ;
       self.spc_cmt() ;
-      if self.try_tag(">") ? || self.try_tag("CVC4>") ? {
-        ()
-      } else if self.try_tag("...") ? {
+      if self.try_tag(">") ?
+      || self.try_tag("CVC4>") ?
+      || self.try_tag("...") ? {
         ()
       } else {
         self.backtrack_to(start_pos) ;
@@ -612,17 +613,17 @@ impl<R: BufRead> SmtParser<R> {
       Ok(e) => Some( e.to_string() ),
       _ => None,
     } ;
-    let sexpr = if let Some(e) = sexpr { e } else {
-      if self.cursor < self.buff.len() {
-        let mut stuff = self.buff[ self.cursor .. ].trim().split_whitespace() ;
-        if let Some(stuff) = stuff.next() {
-          stuff.to_string()
-        } else {
-          " ".to_string()
-        }
+    let sexpr = if let Some(e) = sexpr {
+      e
+    } else if self.cursor < self.buff.len() {
+      let mut stuff = self.buff[ self.cursor .. ].trim().split_whitespace() ;
+      if let Some(stuff) = stuff.next() {
+        stuff.to_string()
       } else {
-        "eof".to_string()
+        " ".to_string()
       }
+    } else {
+      "eof".to_string()
     } ;
     if sexpr == "unsupported" {
       bail!(ErrorKind::Unsupported)
@@ -1248,7 +1249,7 @@ impl<R: BufRead> SmtParser<R> {
         let id = parser.parse_ident(self) ? ;
         self.tags( & ["(", ")"] ) ? ;
         let typ = parser.parse_type(self) ? ;
-        let value = parser.parse_value(self, & id, & vec![], & typ) ? ;
+        let value = parser.parse_value(self, & id, & [], & typ) ? ;
         model.push( (id, typ, value) ) ;
       }
       self.tag(")") ?
@@ -1261,7 +1262,7 @@ impl<R: BufRead> SmtParser<R> {
   /// Parses the result of a get-model.
   pub fn get_model<Ident, Value, Type, Parser>(
     & mut self, prune_actlits: bool, parser: Parser
-  ) -> SmtRes< Vec<(Ident, Vec<(Ident, Type)>, Type, Value)> >
+  ) -> SmtRes< Model<Ident, Type, Value> >
   where
   Parser: for<'a> IdentParser<
     Ident, Type, & 'a mut Self
@@ -1379,14 +1380,14 @@ where T: IdentParser<Ident, Type, & 'a str>, Br: BufRead {
 /// [module-level documentation]: index.html
 pub trait ModelParser<Ident, Type, Value, Input>: Copy {
   fn parse_value(
-    self, Input, & Ident, & Vec<(Ident, Type)>, & Type
+    self, Input, & Ident, & [ (Ident, Type) ], & Type
   ) -> SmtRes<Value> ;
 }
 impl<'a, Ident, Type, Value, T> ModelParser<Ident, Type, Value, & 'a str> for T
 where T: ModelParser<Ident, Type, Value, & 'a [u8]> {
   fn parse_value(
     self, input: & 'a str, name: & Ident,
-    inputs: & Vec<(Ident, Type)>, output: & Type
+    inputs: & [ (Ident, Type) ], output: & Type
   ) -> SmtRes<Value> {
     self.parse_value( input.as_bytes(), name, inputs, output )
   }
@@ -1397,7 +1398,7 @@ impl<'a, Ident, Type, Value, T, Br> ModelParser<
 T: ModelParser<Ident, Type, Value, & 'a str>, Br: BufRead {
   fn parse_value(
     self, input: & 'a mut SmtParser<Br>, name: & Ident,
-    inputs: & Vec<(Ident, Type)>, output: & Type
+    inputs: & [ (Ident, Type) ], output: & Type
   ) -> SmtRes<Value> {
     self.parse_value( input.get_sexpr() ?, name, inputs, output )
   }

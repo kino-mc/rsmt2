@@ -19,7 +19,7 @@ use self::Var::* ;
 
 
 /// A type.
-#[derive(Debug,Clone,Copy,PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 enum Type {
   /// Integers.
   Int,
@@ -30,8 +30,8 @@ enum Type {
 }
 impl Type {
   /// String representation.
-  pub fn to_str(& self) -> & 'static str {
-    match * self {
+  pub fn to_str(self) -> & 'static str {
+    match self {
       Type::Int => "Int",
       Type::Bool => "Bool",
       Type::Real => "Real",
@@ -250,7 +250,7 @@ impl<'a> IdentParser< (Var, Option<usize>), Type, & 'a str > for Parser {
   fn parse_ident(self, s: & 'a str) -> SmtRes<(Var, Option<usize>)> {
     if s.len() <= 2 { bail!("not one of my idents...") }
     let s = & s[ 1 .. (s.len() - 1) ] ; // Removing surrounding pipes.
-    let mut parts = s.split("@") ;
+    let mut parts = s.split('@') ;
     let id = if let Some(id) = parts.next() { id.to_string() } else {
       bail!("nothing between my pipes!")
     } ;
@@ -285,7 +285,7 @@ impl<'a, Br> ModelParser<
 where Br: ::std::io::BufRead {
   fn parse_value(
     self, input: & 'a mut SmtParser<Br>,
-    _: & (Var, Option<usize>), _: & Vec<((Var, Option<usize>), Type)>,
+    _: & (Var, Option<usize>), _: & [ ((Var, Option<usize>), Type) ],
     _: & Type
   ) -> SmtRes<Const> {
     use std::str::FromStr ;

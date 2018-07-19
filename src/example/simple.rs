@@ -173,7 +173,7 @@
 //! impl<'a> ModelParser<String, String, Cst, & 'a str> for Parser {
 //!   fn parse_value(
 //!     self, input: & 'a str,
-//!     _ident: & String, _signature: & Vec<(String, String)>, _type: & String,
+//!     _ident: & String, _signature: & [ (String, String) ], _type: & String,
 //!   ) -> SmtRes<Cst> {
 //!     match input.trim() {
 //!       "true" => Ok( Cst::B(true) ),
@@ -221,7 +221,7 @@
 //! where Br: ::std::io::BufRead {
 //!   fn parse_value(
 //!     self, input: & 'a mut SmtParser<Br>,
-//!     _ident: & String, _signature: & Vec<(String, String)>, _type: & String
+//!     _ident: & String, _signature: & [ (String, String) ], _type: & String
 //!   ) -> SmtRes<Cst> {
 //!     use std::str::FromStr ;
 //!     if let Some(b) = input.try_bool() ? {
@@ -431,11 +431,9 @@ impl Expr2Smt<()> for Expr {
             stack.push((true, sub_terms.iter().rev().collect(), true))
           },
         }
-      } else {
-        // No more things to write at this level.
-        if closing_paren {
-          write!(w, ")") ?
-        }
+      } else if closing_paren {
+      // No more things to write at this level.
+        write!(w, ")") ?
       }
     }
     Ok(())
@@ -461,7 +459,7 @@ impl<'a> IdentParser<String, String, & 'a str> for Parser {
 impl<'a> ModelParser<String, String, Cst, & 'a str> for Parser {
   fn parse_value(
     self, input: & 'a str,
-    _: & String, _: & Vec<(String, String)>, _: & String
+    _: & String, _: & [(String, String)], _: & String
   ) -> SmtRes<Cst> {
     match input.trim() {
       "true" => Ok( Cst::B(true) ),
@@ -471,15 +469,14 @@ impl<'a> ModelParser<String, String, Cst, & 'a str> for Parser {
         let s = int.trim() ;
         if let Ok(res) = isize::from_str(s) {
           return Ok( Cst::I(res) )
-        } else if s.len() >= 4 {
-          if & s[0 .. 1] == "("
-          && & s[s.len() - 1 ..] == ")" {
-            let s = & s[1 .. s.len() - 1].trim() ;
-            if & s[0 .. 1] == "-" {
-              let s = & s[1..].trim() ;
-              if let Ok(res) = isize::from_str(s) {
-                return Ok( Cst::I(- res) )
-              }
+        } else if s.len() >= 4
+        && & s[0 .. 1] == "("
+        && & s[s.len() - 1 ..] == ")" {
+          let s = & s[1 .. s.len() - 1].trim() ;
+          if & s[0 .. 1] == "-" {
+            let s = & s[1..].trim() ;
+            if let Ok(res) = isize::from_str(s) {
+              return Ok( Cst::I(- res) )
             }
           }
         }

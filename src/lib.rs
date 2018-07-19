@@ -122,7 +122,7 @@
 //!   // Idents ~~~~~~~~~^^^^^^                  ^^^^^^^^~~~~ Input
 //!   fn parse_value(
 //!     self, input: & 'a str,
-//!     ident: & String, params: & Vec<(String, String)>, typ: & String,
+//!     ident: & String, params: & [ (String, String) ], typ: & String,
 //!   ) -> SmtRes<String> {
 //!     Ok(input.into())
 //!   }

@@ -120,7 +120,7 @@
 //! > for & 'b Parser {
 //!   fn parse_value(
 //!     self, s: & 'a str,
-//!     _: & String, _: & Vec<(String, String)>, _: & String
+//!     _: & String, _: & [ (String, String) ], _: & String
 //!   ) -> SmtRes<String> {
 //!     Ok(s.to_string())
 //!   }

@@ -4,6 +4,10 @@ use std::{ io, fmt } ;
 
 use errors::* ;
 
+/// Type of a model.
+pub type Model<Ident, Type, Value> = Vec<
+  ( Ident, Vec<(Ident, Type)>, Type, Value )
+> ;
 
 /// A symbol printable in the SMT Lib 2 standard given some info.
 pub trait Sym2Smt<Info> {
@@ -181,7 +185,7 @@ impl fmt::Display for Logic {
 }
 impl Logic {
   /// Prints the logic in a writer in SMT Lib 2 format.
-  pub fn to_smt2(& self, writer: & mut io::Write, _: ()) -> SmtRes<()> {
+  pub fn to_smt2(self, writer: & mut io::Write, _: ()) -> SmtRes<()> {
     write!(writer, "{}", self) ? ;
     Ok(())
   }
