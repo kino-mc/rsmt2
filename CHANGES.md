@@ -1,5 +1,8 @@
 # v0.9.10
 
+- support `timeout`s
+- `Solver` now implements `Write` ; this allows users to write custom commands
+  directly
 - separated `ValueParser` and `ModelParser` ; this fixes model parsing which
   wasn't making sense when parsing function definitions
 
