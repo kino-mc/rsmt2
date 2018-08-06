@@ -370,6 +370,10 @@ pub mod errors {
       Unknown {
         description("smt solver reported `unknown`")
       }
+      #[doc = "The solver reported `timeout`."]
+      Timeout {
+        description("smt solver reported `timeout`")
+      }
       #[doc = "The solver reported `unsupported`."]
       Unsupported {
         description("unsupported command")
@@ -400,9 +404,19 @@ pub mod errors {
   impl ErrorKind {
     /// True if the error is `Unknown`.
     pub fn is_unknown(& self) -> bool {
-      match * self {
-        ErrorKind::Unknown => true,
-        _ => false,
+      if let ErrorKind::Unknown = * self {
+        true
+      } else {
+        false
+      }
+    }
+
+    /// True if the error is `Timeout`.
+    pub fn is_timeout(& self) -> bool {
+      if let ErrorKind::Timeout = * self {
+        true
+      } else {
+        false
       }
     }
   }

@@ -225,10 +225,10 @@ impl<R: BufRead> SmtParser<R> {
   /// # }
   /// ```
   pub fn get_sexpr(& mut self) -> SmtRes<& str> {
-    let end = self.load_sexpr() ? ;
-    let start = self.cursor ;
-    self.cursor = end ;
-    Ok( & self.buff[ start .. end ] )
+    let sexpr_end = self.load_sexpr() ? ;
+    let sexpr_start = self.cursor ;
+    self.cursor = sexpr_end ;
+    Ok( & self.buff[ sexpr_start .. sexpr_end ] )
   }
 
   /// Loads lines until a full s-expr is loaded.
@@ -240,20 +240,20 @@ impl<R: BufRead> SmtParser<R> {
 
     let (mut op_paren, mut cl_paren) = (0, 0) ;
     let mut quoted_ident = false ;
-    let mut start = self.cursor ;
-    let mut end = start ;
+    let mut sexpr_start = self.cursor ;
+    let mut sexpr_end = sexpr_start ;
 
     'load: loop {
-      if start == self.buff.len() {
+      if sexpr_start == self.buff.len() {
         let eof = ! self.read_line() ? ;
         if eof { bail!("reached eof") }
       }
       debug_assert!(op_paren >= cl_paren) ;
 
-      for line in self.buff[start..].lines() {
+      for line in self.buff[sexpr_start..].lines() {
         debug_assert!(op_paren >= cl_paren) ;
 
-        let mut this_end = start ;
+        let mut this_end = sexpr_start ;
         let mut chars = line.chars() ;
         'this_line: while let Some(c) = chars.next() {
           debug_assert!(op_paren >= cl_paren) ;
@@ -262,7 +262,7 @@ impl<R: BufRead> SmtParser<R> {
           if quoted_ident {
             quoted_ident = c != '|' ;
             if ! quoted_ident && op_paren == 0 {
-              end = this_end ;
+              sexpr_end = this_end ;
               break 'load
             }
           } else {
@@ -273,7 +273,7 @@ impl<R: BufRead> SmtParser<R> {
               ')' => {
                 cl_paren += 1 ;
                 if op_paren == cl_paren {
-                  end = this_end ;
+                  sexpr_end = this_end ;
                   break 'load
                 }
               },
@@ -286,7 +286,7 @@ impl<R: BufRead> SmtParser<R> {
                     _ => this_end += 1,
                   }
                 }
-                end = this_end ;
+                sexpr_end = this_end ;
                 break 'load
               },
             }
@@ -295,13 +295,13 @@ impl<R: BufRead> SmtParser<R> {
         }
 
       }
-      if start == self.buff.len() { break 'load }
-      start = self.buff.len()
+      if sexpr_start == self.buff.len() { break 'load }
+      sexpr_start = self.buff.len()
 
     }
 
     self.spc_cmt() ;
-    Ok(end)
+    Ok(sexpr_end)
   }
 
   /// Clears the buffer up to the current position.
@@ -714,9 +714,9 @@ impl<R: BufRead> SmtParser<R> {
   #[inline]
   fn try_uint(& mut self) -> SmtRes< Option<& str> > {
     self.spc_cmt() ;
-    if let Some((start, end)) = self.try_uint_indices() ? {
-      self.cursor = end ;
-      Ok( Some( & self.buff[ start .. end ] ) )
+    if let Some((res_start, res_end)) = self.try_uint_indices() ? {
+      self.cursor = res_end ;
+      Ok( Some( & self.buff[ res_start .. res_end ] ) )
     } else {
       Ok(None)
     }
@@ -816,14 +816,14 @@ impl<R: BufRead> SmtParser<R> {
 
     let mut res = None ;
 
-    if let Some((start, end)) = self.try_uint_indices() ? {
-      self.cursor = end ;
+    if let Some((int_start, int_end)) = self.try_uint_indices() ? {
+      self.cursor = int_end ;
       if self.try_tag(".") ? {
         self.backtrack_to(start_pos) ;
         res = None
       } else {
-        self.cursor = end ;
-        let uint = & self.buff[start .. end] ;
+        self.cursor = int_end ;
+        let uint = & self.buff[int_start .. int_end] ;
         try_apply!(
           f(uint, true) => |int| res = Some(int),
           format!("error parsing integer `{}`", uint)
@@ -1096,7 +1096,7 @@ impl<R: BufRead> SmtParser<R> {
   pub fn try_sym<F, T, Err>(& mut self, f: F) -> SmtRes<Option<T>>
   where F: FnOnce(& str) -> Result<T, Err>, Err: ::std::fmt::Display {
     self.spc_cmt() ;
-    let end = self.load_sexpr() ? ;
+    let err_end = self.load_sexpr() ? ;
     let is_sym = if let Some(c) = self.buff[ self.cursor .. ].chars().next() {
       match c {
         _ if c.is_alphabetic() => true,
@@ -1108,13 +1108,13 @@ impl<R: BufRead> SmtParser<R> {
       false
     } ;
     if is_sym {
-      let ident = & self.buff[ self.cursor .. end ] ;
-      self.cursor = end ;
+      let ident = & self.buff[ self.cursor .. err_end ] ;
+      self.cursor = err_end ;
       match f(ident) {
         Ok(res) => Ok( Some(res) ),
         Err(e) => bail!(
           "error parsing symbol `{}`: {}",
-          & self.buff[ self.cursor .. end ], e
+          & self.buff[ self.cursor .. err_end ], e
         ),
       }
     } else {
@@ -1162,25 +1162,25 @@ impl<R: BufRead> SmtParser<R> {
       if self.try_tag("error") ? {
         self.spc_cmt() ;
         if self.try_tag("\"") ? {
-          let start = self.pos() ;
-          let mut end = start ;
+          let err_start = self.pos() ;
+          let mut err_end = err_start ;
           loop {
-            if end < self.buff.len() && & self.buff[
-              end .. end + 1
+            if err_end < self.buff.len() && & self.buff[
+              err_end .. err_end + 1
             ] != "\"" {
-              end += 1
+              err_end += 1
             } else {
               break
             }
           }
-          self.cursor = end + 1 ;
+          self.cursor = err_end + 1 ;
           self.spc_cmt() ;
           self.tag(")").chain_err(
             || "closing error message"
           ) ? ;
           bail!(
             ErrorKind::SolverError(
-              self.buff[ start .. end ].into()
+              self.buff[ err_start .. err_end ].into()
             )
           )
         }
@@ -1193,6 +1193,8 @@ impl<R: BufRead> SmtParser<R> {
 
 
   /// Parses the result of a check-sat.
+  ///
+  /// Returns `None` if the solver reported `unknown`.
   pub fn check_sat(& mut self) -> SmtRes< Option<bool> > {
     self.prompt() ? ;
     self.spc_cmt() ;
@@ -1202,6 +1204,8 @@ impl<R: BufRead> SmtParser<R> {
       Ok(Some(false))
     } else if self.try_tag("unknown") ? {
       Ok(None)
+    } else if self.try_tag("timeout") ? {
+      bail!( ErrorKind::Timeout )
     } else {
       self.try_error() ? ;
       self.fail_with("expected `sat` or `unsat`")
