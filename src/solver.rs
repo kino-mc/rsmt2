@@ -594,7 +594,7 @@ impl<Parser> Solver<Parser> {
   ) -> SmtRes<bool>
   where
   Ident: ?Sized + Sym2Smt<()> + 'a,
-  Idents: Copy + IntoIterator< Item = & 'a Ident > {
+  Idents: IntoIterator< Item = & 'a Ident > {
     self.check_sat_assuming_with(idents, ())
   }
 
@@ -604,7 +604,7 @@ impl<Parser> Solver<Parser> {
   ) -> SmtRes<Option<bool>>
   where
   Ident: ?Sized + Sym2Smt<()> + 'a,
-  Idents: Copy + IntoIterator< Item = & 'a Ident > {
+  Idents: IntoIterator< Item = & 'a Ident > {
     self.check_sat_assuming_or_unk_with(idents, ())
   }
 
@@ -1144,7 +1144,7 @@ impl<Parser> Solver<Parser> {
   ) -> SmtRes<FutureCheckSat>
   where
   Ident: ?Sized + Sym2Smt<()> + 'a,
-  Idents: Copy + IntoIterator< Item = & 'a Ident > {
+  Idents: IntoIterator< Item = & 'a Ident > {
     self.print_check_sat_assuming_with(bool_vars, ())
   }
 
@@ -1155,7 +1155,7 @@ impl<Parser> Solver<Parser> {
   where
   Info: Copy,
   Ident: ?Sized + Sym2Smt<Info> + 'a,
-  Idents: Copy + IntoIterator< Item = & 'a Ident > {
+  Idents: IntoIterator< Item = & 'a Ident > {
     match self.conf.get_check_sat_assuming() {
       Some(ref cmd) => {
         tee_write! {
@@ -1174,7 +1174,7 @@ impl<Parser> Solver<Parser> {
         }
         Ok(future_check_sat())
       },
-      _ => Err(
+      None => Err(
         format!(
           "{} does not support check-sat-assuming", self.conf.desc()
         ).into()
@@ -1713,7 +1713,7 @@ impl<Parser> Solver<Parser> {
   where
   Info: Copy,
   Ident: ?Sized + Sym2Smt<Info> + 'a,
-  Idents: Copy + IntoIterator< Item = & 'a Ident > {
+  Idents: IntoIterator< Item = & 'a Ident > {
     let future = self.print_check_sat_assuming_with(idents, info) ? ;
     self.parse_check_sat(future)
   }
@@ -1725,7 +1725,7 @@ impl<Parser> Solver<Parser> {
   where
   Info: Copy,
   Ident: ?Sized + Sym2Smt<Info> + 'a,
-  Idents: Copy + IntoIterator< Item = & 'a Ident > {
+  Idents: IntoIterator< Item = & 'a Ident > {
     let future = self.print_check_sat_assuming_with(idents, info) ? ;
     self.parse_check_sat_or_unk(future)
   }
