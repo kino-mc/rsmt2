@@ -954,7 +954,7 @@ impl<Parser> Solver<Parser> {
     & mut self, actlits: Actlits
   ) -> SmtRes<bool>
   where
-  Actlits: Copy + IntoIterator<Item = & 'a Actlit> {
+  Actlits: IntoIterator<Item = & 'a Actlit> {
     let future = self.print_check_sat_act(actlits) ? ;
     self.parse_check_sat(future)
   }
@@ -965,7 +965,7 @@ impl<Parser> Solver<Parser> {
     & mut self, actlits: Actlits
   ) -> SmtRes< Option<bool> >
   where
-  Actlits: Copy + IntoIterator<Item = & 'a Actlit> {
+  Actlits: IntoIterator<Item = & 'a Actlit> {
     let future = self.print_check_sat_act(actlits) ? ;
     self.parse_check_sat_or_unk(future)
   }
@@ -1022,7 +1022,7 @@ impl<Parser> Solver<Parser> {
     & mut self, actlits: Actlits
   ) -> SmtRes<FutureCheckSat>
   where
-  Actlits: Copy + IntoIterator<Item = & 'a Actlit> {
+  Actlits: IntoIterator<Item = & 'a Actlit> {
     tee_write! {
       self, |w| write_str(w, "(check-sat-assuming (") ?
     }
