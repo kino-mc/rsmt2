@@ -1138,7 +1138,10 @@ impl<Parser> Solver<Parser> {
                 }
                 Ok(future_check_sat())
             }
-            None => Err(format!("{} does not support check-sat-assuming", self.conf.desc()).into()),
+            None => {
+                let msg = format!("{} does not support check-sat-assuming", self.conf.desc());
+                Err(msg.into())
+            }
         }
     }
 
@@ -1183,11 +1186,11 @@ impl<Parser> Solver<Parser> {
     }
 
     /// Parse the result of a get-values.
-    fn parse_get_values_with<Info, Expr, Value>(&mut self, info: Info) -> SmtRes<Vec<(Expr, Value)>>
+    fn parse_get_values_with<Info, Expr, Val>(&mut self, info: Info) -> SmtRes<Vec<(Expr, Val)>>
     where
         Info: Copy,
         Parser: for<'a> ExprParser<Expr, Info, &'a mut RSmtParser>
-            + for<'a> ValueParser<Value, &'a mut RSmtParser>,
+            + for<'a> ValueParser<Val, &'a mut RSmtParser>,
     {
         let res = self.smt_parser.get_values(self.parser, info);
         if res.is_err() && !self.conf.get_models() {

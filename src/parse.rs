@@ -1024,7 +1024,9 @@ impl<R: BufRead> SmtParser<R> {
                 }
                 self.spc_cmt();
                 if let Some((den_start, den_end)) = self.try_uint_indices()? {
-                    if den_end + 1 < self.buff.len() && &self.buff[den_end..(den_end + 2)] == ".0" {
+                    let not_eof = den_end + 1 < self.buff.len();
+                    let point_zero = &self.buff[den_end..(den_end + 2)] == ".0";
+                    if not_eof && point_zero {
                         self.cursor = den_end + 2
                     // } else if den_end < self.buff.len()
                     // && & self.buff[ den_end .. (den_end + 1) ] == "." {
@@ -1312,14 +1314,14 @@ impl<R: BufRead> SmtParser<R> {
     }
 
     /// Parses the result of a get-value.
-    pub fn get_values<Value, Info: Clone, Expr, Parser>(
+    pub fn get_values<Val, Info: Clone, Expr, Parser>(
         &mut self,
         parser: Parser,
         info: Info,
-    ) -> SmtRes<Vec<(Expr, Value)>>
+    ) -> SmtRes<Vec<(Expr, Val)>>
     where
         Parser:
-            for<'a> ValueParser<Value, &'a mut Self> + for<'a> ExprParser<Expr, Info, &'a mut Self>,
+            for<'a> ValueParser<Val, &'a mut Self> + for<'a> ExprParser<Expr, Info, &'a mut Self>,
     {
         self.prompt()?;
         self.spc_cmt();
