@@ -1,3 +1,9 @@
+# v0.9.11
+
+- (probably) fixed backend solvers being (sometimes) zombified when unwinding
+- improved `check_sat_assuming` over iterators
+- rustfmt!
+
 # v0.9.10
 
 - support `timeout`s
