@@ -67,7 +67,7 @@
 //! let mut solver = match Solver::default(()) {
 //!   Ok(kid) => kid,
 //!   Err(e) => panic!("Could not spawn solver kid: {:?}", e)
-//! } ; solver.path_tee("log.smt2").unwrap() ;
+//! } ;
 //!
 //! solver.declare_const("x", "Int").unwrap() ;
 //!
