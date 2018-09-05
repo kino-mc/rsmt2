@@ -11,13 +11,13 @@ macro_rules! smtry {
   ) ;
 }
 
-pub mod simple ;
-pub mod print_time ;
+pub mod print_time;
+pub mod simple;
 
 #[cfg(test)]
 fn get_solver<Parser>(p: Parser) -> ::Solver<Parser> {
-  match ::Solver::default(p) {
-    Ok(solver) => solver,
-    Err(e) => panic!("Could not spawn solver solver: {:?}", e)
-  }
+    match ::Solver::default(p) {
+        Ok(solver) => solver,
+        Err(e) => panic!("Could not spawn solver solver: {:?}", e),
+    }
 }
