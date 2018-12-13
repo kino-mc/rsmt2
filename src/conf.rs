@@ -6,7 +6,7 @@
 
 use std::fmt;
 
-use {SmtRes, Solver};
+use crate::{SmtRes, Solver};
 
 use self::SmtStyle::*;
 

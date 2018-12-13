@@ -251,4 +251,4 @@
 //! (check_sat_assuming function)
 //! [get_model]: ../trait.Solver.html#method.get_model (get_model function)
 
-pub use solver::Actlit;
+pub use crate::solver::Actlit;

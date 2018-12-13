@@ -356,49 +356,49 @@ extern crate error_chain;
 ///
 /// Aggregates I/O errors and `rsmt2` specific errors.
 pub mod errors {
-    error_chain!{
-      types {
-        Error, ErrorKind, ResExt, SmtRes ;
-      }
-
-      foreign_links {
-        Io(::std::io::Error) #[doc = "IO error."] ;
-      }
-
-      errors {
-        #[doc = "The solver reported `unknown`."]
-        Unknown {
-          description("smt solver reported `unknown`")
-        }
-        #[doc = "The solver reported `timeout`."]
-        Timeout {
-          description("smt solver reported `timeout`")
-        }
-        #[doc = "The solver reported `unsupported`."]
-        Unsupported {
-          description("unsupported command")
+    error_chain! {
+        types {
+            Error, ErrorKind, ResExt, SmtRes ;
         }
 
-        #[doc = "IO error."]
-        IoError(s: String) {
-          description("input/output error")
-          display("IO error: \"{}\"", s)
+        foreign_links {
+            Io(::std::io::Error) #[doc = "IO error."] ;
         }
 
-        #[doc = "The solver reported an error."]
-        SolverError(s: String) {
-          description("solver error")
-          display("solver error: \"{}\"", s)
-        }
+        errors {
+            #[doc = "The solver reported `unknown`."]
+            Unknown {
+                description("smt solver reported `unknown`")
+            }
+            #[doc = "The solver reported `timeout`."]
+            Timeout {
+                description("smt solver reported `timeout`")
+            }
+            #[doc = "The solver reported `unsupported`."]
+            Unsupported {
+                description("unsupported command")
+            }
 
-        #[doc =
-          "Parse error, contains the s-expression on which the error happened"
-        ]
-        ParseError(msg: String, sexpr: String) {
-          description("parse error")
-          display("parse error: {} on `{}`", msg, sexpr)
+            #[doc = "IO error."]
+            IoError(s: String) {
+                description("input/output error")
+                display("IO error: \"{}\"", s)
+            }
+
+            #[doc = "The solver reported an error."]
+            SolverError(s: String) {
+                description("solver error")
+                display("solver error: \"{}\"", s)
+            }
+
+            #[doc =
+                "Parse error, contains the s-expression on which the error happened"
+            ]
+            ParseError(msg: String, sexpr: String) {
+                description("parse error")
+                display("parse error: {} on `{}`", msg, sexpr)
+            }
         }
-      }
     }
 
     impl ErrorKind {
@@ -429,19 +429,19 @@ mod conf;
 pub mod parse;
 mod solver;
 
-pub use common::Logic;
-pub use conf::{SmtConf, SmtStyle};
-pub use errors::SmtRes;
-pub use solver::Solver;
+pub use crate::common::Logic;
+pub use crate::conf::{SmtConf, SmtStyle};
+pub use crate::errors::SmtRes;
+pub use crate::solver::Solver;
 
 /// Promises for future results on ongoing computations.
 pub mod future {
-    pub use solver::FutureCheckSat;
+    pub use crate::solver::FutureCheckSat;
 }
 
 pub mod example;
 
 /// Traits your types must implement so that `rsmt2` can use them.
 pub mod print {
-    pub use common::{Expr2Smt, Sort2Smt, Sym2Smt};
+    pub use crate::common::{Expr2Smt, Sort2Smt, Sym2Smt};
 }

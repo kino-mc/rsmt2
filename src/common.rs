@@ -2,7 +2,7 @@
 
 use std::{fmt, io};
 
-use errors::*;
+pub use crate::errors::*;
 
 /// Type of a model.
 pub type Model<Ident, Type, Value> = Vec<(Ident, Vec<(Ident, Type)>, Type, Value)>;
@@ -10,7 +10,7 @@ pub type Model<Ident, Type, Value> = Vec<(Ident, Vec<(Ident, Type)>, Type, Value
 /// A symbol printable in the SMT Lib 2 standard given some info.
 pub trait Sym2Smt<Info> {
     /// Prints a symbol to a writer given some info.
-    fn sym_to_smt2<Writer>(&self, &mut Writer, Info) -> SmtRes<()>
+    fn sym_to_smt2<Writer>(&self, w: &mut Writer, i: Info) -> SmtRes<()>
     where
         Writer: io::Write;
 }
@@ -18,7 +18,7 @@ pub trait Sym2Smt<Info> {
 /// An expression printable in the SMT Lib 2 standard given some info.
 pub trait Expr2Smt<Info> {
     /// Prints an expression to a writer given some info.
-    fn expr_to_smt2<Writer>(&self, &mut Writer, Info) -> SmtRes<()>
+    fn expr_to_smt2<Writer>(&self, w: &mut Writer, i: Info) -> SmtRes<()>
     where
         Writer: io::Write;
 }
@@ -26,7 +26,7 @@ pub trait Expr2Smt<Info> {
 /// A sort printable in the SMT Lib 2 standard.
 pub trait Sort2Smt {
     /// Prints a sort to a writer info.
-    fn sort_to_smt2<Writer>(&self, &mut Writer) -> SmtRes<()>
+    fn sort_to_smt2<Writer>(&self, w: &mut Writer) -> SmtRes<()>
     where
         Writer: io::Write;
 }
@@ -177,10 +177,10 @@ pub enum Logic {
     /// Quantifier-free linear real arithmetic.
     QF_LRA,
     /** Quantifier-free arrays, uninterpreted functions, linear integer
-  arithmetic. */
+    arithmetic. */
     QF_AUFLIA,
     /** Quantifier-free arrays, uninterpreted functions, linear integer
-  arithmetic. */
+    arithmetic. */
     AUFLIA,
     /// Arrays, uninterpreted functions, linear integer/real arithmetic.
     AUFLIRA,
@@ -215,8 +215,8 @@ impl Logic {
 
 #[test]
 fn logic() {
-    use conf::SmtConf;
-    use Solver;
+    use crate::conf::SmtConf;
+    use crate::Solver;
 
     let conf = SmtConf::z3();
 

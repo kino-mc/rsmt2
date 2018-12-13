@@ -6,12 +6,10 @@
 // Parser library.
 use std::io::Write;
 
-use parse::*;
-use print::*;
-use *;
+use crate::{common::*, parse::*};
 
 #[cfg(test)]
-use example::get_solver;
+use crate::example::get_solver;
 
 use self::Var::*;
 
@@ -261,8 +259,6 @@ impl<'a> IdentParser<(Var, Option<usize>), Type, &'a str> for Parser {
     }
 }
 
-use parse::SmtParser;
-
 impl<'a, Br> ModelParser<(Var, Option<usize>), Type, Const, &'a mut SmtParser<Br>> for Parser
 where
     Br: ::std::io::BufRead,
@@ -278,25 +274,30 @@ where
         if let Some(b) = input.try_bool()? {
             Ok(Const::BConst(b))
         } else if let Some(int) = input.try_int(|int, pos| match isize::from_str(int) {
-            Ok(int) => if pos {
-                Ok(int)
-            } else {
-                Ok(-int)
-            },
+            Ok(int) => {
+                if pos {
+                    Ok(int)
+                } else {
+                    Ok(-int)
+                }
+            }
             Err(e) => Err(e),
         })? {
             Ok(Const::IConst(int))
         } else if let Some((num, den)) =
             input.try_rat(
                 |num, den, pos| match (isize::from_str(num), usize::from_str(den)) {
-                    (Ok(num), Ok(den)) => if pos {
-                        Ok((num, den))
-                    } else {
-                        Ok((-num, den))
-                    },
+                    (Ok(num), Ok(den)) => {
+                        if pos {
+                            Ok((num, den))
+                        } else {
+                            Ok((-num, den))
+                        }
+                    }
                     (Err(e), _) | (_, Err(e)) => Err(format!("{}", e)),
                 },
-            )? {
+            )?
+        {
             Ok(Const::RConst(num, den))
         } else {
             input.fail_with("unexpected value")
@@ -309,10 +310,10 @@ fn declare_non_nullary_fun() {
     let mut solver = get_solver(Parser);
 
     smtry!(
-    solver.declare_fun(
-      "my_fun", & [ "Int", "Real", "Bool" ], "Real"
-    ), failwith "during function declaration: {:?}"
-  );
+      solver.declare_fun(
+        "my_fun", & [ "Int", "Real", "Bool" ], "Real"
+      ), failwith "during function declaration: {:?}"
+    );
 
     solver.kill().expect("kill")
 }
@@ -344,29 +345,29 @@ fn test_native() {
     let offset1 = Offset(0, 1);
 
     smtry!(
-    solver.declare_const_with(& nsv_0, & "Bool", & offset1),
-    failwith "declaration failed: {:?}"
-  );
+      solver.declare_const_with(& nsv_0, & "Bool", & offset1),
+      failwith "declaration failed: {:?}"
+    );
 
     smtry!(
-    solver.declare_const_with(& nsv_1, & "Real", & offset1),
-    failwith "declaration failed: {:?}"
-  );
+      solver.declare_const_with(& nsv_1, & "Real", & offset1),
+      failwith "declaration failed: {:?}"
+    );
 
     smtry!(
-    solver.declare_const_with(& sv_0, & "Bool", & offset1),
-    failwith "declaration failed: {:?}"
-  );
+      solver.declare_const_with(& sv_0, & "Bool", & offset1),
+      failwith "declaration failed: {:?}"
+    );
 
     smtry!(
-    solver.declare_const_with(& sv_1, & "Int", & offset1),
-    failwith "declaration failed: {:?}"
-  );
+      solver.declare_const_with(& sv_1, & "Int", & offset1),
+      failwith "declaration failed: {:?}"
+    );
 
     smtry!(
-    solver.assert_with(& app, & offset1),
-    failwith "assert failed: {:?}"
-  );
+      solver.assert_with(& app, & offset1),
+      failwith "assert failed: {:?}"
+    );
 
     assert!(smtry!(
       solver.check_sat(),
@@ -374,9 +375,9 @@ fn test_native() {
     ));
 
     let model = smtry!(
-    solver.get_model(),
-    failwith "while getting model: {:?}"
-  );
+      solver.get_model(),
+      failwith "while getting model: {:?}"
+    );
 
     for ((var, off), _, typ, val) in model {
         if var.sym() == "stateful var" {
@@ -437,33 +438,33 @@ fn test_unroll() {
 
     let sym = nsv_0.unroll(&offset1);
     smtry!(
-    solver.declare_const(& sym, & "Bool"),
-    failwith "declaration failed: {:?}"
-  );
+      solver.declare_const(& sym, & "Bool"),
+      failwith "declaration failed: {:?}"
+    );
 
     let sym = nsv_1.unroll(&offset1);
     smtry!(
-    solver.declare_const(& sym, & "Real"),
-    failwith "declaration failed: {:?}"
-  );
+      solver.declare_const(& sym, & "Real"),
+      failwith "declaration failed: {:?}"
+    );
 
     let sym = sv_0.unroll(&offset1);
     smtry!(
-    solver.declare_const(& sym, & "Bool"),
-    failwith "declaration failed: {:?}"
-  );
+      solver.declare_const(& sym, & "Bool"),
+      failwith "declaration failed: {:?}"
+    );
 
     let sym = sv_1.unroll(&offset1);
     smtry!(
-    solver.declare_const(& sym, & "Int"),
-    failwith "declaration failed: {:?}"
-  );
+      solver.declare_const(& sym, & "Int"),
+      failwith "declaration failed: {:?}"
+    );
 
     let expr = app.unroll(&offset1);
     smtry!(
-    solver.assert(& expr),
-    failwith "assert failed: {:?}"
-  );
+      solver.assert(& expr),
+      failwith "assert failed: {:?}"
+    );
 
     assert!(smtry!(
       solver.check_sat(),
@@ -471,9 +472,9 @@ fn test_unroll() {
     ));
 
     let model = smtry!(
-    solver.get_model(),
-    failwith "while getting model: {:?}"
-  );
+      solver.get_model(),
+      failwith "while getting model: {:?}"
+    );
 
     for ((var, off), _, typ, val) in model {
         if var.sym() == "stateful var" {

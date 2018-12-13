@@ -1,3 +1,10 @@
+# v0.10.0
+
+- switched to edition 2018
+- removed a lot of the `Copy` requirements for parsers and input collections
+  for `declare_fun` *etc*...
+- various minor code embellishments
+
 # v0.9.11
 
 - (probably) fixed backend solvers being (sometimes) zombified when unwinding

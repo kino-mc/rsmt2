@@ -114,8 +114,7 @@
 //! [try_int]: struct.SmtParser.html#method.try_int (try_int function)
 //! [try_sym]: struct.SmtParser.html#method.try_sym (try_sym function)
 
-use common::*;
-use errors::*;
+use crate::common::*;
 
 use std::io::{BufRead, BufReader};
 use std::process::ChildStdout;
@@ -274,20 +273,22 @@ impl<R: BufRead> SmtParser<R> {
                                     break 'load;
                                 }
                             }
-                            _ => if !c.is_whitespace() && op_paren == 0 {
-                                // print!("... `") ;
-                                'token: for c in chars {
-                                    if c.is_whitespace() {
-                                        break 'token;
+                            _ => {
+                                if !c.is_whitespace() && op_paren == 0 {
+                                    // print!("... `") ;
+                                    'token: for c in chars {
+                                        if c.is_whitespace() {
+                                            break 'token;
+                                        }
+                                        match c {
+                                            ')' | '(' | '|' | ';' => break 'token,
+                                            _ => this_end += 1,
+                                        }
                                     }
-                                    match c {
-                                        ')' | '(' | '|' | ';' => break 'token,
-                                        _ => this_end += 1,
-                                    }
+                                    sexpr_end = this_end;
+                                    break 'load;
                                 }
-                                sexpr_end = this_end;
-                                break 'load;
-                            },
+                            }
                         }
                     }
                 }
@@ -830,9 +831,9 @@ impl<R: BufRead> SmtParser<R> {
                 self.cursor = int_end;
                 let uint = &self.buff[int_start..int_end];
                 try_apply!(
-          f(uint, true) => |int| res = Some(int),
-          format!("error parsing integer `{}`", uint)
-        )
+                  f(uint, true) => |int| res = Some(int),
+                  format!("error parsing integer `{}`", uint)
+                )
             }
         } else if self.try_tag("(")? {
             let pos = if self.try_tag("-")? {
@@ -968,10 +969,10 @@ impl<R: BufRead> SmtParser<R> {
         if let Some((fst_start, fst_end)) = self.try_uint_indices()? {
             if fst_end + 1 < self.buff.len() && &self.buff[fst_end..(fst_end + 2)] == ".0" {
                 try_apply!(
-          f(
-            & self.buff[ fst_start .. fst_end ], "1", positive
-          ) => |okay| res = Some(okay), err
-        );
+                  f(
+                    & self.buff[ fst_start .. fst_end ], "1", positive
+                  ) => |okay| res = Some(okay), err
+                );
                 self.cursor = fst_end + 2
             } else if fst_end < self.buff.len() && &self.buff[fst_end..(fst_end + 1)] == "." {
                 self.cursor = fst_end + 1;
@@ -987,10 +988,10 @@ impl<R: BufRead> SmtParser<R> {
                         den.push('0')
                     }
                     try_apply!(
-            f(
-              & num, & den, positive
-            ) => |okay| res = Some(okay), err
-          );
+                      f(
+                        & num, & den, positive
+                      ) => |okay| res = Some(okay), err
+                    );
                     self.cursor = snd_end
                 } else {
                     bail!("ill-formed rational")
@@ -1218,10 +1219,10 @@ impl<R: BufRead> SmtParser<R> {
 
     /// Tries to parse a reserved actlit id.
     pub fn try_actlit_id(&mut self) -> SmtRes<bool> {
-        if self.try_tag(::solver::actlit_pref)? {
+        if self.try_tag(crate::solver::actlit_pref)? {
             self.uint(|_| ())
                 .chain_err(|| "while parsing internal actlit identifier")?;
-            self.tag(::solver::actlit_suff)?;
+            self.tag(crate::solver::actlit_suff)?;
             Ok(true)
         } else {
             Ok(false)
@@ -1347,9 +1348,9 @@ impl<R: BufRead> SmtParser<R> {
 /// [module-level documentation]: index.html
 pub trait IdentParser<Ident, Type, Input>: Copy {
     /// Parses an identifier.
-    fn parse_ident(self, Input) -> SmtRes<Ident>;
+    fn parse_ident(self, i: Input) -> SmtRes<Ident>;
     /// Parses a type.
-    fn parse_type(self, Input) -> SmtRes<Type>;
+    fn parse_type(self, i: Input) -> SmtRes<Type>;
 }
 impl<'a, Ident, Type, T> IdentParser<Ident, Type, &'a str> for T
 where
@@ -1381,7 +1382,8 @@ where
 ///
 /// [module-level documentation]: index.html
 pub trait ModelParser<Ident, Type, Value, Input>: Copy {
-    fn parse_value(self, Input, &Ident, &[(Ident, Type)], &Type) -> SmtRes<Value>;
+    fn parse_value(self, i: Input, id: &Ident, args: &[(Ident, Type)], out: &Type)
+        -> SmtRes<Value>;
 }
 impl<'a, Ident, Type, Value, T> ModelParser<Ident, Type, Value, &'a str> for T
 where
@@ -1419,7 +1421,7 @@ where
 ///
 /// [module-level documentation]: index.html
 pub trait ValueParser<Value, Input>: Copy {
-    fn parse_value(self, Input) -> SmtRes<Value>;
+    fn parse_value(self, i: Input) -> SmtRes<Value>;
 }
 impl<'a, Value, T> ValueParser<Value, &'a str> for T
 where
@@ -1445,7 +1447,7 @@ where
 ///
 /// [module-level documentation]: index.html
 pub trait ExprParser<Expr, Info, Input>: Copy {
-    fn parse_expr(self, Input, Info) -> SmtRes<Expr>;
+    fn parse_expr(self, i: Input, info: Info) -> SmtRes<Expr>;
 }
 impl<'a, Expr, Info, T> ExprParser<Expr, Info, &'a str> for T
 where
@@ -1471,7 +1473,7 @@ where
 ///
 /// [module-level documentation]: index.html
 pub trait ProofParser<Proof, Input>: Copy {
-    fn parse_proof(self, Input) -> SmtRes<Proof>;
+    fn parse_proof(self, i: Input) -> SmtRes<Proof>;
 }
 impl<'a, Proof, T> ProofParser<Proof, &'a str> for T
 where

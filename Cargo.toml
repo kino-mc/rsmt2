@@ -1,6 +1,6 @@
 [package]
 name = "rsmt2"
-version = "0.9.11"
+version = "0.10.0"
 authors = ["Adrien Champion <adrien.champion@email.com>"]
 description = "Wrapper for SMT-LIB 2 compliant SMT solvers."
 documentation = "https://docs.rs/rsmt2"
@@ -10,6 +10,7 @@ readme = "README.md"
 categories = ["science"]
 keywords = ["SMT", "SAT", "satisfiability", "solver", "SMT-LIB"]
 license = "MIT/Apache-2.0"
+edition = "2018"
 
 [badges]
 travis-ci = { repository = "kino-mc/rsmt2", service = "github" }

@@ -332,12 +332,14 @@
 //! (Print-time information example)
 //! [smt_parser]: parse/struct.SmtParser.html (SmtParser structure)
 
-use errors::SmtRes;
-use parse::{IdentParser, ModelParser};
-use print::Expr2Smt;
+use crate::{
+    errors::SmtRes,
+    parse::{IdentParser, ModelParser},
+    print::Expr2Smt,
+};
 
 #[cfg(test)]
-use example::get_solver;
+use crate::example::get_solver;
 
 /// Operators. Just implements `Display`, never manipulated directly by the
 /// solver.

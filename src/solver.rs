@@ -7,11 +7,11 @@ use std::fs::File;
 use std::io::{BufReader, BufWriter, Write};
 use std::process::{Child, ChildStdin, ChildStdout, Command, Stdio};
 
-use errors::*;
-
-use common::*;
-use conf::SmtConf;
-use parse::{ExprParser, IdentParser, ModelParser, RSmtParser, ValueParser};
+use crate::{
+    common::*,
+    conf::SmtConf,
+    parse::{ExprParser, IdentParser, ModelParser, RSmtParser, ValueParser},
+};
 
 /// Prefix of an actlit identifier.
 #[allow(non_upper_case_globals)]
@@ -134,10 +134,12 @@ impl<Parser> Solver<Parser> {
         let mut kid = Command::new(
             // Command.
             conf.get_cmd(),
-        ).args(
+        )
+        .args(
             // Options.
             conf.get_options(),
-        ).stdin(Stdio::piped())
+        )
+        .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
@@ -145,7 +147,8 @@ impl<Parser> Solver<Parser> {
             format!(
                 "While spawning child process with {}",
                 conf.get_cmd().to_string()
-            ).into()
+            )
+            .into()
         })?;
 
         let mut stdin_opt = None;
@@ -475,7 +478,7 @@ impl<Parser> Solver<Parser> {
         FunSym: ?Sized + Sym2Smt<()>,
         ArgSort: ?Sized + Sort2Smt + 'a,
         OutSort: ?Sized + Sort2Smt,
-        Args: Copy + IntoIterator<Item = &'a ArgSort>,
+        Args: IntoIterator<Item = &'a ArgSort>,
     {
         self.declare_fun_with(symbol, args, out, ())
     }
@@ -531,7 +534,7 @@ impl<Parser> Solver<Parser> {
         FunSym: ?Sized + Sym2Smt<()>,
         ArgSym: Sym2Smt<()> + 'a,
         Body: ?Sized + Expr2Smt<()>,
-        Args: Copy + IntoIterator<Item = &'a (ArgSym, ArgSort)>,
+        Args: IntoIterator<Item = &'a (ArgSym, ArgSort)>,
     {
         self.define_fun_with(symbol, args, out, body, ())
     }
@@ -647,7 +650,7 @@ impl<Parser> Solver<Parser> {
         FunSym: ?Sized + Sym2Smt<()>,
         ArgSym: Sym2Smt<()> + 'a,
         Body: ?Sized + Expr2Smt<()>,
-        Args: Copy + IntoIterator<Item = &'a (ArgSym, ArgSort)>,
+        Args: IntoIterator<Item = &'a (ArgSym, ArgSort)>,
     {
         self.define_fun_rec_with(symbol, args, out, body, ())
     }
@@ -679,7 +682,8 @@ impl<Parser> Solver<Parser> {
         &'a Args: IntoIterator<Item = &'a (ArgSym, ArgSort)> + 'a,
         Args: ?Sized,
         ArgsRef: 'a + AsRef<Args>,
-        Funs: Copy + IntoIterator<Item = &'a (FunSym, ArgsRef, OutSort, Body)>,
+        Funs: IntoIterator<Item = &'a (FunSym, ArgsRef, OutSort, Body)>,
+        Funs::IntoIter: Clone,
     {
         self.define_funs_rec_with(funs, ())
     }
@@ -722,12 +726,16 @@ impl<Parser> Solver<Parser> {
 
         Def: Sort2Smt + 'a,
         &'a DefList: IntoIterator<Item = &'a Def> + 'a,
-        All: Copy + IntoIterator<Item = &'a (Sort, usize, ParamList, DefList)> + 'a,
+        All: IntoIterator<Item = &'a (Sort, usize, ParamList, DefList)> + 'a,
+        All::IntoIter: Clone,
     {
         tee_write! {
           self, |w| write!(w, "(declare-datatypes (") ?
         }
-        for &(ref sort, arity, _, _) in defs {
+
+        let def_iter = defs.into_iter();
+
+        for &(ref sort, arity, _, _) in def_iter.clone() {
             tee_write! {
               self, |w| {
                 write!(w, " (") ? ;
@@ -741,7 +749,7 @@ impl<Parser> Solver<Parser> {
           self, |w| write!(w, " ) (") ?
         }
 
-        for &(_, arity, ref params, ref defs) in defs {
+        for &(_, arity, ref params, ref defs) in def_iter {
             tee_write! {
               self, |w| {
                 write!(w, " (") ? ;
@@ -786,7 +794,7 @@ impl<Parser> Solver<Parser> {
 }
 
 /// # Basic SMT-LIB commands using the user's parser.
-impl<Parser: Copy> Solver<Parser> {
+impl<Parser> Solver<Parser> {
     /// Get-model command.
     pub fn get_model<Ident, Type, Value>(&mut self) -> SmtRes<Model<Ident, Type, Value>>
     where
@@ -819,7 +827,7 @@ impl<Parser: Copy> Solver<Parser> {
         Parser: for<'b> ExprParser<PExpr, (), &'b mut RSmtParser>
             + for<'b> ValueParser<PValue, &'b mut RSmtParser>,
         Expr: ?Sized + Expr2Smt<()> + 'a,
-        Exprs: Copy + IntoIterator<Item = &'a Expr>,
+        Exprs: IntoIterator<Item = &'a Expr>,
     {
         self.get_values_with(exprs, ())
     }
@@ -1078,7 +1086,7 @@ impl<Parser> Solver<Parser> {
     where
         Info: Copy,
         Expr: ?Sized + Expr2Smt<Info> + 'a,
-        Exprs: Clone + IntoIterator<Item = &'a Expr>,
+        Exprs: IntoIterator<Item = &'a Expr>,
     {
         tee_write! {
           self, |w| write!(w, "(get-value (") ?
@@ -1219,7 +1227,7 @@ impl<Parser> Solver<Parser> {
         Parser: for<'b> ExprParser<PExpr, Info, &'b mut RSmtParser>
             + for<'b> ValueParser<PValue, &'b mut RSmtParser>,
         Expr: ?Sized + Expr2Smt<Info> + 'a,
-        Exprs: Copy + IntoIterator<Item = &'a Expr>,
+        Exprs: IntoIterator<Item = &'a Expr>,
     {
         self.print_get_values_with(exprs, info)?;
         self.parse_get_values_with(info)
@@ -1299,9 +1307,9 @@ impl<Parser> Solver<Parser> {
         Sort: ?Sized + Sort2Smt,
         Arg: ?Sized + Sort2Smt + 'a,
         Body: ?Sized + Sort2Smt,
-        Args: Copy + IntoIterator<Item = &'a Arg>,
+        Args: IntoIterator<Item = &'a Arg>,
     {
-        tee_write!{
+        tee_write! {
           self, |w| {
             write_str(w, "( define-sort ") ? ;
             sort.sort_to_smt2(w) ? ;
@@ -1388,7 +1396,7 @@ impl<Parser> Solver<Parser> {
         FunSym: ?Sized + Sym2Smt<Info>,
         ArgSort: ?Sized + Sort2Smt + 'a,
         OutSort: ?Sized + Sort2Smt,
-        Args: Copy + IntoIterator<Item = &'a ArgSort>,
+        Args: IntoIterator<Item = &'a ArgSort>,
     {
         tee_write! {
           self, |w| {
@@ -1461,7 +1469,7 @@ impl<Parser> Solver<Parser> {
         FunSym: ?Sized + Sym2Smt<Info>,
         ArgSym: Sym2Smt<Info> + 'a,
         Body: ?Sized + Expr2Smt<Info>,
-        Args: Copy + IntoIterator<Item = &'a (ArgSym, ArgSort)>,
+        Args: IntoIterator<Item = &'a (ArgSym, ArgSort)>,
     {
         tee_write! {
           self, |w| {
@@ -1522,15 +1530,18 @@ impl<Parser> Solver<Parser> {
         &'a Args: IntoIterator<Item = &'a (ArgSym, ArgSort)> + 'a,
         Args: ?Sized,
         ArgsRef: 'a + AsRef<Args>,
-        Funs: Copy + IntoIterator<Item = &'a (FunSym, ArgsRef, OutSort, Body)>,
+        Funs: IntoIterator<Item = &'a (FunSym, ArgsRef, OutSort, Body)>,
+        Funs::IntoIter: Clone,
     {
         // Header.
         tee_write! {
           self, |w| write_str(w, "(define-funs-rec (\n") ?
         }
 
+        let fun_iter = funs.into_iter();
+
         // Signatures.
-        for fun in funs {
+        for fun in fun_iter.clone() {
             let (ref sym, ref args, ref out, _) = *fun;
 
             tee_write! {
@@ -1567,7 +1578,7 @@ impl<Parser> Solver<Parser> {
         }
 
         // Bodies
-        for fun in funs {
+        for fun in fun_iter {
             let (_, _, _, ref body) = *fun;
             tee_write! {
               self, |w| {
@@ -1599,7 +1610,7 @@ impl<Parser> Solver<Parser> {
         FunSym: ?Sized + Sym2Smt<Info>,
         ArgSym: Sym2Smt<Info> + 'a,
         Body: ?Sized + Expr2Smt<Info>,
-        Args: Copy + IntoIterator<Item = &'a (ArgSym, ArgSort)>,
+        Args: IntoIterator<Item = &'a (ArgSym, ArgSort)>,
     {
         // Header.
         tee_write! {
@@ -1801,81 +1812,3 @@ impl<Parser> Solver<Parser> {
         Ok(())
     }
 }
-
-// pub struct DeclareFun<'a, Parser: 'a> {
-//   inner: & 'a mut Solver<Parser>,
-//   err: Option<Error>,
-// }
-// impl<'a, Parser: 'a> DeclareFun<'a, Parser> {
-//   fn new<FunSym, Info>(
-//     inner: & 'a mut Solver<Parser>, sym: & FunSym, info: Info
-//   ) -> Self
-//   where FunSym: ?Sized + Sym2Smt<Info>, Info: Copy {
-//     let err = Self::init(inner, sym, info).err() ;
-//     DeclareFun { inner, err }
-//   }
-
-//   fn init<FunSym, Info>(
-//     inner: & 'a mut Solver<Parser>, sym: & FunSym, info: Info
-//   ) -> SmtRes<()>
-//   where FunSym: ?Sized + Sym2Smt<Info>, Info: Copy {
-//     tee_write! {
-//       inner, |w| {
-//         write!(w, "(declare-fun ") ? ;
-//         sym.sym_to_smt2(w, info) ? ;
-//         write!(w, " ") ? ;
-//       }
-//     }
-//     Ok(())
-//   }
-
-//   pub fn arg<ArgSort: ?Sized + Sort2Smt>(
-//     & mut self, arg: & ArgSort
-//   ) -> & mut Self {
-//     if self.err.is_none() {
-//       let err = self.res_arg(arg).err() ;
-//       self.err = err
-//     }
-//     self
-//   }
-
-//   pub fn out<OutSort: ?Sized + Sort2Smt>(
-//     mut self, out: & OutSort
-//   ) -> SmtRes<()> {
-//     if self.err.is_none() {
-//       let err = self.res_out(out).err() ;
-//       self.err = err
-//     }
-
-//     if let Some(e) = self.err {
-//       Err(e)
-//     } else {
-//       Ok(())
-//     }
-//   }
-
-//   pub fn res_arg<ArgSort: ?Sized + Sort2Smt>(
-//     & mut self, arg: & ArgSort
-//   ) -> SmtRes<()> {
-//     tee_write! {
-//       self.inner, |w| {
-//         write!(w, " ") ? ;
-//         arg.sort_to_smt2(w) ? ;
-//       }
-//     }
-//     Ok(())
-//   }
-//   pub fn res_out<OutSort: ?Sized + Sort2Smt>(
-//     & mut self, out: & OutSort
-//   ) -> SmtRes<()> {
-//     tee_write! {
-//       self.inner, |w| {
-//         write!(w, " )") ? ;
-//         write!(w, " ") ? ;
-//         out.sort_to_smt2(w) ? ;
-//         write!(w,")") ?
-//       }
-//     }
-//     Ok(())
-//   }
-// }
