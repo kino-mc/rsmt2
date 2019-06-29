@@ -1,18 +1,28 @@
 //! This modules handles asynchronous interactions with the solver.
 //!
+//! The related function on `Solver` is [`async_check_sat_or_unk`].
+//!
 //! Presently, only asynchronous check-sat-s are supported. The idea is to wrap the whole solver in
 //! a new thread when `solver.try_check_sat` is called. The new thread starts parsing the output
 //! right away, which is going to block it. Once it's done, it sends a message to its parent thread
 //! with the result.
 //!
-//! **NB:** when the check *runs forever*, the slave process will keep on waiting for the solver to
-//! answer. If you want to be able to keep using the solver in this case, you should spawn the
-//! solver with the right options to add a timeout. For Z3, `-t:500` for a (soft, per query)
-//! timeout, which makes it report `unknown`. This is what the examples below do.
+//! This module uses unsafe code so that the wrapper retains the `&mut solver` (for lifetimes), but
+//! the background thread can read the solver's output. If none of your queries on the wrapper
+//! produce a result, *i.e.* the solver is still trying to answer the check-sat, and the wrapper is
+//! dropped, the drop action **will wait for the slave thread to produce an answer**. This is
+//! because otherwise the background thread would keep on listening to `solver`, making using
+//! `solver` after the wrapper is dropped unsafe. On this topic, do read the following remark.
+//!
+//! > **NB:** when the check *runs forever*, the slave process will keep on waiting for the solver
+//! > to answer. If you want to be able to keep using the solver in this case, you should spawn the
+//! > solver with the right options to add a timeout. For Z3, `-t:500` for a (soft, per query)
+//! > timeout, which makes it report `unknown`. This is what the examples below do.
 //!
 //! # Examples
 //!
-//! This example uses the second SMT-LIB script from this [stack overflow question].
+//! These examples use the second SMT-LIB script from this [stack overflow question] as a script
+//! that Z3 struggles with.
 //!
 //! ```rust
 //! fn do_smt_stuff() -> ::rsmt2::SmtRes<()> {
@@ -24,7 +34,7 @@
 //!     // Setting a timeout because our query will run "forever" otherwise.
 //!     conf.option("-t:100");
 //!
-//!     let mut solver = conf.spawn(parser) ? ;
+//!     let mut solver = conf.spawn(parser)? ;
 //!
 //!     writeln!(solver, r#"
 //!         (declare-fun f (Real) Real)
@@ -60,7 +70,8 @@
 //! do_smt_stuff().unwrap()
 //! ```
 //!
-//! [stack overflow question]: https://stackoverflow.com/questions/43246090/why-is-this-simple-z3-proof-so-slow
+//! [stack overflow question]: https://stackoverflow.com/questions/43246090
+//! [`async_check_sat_or_unk`]: ../struct.Solver.html#method.async_check_sat_or_unk
 
 use std::{
     sync::mpsc::{channel, Receiver, RecvError, RecvTimeoutError, Sender, TryRecvError},
@@ -70,13 +81,13 @@ use std::{
 use crate::{errors::*, solver::Solver};
 
 /// Messages sent by the slave thread.
-pub type AsyncMsg = SmtRes<Option<bool>>;
+type AsyncMsg = SmtRes<Option<bool>>;
 
 /// Send channel for the slave thread.
-pub type AsyncSend = Sender<AsyncMsg>;
+type AsyncSend = Sender<AsyncMsg>;
 
 /// Receive channel for the master thread.
-pub type AsyncRecv = Receiver<AsyncMsg>;
+type AsyncRecv = Receiver<AsyncMsg>;
 
 /// Solver container for (unsafe) mutable reference sharing.
 struct Container<Parser> {
@@ -90,6 +101,12 @@ pub struct CheckSatFuture<'sref, Parser> {
     recv: AsyncRecv,
     /// Reference to the solver.
     solver: &'sref mut Solver<Parser>,
+}
+impl<'sref, Parser> Drop for CheckSatFuture<'sref, Parser> {
+    fn drop(&mut self) {
+        let _ = self.recv.recv();
+        ()
+    }
 }
 impl<'sref, Parser: Send + 'static> CheckSatFuture<'sref, Parser> {
     /// Constructor.

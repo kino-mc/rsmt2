@@ -798,6 +798,10 @@ impl<Parser> Solver<Parser> {
 /// # Non-blocking commands.
 impl<Parser: Send + 'static> Solver<Parser> {
     /// Asynchronous check-sat.
+    ///
+    /// For details, check out the [`asynch` module's documentation].
+    ///
+    /// [`asynch` module's documentation]: asynch/index.html
     pub fn async_check_sat_or_unk(&mut self) -> crate::asynch::CheckSatFuture<Parser> {
         crate::asynch::CheckSatFuture::new(self)
     }
