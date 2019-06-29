@@ -90,6 +90,8 @@ pub struct Solver<Parser> {
     /// Actlit counter.
     actlit: usize,
 }
+unsafe impl<Parser: Send> Send for Solver<Parser> {}
+unsafe impl<Parser: Send> Sync for Solver<Parser> {}
 
 impl<Parser> Write for Solver<Parser> {
     fn write(&mut self, buf: &[u8]) -> ::std::io::Result<usize> {
@@ -790,6 +792,14 @@ impl<Parser> Solver<Parser> {
         }
 
         Ok(())
+    }
+}
+
+/// # Non-blocking commands.
+impl<Parser: Send + 'static> Solver<Parser> {
+    /// Asynchronous check-sat.
+    pub fn async_check_sat_or_unk(&mut self) -> crate::asynch::CheckSatFuture<Parser> {
+        crate::asynch::CheckSatFuture::new(self)
     }
 }
 

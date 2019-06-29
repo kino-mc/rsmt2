@@ -425,6 +425,7 @@ pub mod errors {
 #[macro_use]
 mod common;
 pub mod actlit;
+pub mod asynch;
 mod conf;
 pub mod parse;
 mod solver;
