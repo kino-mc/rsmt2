@@ -34,6 +34,8 @@ pub enum SmtStyle {
     ///
     /// **NB**: CVC4 hasn't been properly tested yet.
     CVC4,
+
+    Yices2,
 }
 
 impl SmtStyle {
@@ -56,15 +58,28 @@ impl SmtStyle {
                 cmd,
                 options: vec![
                     "-q".into(),
-                    "--interactive".into(),
+                    "--no-interactive".into(),
+                    "-im".into(),
                     "--lang".into(),
                     "smt2".into(),
                 ],
-                models: false,
-                incremental: false,
+                models: true,
+                incremental: true,
                 parse_success: false,
                 unsat_cores: false,
-                check_sat_assuming: unsupported(),
+                check_sat_assuming: supported("check-sat"),
+            },
+            Yices2 => SmtConf {
+                style: self,
+                cmd,
+                options: vec![
+                    "--incremental".into(),
+                ],
+                models: true,
+                incremental: true,
+                parse_success: false,
+                unsat_cores: false,
+                check_sat_assuming: supported("check-sat"),
             },
         }
     }
@@ -90,6 +105,7 @@ impl SmtStyle {
         match self {
             Z3 => "z3".to_string(),
             CVC4 => "cvc4".to_string(),
+            Yices2 => "yices_smt2_mt".to_string(),
         }
     }
     /// Default command for a solver style.
@@ -107,6 +123,7 @@ impl fmt::Display for SmtStyle {
         match *self {
             Z3 => write!(fmt, "z3"),
             CVC4 => write!(fmt, "cvc4"),
+            Yices2 => write!(fmt, "yices2"),
         }
     }
 }
@@ -165,6 +182,10 @@ impl SmtConf {
         CVC4.default()
     }
 
+    pub fn yices2() -> Self {
+        Yices2.default()
+    }
+
     /// Spawns the solver.
     ///
     /// # Examples
@@ -191,6 +212,7 @@ impl SmtConf {
         match self.style {
             Z3 => "z3",
             CVC4 => "cvc4",
+            Yices2 => "yices2",
         }
     }
 
@@ -208,6 +230,7 @@ impl SmtConf {
         match self.style {
             CVC4 => self.options.push("--produce-models".into()),
             Z3 => (),
+            Yices2 => (),
         }
     }
 
@@ -225,6 +248,7 @@ impl SmtConf {
         match self.style {
             CVC4 => self.options.push("--incremental".into()),
             Z3 => (),
+            Yices2 => self.options.push("--incremental".into()),
         }
     }
 
