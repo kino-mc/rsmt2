@@ -368,11 +368,11 @@ impl<Parser> Solver<Parser> {
     /// let sat_res = & solver.check_sat() ;
     ///
     /// match * sat_res {
-    ///   Err(ref e) => match * e.kind() {
-    ///     ::rsmt2::errors::ErrorKind::Unknown => (),
-    ///     _ => panic!("expected unknown"),
-    ///   },
-    ///   Ok(res) => panic!("expected error: {:?}", res),
+    ///     Err(ref e) => match * e.kind() {
+    ///         ::rsmt2::errors::ErrorKind::Unknown => (),
+    ///         _ => panic!("expected unknown"),
+    ///     },
+    ///     Ok(res) => panic!("expected error: {:?}", res),
     /// }
     /// ```
     ///
@@ -464,7 +464,7 @@ impl<Parser> Solver<Parser> {
     /// # use rsmt2::Solver ;
     /// let mut solver = Solver::default(()).unwrap() ;
     /// solver.declare_fun(
-    ///   "my_symbol", & [ "Int", "Real", "Bool" ], "Bool"
+    ///     "my_symbol", & [ "Int", "Real", "Bool" ], "Bool"
     /// ).unwrap()
     /// ```
     #[inline]
@@ -491,7 +491,7 @@ impl<Parser> Solver<Parser> {
     /// # use rsmt2::Solver ;
     /// let mut solver = Solver::default(()).unwrap() ;
     /// solver.define_const(
-    ///   "seven", "Int", "7"
+    ///     "seven", "Int", "7"
     /// ).unwrap()
     /// ```
     #[inline]
@@ -517,7 +517,7 @@ impl<Parser> Solver<Parser> {
     /// # use rsmt2::Solver ;
     /// let mut solver = Solver::default(()).unwrap() ;
     /// solver.define_fun(
-    ///   "abs", & [ ("n", "Int") ], "Int", "(ite (< x 0) (- x) x)"
+    ///     "abs", & [ ("n", "Int") ], "Int", "(ite (< x 0) (- x) x)"
     /// ).unwrap()
     /// ```
     #[inline]
@@ -633,7 +633,7 @@ impl<Parser> Solver<Parser> {
     /// # use rsmt2::Solver ;
     /// let mut solver = Solver::default(()).unwrap() ;
     /// solver.define_fun_rec(
-    ///   "abs", & [ ("n", "Int") ], "Int", "(ite (< x 0) (abs (- x)) x)"
+    ///     "abs", & [ ("n", "Int") ], "Int", "(ite (< x 0) (abs (- x)) x)"
     /// ).unwrap()
     /// ```
     #[inline]
@@ -663,9 +663,9 @@ impl<Parser> Solver<Parser> {
     /// # use rsmt2::Solver ;
     /// let mut solver = Solver::default(()).unwrap() ;
     /// solver.define_funs_rec( & [
-    ///   ("abs_1", & [ ("n", "Int") ], "Int", "(ite (< x 0) (abs_2 (- x)) x)"),
-    ///   ("abs_2", & [ ("n", "Int") ], "Int", "(ite (< x 0) (abs_3 (- x)) x)"),
-    ///   ("abs_3", & [ ("n", "Int") ], "Int", "(ite (< x 0) (abs_1 (- x)) x)"),
+    ///     ("abs_1", & [ ("n", "Int") ], "Int", "(ite (< x 0) (abs_2 (- x)) x)"),
+    ///     ("abs_2", & [ ("n", "Int") ], "Int", "(ite (< x 0) (abs_3 (- x)) x)"),
+    ///     ("abs_3", & [ ("n", "Int") ], "Int", "(ite (< x 0) (abs_1 (- x)) x)"),
     /// ] ).unwrap()
     /// ```
     #[inline]
@@ -698,10 +698,10 @@ impl<Parser> Solver<Parser> {
     /// # use rsmt2::Solver ;
     /// let mut solver = Solver::default(()).unwrap() ;
     /// solver.declare_datatypes( & [
-    ///   ( "Tree", 1, ["T"],
-    ///     [ "leaf", "(node (value T) (children (TreeList T)))" ] ),
-    ///   ( "TreeList", 1, ["T"],
-    ///     [ "nil", "(cons (car (Tree T)) (cdr (TreeList T)))" ]),
+    ///     ( "Tree", 1, ["T"],
+    ///         [ "leaf", "(node (value T) (children (TreeList T)))" ] ),
+    ///     ( "TreeList", 1, ["T"],
+    ///         [ "nil", "(cons (car (Tree T)) (cdr (TreeList T)))" ]),
     /// ] ).unwrap() ;
     ///
     /// solver.declare_const( "t1", "(Tree Int)" ).unwrap() ;
@@ -1277,14 +1277,14 @@ impl<Parser> Solver<Parser> {
     /// ```
     /// # use rsmt2::Solver ;
     /// let mut solver = Solver::default(()).unwrap() ;
-    /// solver.define_sort("Set", & ["T"], "(Array T Bool)").unwrap() ;
+    /// solver.define_sort("MySet", & ["T"], "(Array T Bool)").unwrap() ;
     /// solver.define_null_sort("IList", "(List Int)").unwrap() ;
     /// solver.define_sort(
-    ///   "List-Set", & ["T"], "(Array (List T) Bool)"
+    ///     "List-Set", & ["T"], "(Array (List T) Bool)"
     /// ).unwrap() ;
     /// solver.define_null_sort("I", "Int").unwrap() ;
     ///
-    /// solver.declare_const("s1", "(Set I)").unwrap() ;
+    /// solver.declare_const("s1", "(MySet I)").unwrap() ;
     /// solver.declare_const("s2", "(List-Set Int)").unwrap() ;
     /// solver.declare_const("a", "I").unwrap() ;
     /// solver.declare_const("l", "IList").unwrap() ;
