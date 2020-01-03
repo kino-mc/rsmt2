@@ -1,7 +1,6 @@
 //! SMT Lib 2 result parsers.
 //!
-//! Depending on the commands you plan to use, your parser will need to
-//! implement
+//! Depending on the commands you plan to use, your parser will need to implement
 //!
 //! |                                         | for                |
 //! |:---------------------------------------:|:------------------:|
@@ -15,13 +14,71 @@
 //!
 //! - `& [u8]`, *e.g.* for [`nom`][nom],
 //! - `& str`, *e.g.* for [`regex`][regex],
-//! - [`& mut SmtParser`][parser], `rmst2`'s internal parser which
-//!   provides simple helpers to parse s-expressions.
+//! - [`& mut SmtParser`][parser], `rmst2`'s internal parser which provides simple helpers to parse
+//!   s-expressions.
 //!
-//! The first two are safe in that your parsers will be called on the tokens
-//! they are supposed to parse and nothing else.
+//! The first two are safe in that your parsers will be called on the tokens they are supposed to
+//! parse and nothing else.
 //!
+//!
+//! ## Parsing: `&str` (and `&[u8]`)
+//!
+//!
+//! Here is a first example where we defined a value parser that only recognizes booleans, to
+//! showcase [`ValueParser`](trait.ValueParser.html) and
+//! [`Solver::get_values`](../struct.Solver.html#method.get_values). `Expr`essions are represented
+//! as strings, and `Val`ues are booleans.
+//!
+//! ```rust
+//! # extern crate rsmt2;
+//! use rsmt2::{SmtConf, SmtRes, Solver, parse::ValueParser, parse::ExprParser};
+//!
+//! pub type Expr = String;
+//! pub type Val = bool;
+//!
+//! #[derive(Clone, Copy)]
+//! pub struct Parser;
+//! // Value parser implementation for `&'a str` input.
+//! impl<'a> ValueParser<Val, &'a str> for Parser {
+//!     fn parse_value(self, input: &'a str) -> SmtRes<Val> {
+//!         // When parsing `&str` or `&[u8]`, the input is the actual value.
+//!         match input {
+//!             "true" => Ok(true),
+//!             "false" => Ok(false),
+//!             s => Err(format!("unsupported value `{}`", s).into()),
+//!         }
+//!     }
+//! }
+//! impl<'a> ExprParser<Expr, (), &'a str> for Parser {
+//!     fn parse_expr(self, input: &'a str, _: ()) -> SmtRes<Expr> {
+//!         // When parsing `&str` or `&[u8]`, the input is the actual expression. Here we're not
+//!         // constructing some complex expression, we just want to turn the `&str` into a
+//!         // `String`.
+//!         Ok(input.into())
+//!     }
+//! }
+//!
+//! let mut solver = SmtConf::z3().spawn(Parser).unwrap();
+//! solver.declare_const("a", "Bool").unwrap();
+//! solver.declare_const("b", "Bool").unwrap();
+//! solver.assert("(and a (not b))").unwrap();
+//! let is_sat = solver.check_sat().unwrap();
+//! assert!(is_sat);
+//! let values = solver.get_values(&["a", "b", "(and a (not b))"]).unwrap();
+//! assert_eq!(
+//!     &format!("{:?}", values),
+//!     r#"[("a", true), ("b", false), ("(and a (not b))", true)]"#
+//! );
+//! let mut values = values.into_iter();
+//! assert_eq!( values.next(), Some(("a".to_string(), true)) );
+//! assert_eq!( values.next(), Some(("b".to_string(), false)) );
+//! assert_eq!( values.next(), Some(("(and a (not b))".to_string(), true)) );
 //! ```
+//!
+//! Here is a second example where we implement `ModelParser`. This requires to parse identifiers,
+//! types and values.
+//!
+//! ```rust
 //! # extern crate rsmt2 ;
 //! # use rsmt2::parse::SmtParser ;
 //! # fn main() {
@@ -57,9 +114,12 @@
 //! # }
 //! ```
 //!
-//! But a parser taking `SmtParser` as input is "unsafe" in the sense that it
-//! has access to the whole input. Note that `SmtParser` provides helper
-//! parsing functions such as [`try_int`][try_int] and [`try_sym`][try_sym].
+//!
+//! ## Parsing: `SmtParser`
+//!
+//! But a parser taking `SmtParser` as input is "unsafe" in the sense that it has access to the
+//! whole input. Note that `SmtParser` provides helper parsing functions such as
+//! [`try_int`][try_int] and [`try_sym`][try_sym].
 //!
 //! ```
 //! # extern crate rsmt2 ;
