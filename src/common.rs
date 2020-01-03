@@ -176,32 +176,3 @@ impl Logic {
         Ok(())
     }
 }
-
-#[test]
-fn logic() {
-    use crate::conf::SmtConf;
-    use crate::Solver;
-
-    let conf = SmtConf::z3();
-
-    let mut solver = Solver::new(conf, ()).expect("solver");
-
-    solver.set_logic(Logic::QF_UF).expect("QF_UF");
-    solver.reset().expect("reset");
-    solver.set_logic(Logic::QF_LIA).expect("QF_LIA");
-    solver.reset().expect("reset");
-    solver.set_logic(Logic::QF_NIA).expect("QF_NIA");
-    solver.reset().expect("reset");
-    solver.set_logic(Logic::QF_LRA).expect("QF_LRA");
-    solver.reset().expect("reset");
-    solver.set_logic(Logic::QF_AUFLIA).expect("QF_AUFLIA");
-    solver.reset().expect("reset");
-    solver.set_logic(Logic::AUFLIA).expect("AUFLIA");
-    solver.reset().expect("reset");
-    solver.set_logic(Logic::AUFLIRA).expect("AUFLIRA");
-    solver.reset().expect("reset");
-    solver.set_logic(Logic::AUFNIRA).expect("AUFNIRA");
-    solver.reset().expect("reset");
-    solver.set_logic(Logic::LRA).expect("LRA");
-    solver.reset().expect("reset");
-}

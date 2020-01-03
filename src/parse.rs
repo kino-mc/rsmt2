@@ -246,8 +246,8 @@ impl<R: BufRead> SmtParser<R> {
 
     /// Returns the next s-expression and positions the cursor directly after it.
     ///
-    /// An s-expression is an ident, a constant with no parens (`42`, `false`,
-    /// *etc.*), or something between (nested) parens.
+    /// An s-expression is an ident, a constant with no parens (`42`, `false`, *etc.*), or something
+    /// between (nested) parens.
     ///
     /// ```
     /// # extern crate rsmt2 ;
@@ -287,8 +287,7 @@ impl<R: BufRead> SmtParser<R> {
 
     /// Loads lines until a full s-expr is loaded.
     ///
-    /// Returns the next position of the end of the sexpr. The cursor will be
-    /// set at its beginning.
+    /// Returns the next position of the end of the sexpr. The cursor will be set at its beginning.
     fn load_sexpr(&mut self) -> SmtRes<usize> {
         self.spc_cmt();
 
@@ -397,8 +396,7 @@ impl<R: BufRead> SmtParser<R> {
 
     /// Parses some spaces or some comments.
     ///
-    /// Parsing a tag or loading an s-expression fetches new lines, this does
-    /// not.
+    /// Parsing a tag or loading an s-expression fetches new lines, this does not.
     ///
     /// ```
     /// # extern crate rsmt2 ;
@@ -449,12 +447,11 @@ impl<R: BufRead> SmtParser<R> {
         }
     }
 
-    /// Tries to parse a tag, `true` if successful. Parse whitespaces and
-    /// comments if any before the token.
+    /// Tries to parse a tag, `true` if successful. Parse whitespaces and comments if any before the
+    /// token.
     ///
-    /// If this function returns `false`, then the cursor is at the first
-    /// non-whitespace non-commented character after the original cursor
-    /// position.
+    /// If this function returns `false`, then the cursor is at the first non-whitespace
+    /// non-commented character after the original cursor position.
     ///
     /// ```
     /// # extern crate rsmt2 ;
@@ -503,8 +500,7 @@ impl<R: BufRead> SmtParser<R> {
     }
     /// Parses a tag or fails.
     ///
-    /// Returns `()` exactly when [`try_tag`][try tag] returns `true`, and an
-    /// error otherwise.
+    /// Returns `()` exactly when [`try_tag`][try tag] returns `true`, and an error otherwise.
     ///
     /// [try tag]: struct.SmtParser.html#method.try_tag (try_tag function)
     pub fn tag(&mut self, tag: &str) -> SmtRes<()> {
@@ -516,8 +512,7 @@ impl<R: BufRead> SmtParser<R> {
     }
     /// Parses a tag or fails, appends `err_msg` at the end of the error message.
     ///
-    /// Returns `()` exactly when [`try_tag`][try tag] returns `true`, and an
-    /// error otherwise.
+    /// Returns `()` exactly when [`try_tag`][try tag] returns `true`, and an error otherwise.
     ///
     /// [try tag]: struct.SmtParser.html#method.try_tag (try_tag function)
     pub fn tag_info(&mut self, tag: &str, err_msg: &str) -> SmtRes<()> {
@@ -539,9 +534,8 @@ impl<R: BufRead> SmtParser<R> {
 
     /// Parses a tag followed by a whitespace, a paren or a comment.
     ///
-    /// If this function returns `false`, then the cursor is at the first
-    /// non-whitespace non-commented character after the original cursor
-    /// position.
+    /// If this function returns `false`, then the cursor is at the first non-whitespace
+    /// non-commented character after the original cursor position.
     ///
     /// ```
     /// # extern crate rsmt2 ;
@@ -589,12 +583,10 @@ impl<R: BufRead> SmtParser<R> {
         Ok(false)
     }
 
-    /// Tries to parse a sequence of things potentially separated by whitespaces
-    /// and/or comments.
+    /// Tries to parse a sequence of things potentially separated by whitespaces and/or comments.
     ///
-    /// If this function returns `false`, then the cursor is at the first
-    /// non-whitespace non-commented character after the original cursor
-    /// position.
+    /// If this function returns `false`, then the cursor is at the first non-whitespace
+    /// non-commented character after the original cursor position.
     ///
     /// ```
     /// # extern crate rsmt2 ;
@@ -634,11 +626,9 @@ impl<R: BufRead> SmtParser<R> {
         Ok(true)
     }
 
-    /// Parses a sequence of things potentially separated by whitespaces and/or
-    /// comments.
+    /// Parses a sequence of things potentially separated by whitespaces and/or comments.
     ///
-    /// Returns `()` exactly when [`try_tags`][try tags] returns `true`, and an
-    /// error otherwise.
+    /// Returns `()` exactly when [`try_tags`][try tags] returns `true`, and an error otherwise.
     ///
     /// [try tags]: struct.SmtParser.html#method.try_tag (try_tag function)
     pub fn tags<'a, Tags, S>(&mut self, tags: &'a Tags) -> SmtRes<()>
@@ -742,8 +732,9 @@ impl<R: BufRead> SmtParser<R> {
         }
     }
 
-    /// Tries to parse an unsigned integer. Does **not** load, backtrack, or
-    /// mark. Returns start and end positions.
+    /// Tries to parse an unsigned integer. Does **not** load, backtrack, or mark.
+    ///
+    /// Returns start and end positions.
     #[inline]
     fn try_uint_indices(&self) -> SmtRes<Option<(usize, usize)>> {
         let mut end = self.cursor;
@@ -770,8 +761,10 @@ impl<R: BufRead> SmtParser<R> {
         }
     }
 
-    /// Tries to parse an unsigned integer. Does **not** load, backtrack, or
-    /// mark, but moves the cursor to the end of the integer if any.
+    /// Tries to parse an unsigned integer.
+    ///
+    /// Does **not** load, backtrack, or mark, but moves the cursor to the end of the integer if
+    /// any.
     #[inline]
     fn try_uint(&mut self) -> SmtRes<Option<&str>> {
         self.spc_cmt();
@@ -802,9 +795,9 @@ impl<R: BufRead> SmtParser<R> {
     /// - the absolute value of the integer parsed,
     /// - positiveness flag: `true` iff the integer is positive.
     ///
-    /// **NB**: input function `f` cannot return the input string in any way.
-    /// Doing so will not borrow-check and is completely unsafe as the parser can
-    /// and in general will discard what's in its buffer once it's parsed.
+    /// **NB**: input function `f` cannot return the input string in any way. Doing so will not
+    /// borrow-check and is completely unsafe as the parser can and in general will discard what's
+    /// in its buffer once it's parsed.
     ///
     /// Only recognizes integers of the form
     ///
@@ -947,9 +940,9 @@ impl<R: BufRead> SmtParser<R> {
     /// usize ::= [0-9][0-9]*
     /// ```
     ///
-    /// **NB**: input function `f` cannot return the input strings in any way.
-    /// Doing so will not borrow-check and is completely unsafe as the parser can
-    /// and in general will discard what's in its buffer once it's parsed.
+    /// **NB**: input function `f` cannot return the input strings in any way. Doing so will not
+    /// borrow-check and is completely unsafe as the parser can and in general will discard what's
+    /// in its buffer once it's parsed.
     ///
     /// ```
     /// # extern crate rsmt2 ;
@@ -1127,12 +1120,11 @@ impl<R: BufRead> SmtParser<R> {
 
     /// Tries to parse a symbol.
     ///
-    /// Quoted symbols (anything but `|` surrounded by `|`) are passed **with**
-    /// the surrounding `|`.
+    /// Quoted symbols (anything but `|` surrounded by `|`) are passed **with** the surrounding `|`.
     ///
-    /// **NB**: input function `f` cannot return the input string in any way.
-    /// Doing so will not borrow-check and is completely unsafe as the parser can
-    /// and in general will discard what's in its buffer once it's parsed.
+    /// **NB**: input function `f` cannot return the input string in any way. Doing so will not
+    /// borrow-check and is completely unsafe as the parser can and in general will discard what's
+    /// in its buffer once it's parsed.
     ///
     /// ```
     /// # extern crate rsmt2 ;
@@ -1442,6 +1434,23 @@ where
 ///
 /// [module-level documentation]: index.html
 pub trait ModelParser<Ident, Type, Value, Input>: Copy {
+    /// Parses a value in the context of a `get-model` command.
+    ///
+    /// When rsmt2 parses a value for some symbol `id` in a model, it will call this function so
+    /// that it knows what to construct the value with. Remember that in a model, values are usually
+    /// presented as
+    ///
+    /// ```lisp
+    /// (define-fun <symbol> ( (<arg> <arg_sort>) ... ) <out_sort> <value>)
+    /// ```
+    ///
+    /// This function's purpose is to parse `<value>` and construct an actual `Value`, given all the
+    /// information preceeding the `<value>` token. So, parameter
+    ///
+    /// - `i` is the "Text input", the actual value token tree (`<value>`);
+    /// - `id` is the symbol (`symbol`) we're parsing the value of;
+    /// - `args` is `id`'s "input signature" (`(<arg> <arg_sort>) ...`);
+    /// - `out` is `id`'s output sort (`<out_sort>`).
     fn parse_value(self, i: Input, id: &Ident, args: &[(Ident, Type)], out: &Type)
         -> SmtRes<Value>;
 }
@@ -1481,6 +1490,7 @@ where
 ///
 /// [module-level documentation]: index.html
 pub trait ValueParser<Value, Input>: Copy {
+    /// Parses a plain value.
     fn parse_value(self, i: Input) -> SmtRes<Value>;
 }
 impl<'a, Value, T> ValueParser<Value, &'a str> for T

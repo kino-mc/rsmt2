@@ -1,3 +1,9 @@
+# v0.10.2
+
+- some (slight) documentation documentation improvements
+- fixed some problems in code/doc formatting (internal)
+- slightly improved CVC4 support
+
 # v0.10.0
 
 - switched to edition 2018

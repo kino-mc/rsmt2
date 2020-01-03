@@ -1,7 +1,7 @@
 //! A more involved example.
 //!
-//! This example showcases print-time user-specified information but lacks a
-//! proper discussion, because no one has asked for it yet.
+//! This example showcases print-time user-specified information but lacks a proper discussion,
+//! because no one has asked for it yet.
 
 // Parser library.
 use std::io::Write;

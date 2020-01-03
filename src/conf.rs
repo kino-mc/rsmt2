@@ -1,8 +1,7 @@
 //! Solver configuration, contains backend-solver-specific info.
 //!
-//! Do **NOT** use wildcards when matching over `SmtStyle`. We want the code to
-//! fail to compile whenever we add a solver. Likewise, do not use `if let`
-//! with `SmtStyle`.
+//! Do **NOT** use wildcards when matching over `SmtStyle`. We want the code to fail to compile
+//! whenever we add a solver. Likewise, do not use `if let` with `SmtStyle`.
 
 use std::fmt;
 
@@ -137,7 +136,7 @@ impl SmtConf {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```rust
     /// # use rsmt2::SmtConf ;
     /// let conf = SmtConf::z3() ;
     /// assert! {
@@ -153,7 +152,7 @@ impl SmtConf {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```rust
     /// # use rsmt2::SmtConf ;
     /// let conf = SmtConf::cvc4() ;
     /// assert! {
@@ -169,7 +168,7 @@ impl SmtConf {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```rust
     /// # use rsmt2::SmtConf ;
     /// let _solver = SmtConf::z3().spawn(()).unwrap() ;
     /// ```
@@ -182,7 +181,7 @@ impl SmtConf {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```rust
     /// # use rsmt2::SmtConf ;
     /// assert_eq! { SmtConf::z3().desc(), "z3" }
     /// ```
@@ -194,7 +193,7 @@ impl SmtConf {
         }
     }
 
-    /// Model production.
+    /// Model production flag.
     pub fn get_models(&self) -> bool {
         self.models
     }
@@ -232,7 +231,7 @@ impl SmtConf {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```rust
     /// # use rsmt2::SmtConf ;
     /// let conf = SmtConf::z3() ;
     /// assert! {
@@ -248,7 +247,7 @@ impl SmtConf {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```rust
     /// # use rsmt2::SmtConf ;
     /// assert_eq! {
     ///     SmtConf::z3().get_options(), & [ "-in", "-smt2" ]
@@ -263,7 +262,7 @@ impl SmtConf {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```rust
     /// # use rsmt2::SmtConf ;
     /// assert! { ! SmtConf::z3().get_print_success() }
     /// ```
@@ -276,7 +275,7 @@ impl SmtConf {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```rust
     /// # use rsmt2::SmtConf ;
     /// assert! { ! SmtConf::z3().get_unsat_cores() }
     /// ```
@@ -289,7 +288,7 @@ impl SmtConf {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```rust
     /// # use rsmt2::SmtConf ;
     /// assert_eq! {
     ///     SmtConf::z3().get_check_sat_assuming(), Some("check-sat")
@@ -304,7 +303,7 @@ impl SmtConf {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```rust
     /// # use rsmt2::SmtConf ;
     /// let mut conf = SmtConf::z3() ;
     /// conf.option("arith.euclidean_solver=true") ;
@@ -323,7 +322,7 @@ impl SmtConf {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```rust
     /// # use rsmt2::SmtConf ;
     /// let mut conf = SmtConf::z3() ;
     /// conf.cmd("my_custom_z3_command") ;
@@ -354,7 +353,7 @@ impl SmtConf {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```rust
     /// # use rsmt2::SmtConf ;
     /// let mut conf = SmtConf::z3() ;
     /// conf.print_success() ;
@@ -370,7 +369,7 @@ impl SmtConf {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```rust
     /// # use rsmt2::SmtConf ;
     /// let mut conf = SmtConf::z3() ;
     /// conf.unsat_cores() ;
@@ -379,5 +378,19 @@ impl SmtConf {
     #[inline]
     pub fn unsat_cores(&mut self) {
         self.unsat_cores = true
+    }
+}
+
+/// ## Solver-specific error-handling
+impl SmtConf {
+    /// Adds information to a `get-value` error message if needed.
+    pub fn enrich_get_values_error(&self, e: crate::errors::Error) -> crate::errors::Error {
+        match self.style {
+            SmtStyle::Z3 => e,
+            SmtStyle::CVC4 => e.chain_err(|| {
+                "some versions of CVC4 produce errors on `get-value` commands, \
+                 consider using `get-model` instead"
+            }),
+        }
     }
 }
