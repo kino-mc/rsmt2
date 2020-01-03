@@ -33,7 +33,7 @@ pub trait Sort2Smt {
 
 /// Writes a string.
 #[inline(always)]
-pub fn write_str(w: &mut io::Write, s: &str) -> SmtRes<()> {
+pub fn write_str<W: io::Write>(w: &mut W, s: &str) -> SmtRes<()> {
     w.write_all(s.as_bytes())?;
     Ok(())
 }
@@ -71,42 +71,6 @@ where
         Writer: io::Write,
     {
         (*self).sort_to_smt2(writer)
-    }
-}
-
-impl<T, Info> Sym2Smt<Info> for AsRef<T>
-where
-    T: Sym2Smt<Info>,
-{
-    fn sym_to_smt2<Writer>(&self, writer: &mut Writer, info: Info) -> SmtRes<()>
-    where
-        Writer: io::Write,
-    {
-        self.as_ref().sym_to_smt2(writer, info)
-    }
-}
-
-impl<T, Info> Expr2Smt<Info> for AsRef<T>
-where
-    T: Expr2Smt<Info> + ?Sized,
-{
-    fn expr_to_smt2<Writer>(&self, writer: &mut Writer, info: Info) -> SmtRes<()>
-    where
-        Writer: io::Write,
-    {
-        self.as_ref().expr_to_smt2(writer, info)
-    }
-}
-
-impl<T> Sort2Smt for AsRef<T>
-where
-    T: Sort2Smt + ?Sized,
-{
-    fn sort_to_smt2<Writer>(&self, writer: &mut Writer) -> SmtRes<()>
-    where
-        Writer: io::Write,
-    {
-        self.as_ref().sort_to_smt2(writer)
     }
 }
 
@@ -207,7 +171,7 @@ impl fmt::Display for Logic {
 }
 impl Logic {
     /// Prints the logic in a writer in SMT Lib 2 format.
-    pub fn to_smt2(self, writer: &mut io::Write, _: ()) -> SmtRes<()> {
+    pub fn to_smt2<W: io::Write>(self, writer: &mut W, _: ()) -> SmtRes<()> {
         write!(writer, "{}", self)?;
         Ok(())
     }

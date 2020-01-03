@@ -141,7 +141,7 @@ impl SmtConf {
     /// # use rsmt2::SmtConf ;
     /// let conf = SmtConf::z3() ;
     /// assert! {
-    ///   conf.get_cmd() == "z3" || conf.get_cmd() == "z3.exe"
+    ///     conf.get_cmd() == "z3" || conf.get_cmd() == "z3.exe"
     /// }
     /// ```
     #[inline]
@@ -157,7 +157,7 @@ impl SmtConf {
     /// # use rsmt2::SmtConf ;
     /// let conf = SmtConf::cvc4() ;
     /// assert! {
-    ///   conf.get_cmd() == "cvc4" || conf.get_cmd() == "cvc4.exe"
+    ///     conf.get_cmd() == "cvc4" || conf.get_cmd() == "cvc4.exe"
     /// }
     /// ```
     #[inline]
@@ -236,7 +236,7 @@ impl SmtConf {
     /// # use rsmt2::SmtConf ;
     /// let conf = SmtConf::z3() ;
     /// assert! {
-    ///   conf.get_cmd() == "z3" || conf.get_cmd() == "z3.exe"
+    ///     conf.get_cmd() == "z3" || conf.get_cmd() == "z3.exe"
     /// }
     /// ```
     #[inline]
@@ -251,7 +251,7 @@ impl SmtConf {
     /// ```
     /// # use rsmt2::SmtConf ;
     /// assert_eq! {
-    ///   SmtConf::z3().get_options(), & [ "-in", "-smt2" ]
+    ///     SmtConf::z3().get_options(), & [ "-in", "-smt2" ]
     /// }
     /// ```
     #[inline]
@@ -292,7 +292,7 @@ impl SmtConf {
     /// ```
     /// # use rsmt2::SmtConf ;
     /// assert_eq! {
-    ///   SmtConf::z3().get_check_sat_assuming(), Some("check-sat")
+    ///     SmtConf::z3().get_check_sat_assuming(), Some("check-sat")
     /// }
     /// ```
     #[inline]
@@ -309,8 +309,8 @@ impl SmtConf {
     /// let mut conf = SmtConf::z3() ;
     /// conf.option("arith.euclidean_solver=true") ;
     /// assert_eq! {
-    ///   conf.get_options(),
-    ///   & [ "-in", "-smt2", "arith.euclidean_solver=true" ]
+    ///     conf.get_options(),
+    ///     & [ "-in", "-smt2", "arith.euclidean_solver=true" ]
     /// }
     /// ```
     #[inline]

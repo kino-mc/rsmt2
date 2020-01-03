@@ -36,48 +36,48 @@
 //!
 //! /// An example of expression.
 //! pub enum Expr {
-//!   /// A constant.
-//!   C(Cst),
-//!   /// Variable.
-//!   V(String),
-//!   /// Operator application.
-//!   O( Op, Vec<Expr> ),
+//!     /// A constant.
+//!     C(Cst),
+//!     /// Variable.
+//!     V(String),
+//!     /// Operator application.
+//!     O( Op, Vec<Expr> ),
 //! }
 //! impl Expr {
-//!   pub fn cst<C: Into<Cst>>(c: C) -> Self {
-//!     Expr::C( c.into() )
-//!   }
+//!     pub fn cst<C: Into<Cst>>(c: C) -> Self {
+//!         Expr::C( c.into() )
+//!     }
 //! }
 //! impl Expr2Smt<()> for Expr {
-//!   fn expr_to_smt2<Writer>(
-//!     & self, w: & mut Writer, _: ()
-//!   ) -> SmtRes<()>
-//!   where Writer: ::std::io::Write {
-//!     let mut stack = vec![ (false, vec![self], false) ] ;
-//!     while let Some((space, mut to_write, closing_paren)) = stack.pop() {
-//!       if let Some(next) = to_write.pop() {
-//!         if space {
-//!           write!(w, " ") ?
+//!     fn expr_to_smt2<Writer>(
+//!         & self, w: & mut Writer, _: ()
+//!     ) -> SmtRes<()>
+//!     where Writer: ::std::io::Write {
+//!         let mut stack = vec![ (false, vec![self], false) ] ;
+//!         while let Some((space, mut to_write, closing_paren)) = stack.pop() {
+//!             if let Some(next) = to_write.pop() {
+//!                 if space {
+//!                     write!(w, " ") ?
+//!                 }
+//!                 // We have something to print, push the rest back.
+//!                 stack.push((space, to_write, closing_paren)) ;
+//!                 match * next {
+//!                     Expr::C(cst) => write!(w, "{}", cst) ?,
+//!                     Expr::V(ref var) => write!(w, "{}", var) ?,
+//!                     Expr::O(op, ref sub_terms) => {
+//!                         write!(w, "({}", op) ? ;
+//!                         stack.push((true, sub_terms.iter().rev().collect(), true))
+//!                     },
+//!                 }
+//!             } else {
+//!                 // No more things to write at this level.
+//!                 if closing_paren {
+//!                     write!(w, ")") ?
+//!                 }
+//!             }
 //!         }
-//!         // We have something to print, push the rest back.
-//!         stack.push((space, to_write, closing_paren)) ;
-//!         match * next {
-//!           Expr::C(cst) => write!(w, "{}", cst) ?,
-//!           Expr::V(ref var) => write!(w, "{}", var) ?,
-//!           Expr::O(op, ref sub_terms) => {
-//!             write!(w, "({}", op) ? ;
-//!             stack.push((true, sub_terms.iter().rev().collect(), true))
-//!           },
-//!         }
-//!       } else {
-//!         // No more things to write at this level.
-//!         if closing_paren {
-//!           write!(w, ")") ?
-//!         }
-//!       }
+//!         Ok(())
 //!     }
-//!     Ok(())
-//!   }
 //! }
 //!
 //! # fn main() {}
@@ -97,36 +97,36 @@
 //! # fn main() {
 //!
 //! let mut solver = Solver::default(()).expect(
-//!   "could not spawn solver kid"
+//!     "could not spawn solver kid"
 //! ) ;
 //!
 //! let v_1 = "v_1".to_string() ;
 //! let v_2 = "v_2".to_string() ;
 //!
 //! solver.declare_const( & v_1, & "Bool" ).expect(
-//!   "while declaring v_1"
+//!     "while declaring v_1"
 //! ) ;
 //! solver.declare_const( & v_2, & "Int" ).expect(
-//!   "while declaring v_2"
+//!     "while declaring v_2"
 //! ) ;
 //!
 //! let expr = Expr::O(
-//!   Op::Disj, vec![
-//!     Expr::O(
-//!       Op::Ge, vec![ Expr::cst(-7), Expr::V( v_2.clone() ) ]
-//!     ),
-//!     Expr::V( v_1.clone() )
-//!   ]
+//!     Op::Disj, vec![
+//!         Expr::O(
+//!             Op::Ge, vec![ Expr::cst(-7), Expr::V( v_2.clone() ) ]
+//!         ),
+//!         Expr::V( v_1.clone() )
+//!     ]
 //! ) ;
 //!
 //! solver.assert( & expr ).expect(
-//!   "while asserting an expression"
+//!     "while asserting an expression"
 //! ) ;
 //!
 //! if solver.check_sat().expect("during check sat") {
-//!   ()
+//!     ()
 //! } else {
-//!   panic!("expected sat, got unsat")
+//!     panic!("expected sat, got unsat")
 //! }
 //!
 //! solver.kill().unwrap()
@@ -159,46 +159,46 @@
 //! #[derive(Clone, Copy)]
 //! pub struct Parser ;
 //! impl<'a> IdentParser<String, String, & 'a str> for Parser {
-//!   fn parse_ident(self, input: & 'a str) -> SmtRes<String> {
-//!     Ok( input.to_string() )
-//!   }
-//!   fn parse_type(self, input: & 'a str) -> SmtRes<String> {
-//!     match input {
-//!       "Int" => Ok( "Int".into() ),
-//!       "Bool" => Ok( "Bool".into() ),
-//!       sort => bail!("unexpected sort `{}`", sort),
+//!     fn parse_ident(self, input: & 'a str) -> SmtRes<String> {
+//!         Ok( input.to_string() )
 //!     }
-//!   }
+//!     fn parse_type(self, input: & 'a str) -> SmtRes<String> {
+//!         match input {
+//!             "Int" => Ok( "Int".into() ),
+//!             "Bool" => Ok( "Bool".into() ),
+//!             sort => bail!("unexpected sort `{}`", sort),
+//!         }
+//!     }
 //! }
 //! impl<'a> ModelParser<String, String, Cst, & 'a str> for Parser {
-//!   fn parse_value(
-//!     self, input: & 'a str,
-//!     _ident: & String, _signature: & [ (String, String) ], _type: & String,
-//!   ) -> SmtRes<Cst> {
-//!     match input.trim() {
-//!       "true" => Ok( Cst::B(true) ),
-//!       "false" => Ok( Cst::B(false) ),
-//!       int => {
-//!         use std::str::FromStr ;
-//!         let s = int.trim() ;
-//!         if let Ok(res) = isize::from_str(s) {
-//!           return Ok( Cst::I(res) )
-//!         } else if s.len() >= 4 {
-//!           if & s[0 .. 1] == "("
-//!           && & s[s.len() - 1 ..] == ")" {
-//!             let s = & s[1 .. s.len() - 1].trim() ;
-//!             if & s[0 .. 1] == "-" {
-//!               let s = & s[1..].trim() ;
-//!               if let Ok(res) = isize::from_str(s) {
-//!                 return Ok( Cst::I(- res) )
-//!               }
-//!             }
-//!           }
+//!     fn parse_value(
+//!         self, input: & 'a str,
+//!         _ident: & String, _signature: & [ (String, String) ], _type: & String,
+//!     ) -> SmtRes<Cst> {
+//!         match input.trim() {
+//!             "true" => Ok( Cst::B(true) ),
+//!             "false" => Ok( Cst::B(false) ),
+//!             int => {
+//!                 use std::str::FromStr ;
+//!                 let s = int.trim() ;
+//!                 if let Ok(res) = isize::from_str(s) {
+//!                     return Ok( Cst::I(res) )
+//!                 } else if s.len() >= 4 {
+//!                     if & s[0 .. 1] == "("
+//!                     && & s[s.len() - 1 ..] == ")" {
+//!                         let s = & s[1 .. s.len() - 1].trim() ;
+//!                         if & s[0 .. 1] == "-" {
+//!                             let s = & s[1..].trim() ;
+//!                             if let Ok(res) = isize::from_str(s) {
+//!                                 return Ok( Cst::I(- res) )
+//!                             }
+//!                         }
+//!                     }
+//!                 }
+//!                 bail!("unexpected value `{}`", int)
+//!             },
 //!         }
-//!         bail!("unexpected value `{}`", int)
-//!       },
 //!     }
-//!   }
 //! }
 //! # fn main() {}
 //! ```
@@ -216,27 +216,27 @@
 //! #[derive(Clone, Copy)]
 //! struct Parser ;
 //! impl<'a, Br> ModelParser<
-//!   String, String, Cst, & 'a mut SmtParser<Br>
+//!     String, String, Cst, & 'a mut SmtParser<Br>
 //! > for Parser
 //! where Br: ::std::io::BufRead {
-//!   fn parse_value(
-//!     self, input: & 'a mut SmtParser<Br>,
-//!     _ident: & String, _signature: & [ (String, String) ], _type: & String
-//!   ) -> SmtRes<Cst> {
-//!     use std::str::FromStr ;
-//!     if let Some(b) = input.try_bool() ? {
-//!       Ok( Cst::B(b) )
-//!     } else if let Some(int) = input.try_int(
-//!       |int, pos| match isize::from_str(int) {
-//!         Ok(int) => if pos { Ok(int) } else { Ok(- int) },
-//!         Err(e) => Err(e),
-//!       }
-//!     ) ? {
-//!       Ok( Cst::I(int) )
-//!     } else {
-//!       input.fail_with("unexpected value")
+//!     fn parse_value(
+//!         self, input: & 'a mut SmtParser<Br>,
+//!         _ident: & String, _signature: & [ (String, String) ], _type: & String
+//!     ) -> SmtRes<Cst> {
+//!         use std::str::FromStr ;
+//!         if let Some(b) = input.try_bool() ? {
+//!             Ok( Cst::B(b) )
+//!         } else if let Some(int) = input.try_int(
+//!             |int, pos| match isize::from_str(int) {
+//!                 Ok(int) => if pos { Ok(int) } else { Ok(- int) },
+//!                 Err(e) => Err(e),
+//!             }
+//!         ) ? {
+//!             Ok( Cst::I(int) )
+//!         } else {
+//!             input.fail_with("unexpected value")
+//!         }
 //!     }
-//!   }
 //! }
 //! ```
 //!
@@ -250,73 +250,73 @@
 //!
 //! use rsmt2::{ SmtRes, Solver } ;
 //! use rsmt2::example::simple::{
-//!   Cst, Op, Expr, Parser
+//!     Cst, Op, Expr, Parser
 //! } ;
 //!
 //! # fn main() {
 //!
 //! let mut solver = Solver::default(Parser).expect(
-//!   "could not spawn solver kid"
+//!     "could not spawn solver kid"
 //! ) ;
 //!
 //! let v_1 = "v_1".to_string() ;
 //! let v_2 = "v_2".to_string() ;
 //!
 //! solver.declare_const( & v_1, & "Bool" ).expect(
-//!   "while declaring v_1"
+//!     "while declaring v_1"
 //! ) ;
 //! solver.declare_const( & v_2, & "Int" ).expect(
-//!   "while declaring v_2"
+//!     "while declaring v_2"
 //! ) ;
 //!
 //! let expr = Expr::O(
-//!   Op::Disj, vec![
-//!     Expr::O(
-//!       Op::Ge, vec![ Expr::cst(-7), Expr::V( v_2.clone() ) ]
-//!     ),
-//!     Expr::V( v_1.clone() )
-//!   ]
+//!     Op::Disj, vec![
+//!         Expr::O(
+//!             Op::Ge, vec![ Expr::cst(-7), Expr::V( v_2.clone() ) ]
+//!         ),
+//!         Expr::V( v_1.clone() )
+//!     ]
 //! ) ;
 //!
 //! solver.assert( & expr ).expect(
-//!   "while asserting an expression"
+//!     "while asserting an expression"
 //! ) ;
 //!
 //! if solver.check_sat().expect("during check sat") {
 //!
-//!   let model = solver.get_model_const().expect(
-//!     "while getting model"
-//!   ) ;
+//!     let model = solver.get_model_const().expect(
+//!         "while getting model"
+//!     ) ;
 //!
-//!   let mut okay = false ;
-//!   for (ident, typ, value) in model {
-//!     if ident == v_1 {
-//!       assert_eq!( typ, "Bool" ) ;
-//!       match value {
-//!         Cst::B(true) => okay = true,
-//!         Cst::B(false) => (),
-//!         Cst::I(int) => panic!(
-//!           "value for v_1 is `{}`, expected boolean", int
-//!         ),
-//!       }
-//!     } else if ident == v_2 {
-//!       assert_eq!( typ, "Int" ) ;
-//!       match value {
-//!         Cst::I(i) if -7 >= i => okay = true,
-//!         Cst::I(_) => (),
-//!         Cst::B(b) => panic!(
-//!           "value for v_2 is `{}`, expected isize", b
-//!         ),
-//!       }
+//!     let mut okay = false ;
+//!     for (ident, typ, value) in model {
+//!         if ident == v_1 {
+//!             assert_eq!( typ, "Bool" ) ;
+//!             match value {
+//!                 Cst::B(true) => okay = true,
+//!                 Cst::B(false) => (),
+//!                 Cst::I(int) => panic!(
+//!                     "value for v_1 is `{}`, expected boolean", int
+//!                 ),
+//!             }
+//!         } else if ident == v_2 {
+//!             assert_eq!( typ, "Int" ) ;
+//!             match value {
+//!                 Cst::I(i) if -7 >= i => okay = true,
+//!                 Cst::I(_) => (),
+//!                 Cst::B(b) => panic!(
+//!                     "value for v_2 is `{}`, expected isize", b
+//!                 ),
+//!             }
+//!         }
 //!     }
-//!   }
 //!
-//!   if ! okay {
-//!     panic!("got sat, but model is spurious")
-//!   }
+//!     if ! okay {
+//!         panic!("got sat, but model is spurious")
+//!     }
 //!
 //! } else {
-//!   panic!("expected sat, got unsat")
+//!     panic!("expected sat, got unsat")
 //! }
 //!
 //! solver.kill().unwrap()

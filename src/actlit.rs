@@ -36,23 +36,23 @@
 //!
 //! solver.declare_const("actlit", "Bool").unwrap() ;
 //! solver.assert("\
-//!   (=> actlit \
-//!       (and (> x 0) (< x 3) (= (mod x 3) 0))\
-//!   )\
+//!     (=> actlit \
+//!         (and (> x 0) (< x 3) (= (mod x 3) 0))\
+//!     )\
 //! ").unwrap() ;
 //! assert!{
-//!   ! solver.check_sat_assuming( Some("actlit") ).unwrap()
+//!     ! solver.check_sat_assuming( Some("actlit") ).unwrap()
 //! }
 //! solver.assert("(not actlit)").unwrap() ;
 //!
 //! solver.declare_const("other_actlit", "Bool").unwrap() ;
 //! solver.assert("\
-//!   (=> other_actlit \
-//!       (and (> x 7) (= (mod x 2) 0))\
-//!   )\
+//!     (=> other_actlit \
+//!         (and (> x 7) (= (mod x 2) 0))\
+//!     )\
 //! ").unwrap() ;
 //! assert!{
-//!   solver.check_sat_assuming( Some("other_actlit") ).unwrap()
+//!     solver.check_sat_assuming( Some("other_actlit") ).unwrap()
 //! }
 //! solver.assert("(not other_actlit)").unwrap() ;
 //!
@@ -65,8 +65,8 @@
 //! use rsmt2::* ;
 //!
 //! let mut solver = match Solver::default(()) {
-//!   Ok(kid) => kid,
-//!   Err(e) => panic!("Could not spawn solver kid: {:?}", e)
+//!     Ok(kid) => kid,
+//!     Err(e) => panic!("Could not spawn solver kid: {:?}", e)
 //! } ;
 //!
 //! solver.declare_const("x", "Int").unwrap() ;
@@ -77,7 +77,7 @@
 //! solver.assert_act(& actlit, "(= (mod x 3) 0)").unwrap() ;
 //!
 //! assert!{
-//!   ! solver.check_sat_act( Some(& actlit) ).unwrap()
+//!     ! solver.check_sat_act( Some(& actlit) ).unwrap()
 //! }
 //! solver.de_actlit(actlit).unwrap() ;
 //! // At this point `actlit` has been consumed. So it's a bit safer than the
@@ -87,7 +87,7 @@
 //! solver.assert_act(& actlit, "(> x 7)").unwrap() ;
 //! solver.assert_act(& actlit, "(= (mod x 2) 0)").unwrap() ;
 //! assert!{
-//!   solver.check_sat_act( Some(& actlit) ).unwrap()
+//!     solver.check_sat_act( Some(& actlit) ).unwrap()
 //! }
 //! solver.de_actlit(actlit).unwrap() ;
 //!
@@ -108,27 +108,27 @@
 //!
 //! struct Parser ;
 //! impl<'a, 'b> IdentParser<String, String, & 'a str> for & 'b Parser {
-//!   fn parse_ident(self, s: & 'a str) -> SmtRes<String> {
-//!     Ok(s.to_string())
-//!   }
-//!   fn parse_type(self, s: & 'a str) -> SmtRes<String> {
-//!     Ok(s.to_string())
-//!   }
+//!     fn parse_ident(self, s: & 'a str) -> SmtRes<String> {
+//!         Ok(s.to_string())
+//!     }
+//!     fn parse_type(self, s: & 'a str) -> SmtRes<String> {
+//!         Ok(s.to_string())
+//!     }
 //! }
 //! impl<'a, 'b> ModelParser<
-//!   String, String, String, & 'a str
+//!     String, String, String, & 'a str
 //! > for & 'b Parser {
-//!   fn parse_value(
-//!     self, s: & 'a str,
-//!     _: & String, _: & [ (String, String) ], _: & String
-//!   ) -> SmtRes<String> {
-//!     Ok(s.to_string())
-//!   }
+//!     fn parse_value(
+//!         self, s: & 'a str,
+//!         _: & String, _: & [ (String, String) ], _: & String
+//!     ) -> SmtRes<String> {
+//!         Ok(s.to_string())
+//!     }
 //! }
 //!
 //! let mut solver = match Solver::default(& Parser) {
-//!   Ok(kid) => kid,
-//!   Err(e) => panic!("Could not spawn solver kid: {:?}", e)
+//!     Ok(kid) => kid,
+//!     Err(e) => panic!("Could not spawn solver kid: {:?}", e)
 //! } ;
 //!
 //! solver.declare_const("x", "Int").unwrap() ;
@@ -137,31 +137,31 @@
 //! let mut buf: Vec<u8> = vec![] ;
 //! actlit.write(& mut buf).unwrap() ;
 //! assert_eq!{
-//!   "|rsmt2 actlit 0|",
-//!   ::std::str::from_utf8(& buf).unwrap()
+//!     "|rsmt2 actlit 0|",
+//!     ::std::str::from_utf8(& buf).unwrap()
 //! }
 //!
 //! solver.assert_act(& actlit, "(> x 7)").unwrap() ;
 //! solver.assert_act(& actlit, "(= (mod x 2) 0)").unwrap() ;
 //! assert!{
-//!   solver.check_sat_act( Some(& actlit) ).unwrap()
+//!     solver.check_sat_act( Some(& actlit) ).unwrap()
 //! }
 //!
 //! let model = solver.get_model_const().unwrap() ;
 //! let mut model = model.into_iter() ;
 //! if let Some((x, int, n)) = model.next() {
-//!   assert_eq!{ x, "x" }
-//!   assert_eq!{ int, "Int" }
-//!   use std::str::FromStr ;
-//!   let n = i64::from_str(& n).unwrap() ;
-//!   println!("{}", n) ;
-//!   assert!{ n > 7 }
-//!   assert!{ n % 2 == 0 }
+//!     assert_eq!{ x, "x" }
+//!     assert_eq!{ int, "Int" }
+//!     use std::str::FromStr ;
+//!     let n = i64::from_str(& n).unwrap() ;
+//!     println!("{}", n) ;
+//!     assert!{ n > 7 }
+//!     assert!{ n % 2 == 0 }
 //! } else {
-//!   panic!("expected the model for `x`")
+//!     panic!("expected the model for `x`")
 //! }
 //! assert_eq!{
-//!   model.next(), None
+//!     model.next(), None
 //! }
 //!
 //! solver.de_actlit(actlit).unwrap() ;
@@ -187,18 +187,18 @@
 //! (declare-fun x () Int)
 //!
 //! (push 1)
-//!   (assert (> x 0))
-//!   (assert (< x 3))
-//!   (assert (= (mod x 3) 0))
-//!   (check-sat)
-//!   ; unsat
+//!     (assert (> x 0))
+//!     (assert (< x 3))
+//!     (assert (= (mod x 3) 0))
+//!     (check-sat)
+//!     ; unsat
 //! (pop 1)
 //!
 //! (push 1)
-//!   (assert (> x 7))
-//!   (assert (= (mod x 2) 0))
-//!   (check-sat)
-//!   (get-value (x))
+//!     (assert (> x 7))
+//!     (assert (= (mod x 2) 0))
+//!     (check-sat)
+//!     (get-value (x))
 //! (pop 1)
 //! ```
 //!

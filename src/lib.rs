@@ -38,18 +38,18 @@
 //!
 //! ```rust
 //! fn do_smt_stuff() -> ::rsmt2::SmtRes<()> {
-//!   let parser = () ;
-//!   use rsmt2::SmtConf ;
+//!     let parser = () ;
+//!     use rsmt2::SmtConf ;
 //!
-//!   let solver = SmtConf::z3().spawn(parser) ? ;
+//!     let solver = SmtConf::z3().spawn(parser) ? ;
 //!
-//!   // Alternatively
-//!   use rsmt2::Solver ;
-//!   let _solver = Solver::new(SmtConf::z3(), parser) ? ;
+//!     // Alternatively
+//!     use rsmt2::Solver ;
+//!     let _solver = Solver::new(SmtConf::z3(), parser) ? ;
 //!
-//!   // Another alternative, using the default configuration
-//!   let _solver = Solver::default(parser) ? ;
-//!   Ok(())
+//!     // Another alternative, using the default configuration
+//!     let _solver = Solver::default(parser) ? ;
+//!     Ok(())
 //! }
 //! do_smt_stuff().unwrap()
 //! ```
@@ -108,32 +108,32 @@
 //!
 //!   //       Types ~~~~~~~~~~~~vvvvvv
 //! impl<'a> IdentParser<String, String, & 'a str> for Parser {
-//!   // Idents ~~~~~~~~~^^^^^^          ^^^^^^^^~~~~ Input
-//!   fn parse_ident(self, input: & 'a str) -> SmtRes<String> {
-//!     Ok(input.into())
-//!   }
-//!   fn parse_type(self, input: & 'a str) -> SmtRes<String> {
-//!     Ok(input.into())
-//!   }
+//!     // Idents ~~~~~~~~~^^^^^^          ^^^^^^^^~~~~ Input
+//!     fn parse_ident(self, input: & 'a str) -> SmtRes<String> {
+//!         Ok(input.into())
+//!     }
+//!     fn parse_type(self, input: & 'a str) -> SmtRes<String> {
+//!         Ok(input.into())
+//!     }
 //! }
 //!
 //!   // Types ~~~~~~~~~~~~~~~~~~vvvvvv  vvvvvv~~~~~~~~~~~~~~ Values
 //! impl<'a> ModelParser<String, String, String, & 'a str> for Parser {
-//!   // Idents ~~~~~~~~~^^^^^^                  ^^^^^^^^~~~~ Input
-//!   fn parse_value(
-//!     self, input: & 'a str,
-//!     ident: & String, params: & [ (String, String) ], typ: & String,
-//!   ) -> SmtRes<String> {
-//!     Ok(input.into())
-//!   }
+//!     // Idents ~~~~~~~~~^^^^^^                  ^^^^^^^^~~~~ Input
+//!     fn parse_value(
+//!       self, input: & 'a str,
+//!       ident: & String, params: & [ (String, String) ], typ: & String,
+//!     ) -> SmtRes<String> {
+//!       Ok(input.into())
+//!     }
 //! }
 //!
 //! # fn do_smt_stuff() -> ::rsmt2::SmtRes<()> {
 //! let mut solver = Solver::default(Parser) ? ;
 //!
 //! solver.define_fun(
-//!        "sq", & [ ("n", "Int") ], "Int", "(* n n)"
-//!   // fn sq        (n:   Int)  ->  Int   { n * n }
+//!          "sq", & [ ("n", "Int") ], "Int", "(* n n)"
+//!     // fn sq        (n:   Int)  ->  Int   { n * n }
 //! ) ? ;
 //! solver.declare_const("n", "Int") ? ;
 //! solver.declare_const("m", "Int") ? ;
@@ -146,11 +146,11 @@
 //! let mut model = solver.get_model() ? ;
 //! model.sort() ; // Order might vary, sorting for assert below.
 //! assert_eq! {
-//!   model,
-//!   vec![
-//!     ("m".into(), vec![], "Int".into(), "5".into()),
-//!     ("n".into(), vec![], "Int".into(), "2".into()),
-//!   ]
+//!     model,
+//!     vec![
+//!         ("m".into(), vec![], "Int".into(), "5".into()),
+//!         ("n".into(), vec![], "Int".into(), "2".into()),
+//!     ]
 //! }
 //! # Ok(())
 //! # }
@@ -182,22 +182,22 @@
 //! # #[derive(Clone, Copy)]
 //! # struct Parser ;
 //! # impl<'a> IdentParser<String, String, & 'a str> for Parser {
-//! #   fn parse_ident(self, input: & 'a str) -> SmtRes<String> {
-//! #     Ok(input.into())
-//! #   }
-//! #   fn parse_type(self, input: & 'a str) -> SmtRes<String> {
-//! #     Ok(input.into())
-//! #   }
+//! #     fn parse_ident(self, input: & 'a str) -> SmtRes<String> {
+//! #         Ok(input.into())
+//! #     }
+//! #     fn parse_type(self, input: & 'a str) -> SmtRes<String> {
+//! #         Ok(input.into())
+//! #     }
 //! # }
 //! # impl<'a> ValueParser<String, & 'a str> for Parser {
-//! #   fn parse_value(self, input: & 'a str) -> SmtRes<String> {
-//! #     Ok(input.into())
-//! #   }
+//! #     fn parse_value(self, input: & 'a str) -> SmtRes<String> {
+//! #         Ok(input.into())
+//! #     }
 //! # }
 //! # fn do_smt_stuff() -> ::rsmt2::SmtRes<()> {
 //! # let mut solver = Solver::default(Parser) ? ;
 //! solver.define_fun(
-//!        "sq", & [ ("n", "Int") ], "Int", "(* n n)"
+//!     "sq", & [ ("n", "Int") ], "Int", "(* n n)"
 //! ) ? ;
 //! solver.declare_const("n", "Int") ? ;
 //! solver.declare_const("m", "Int") ? ;
@@ -279,7 +279,7 @@
 //!
 //! ```lisp
 //! (define-fun trans ( (x_0 Int) (y_0 Int) (x_1 Int) (y_1 Int) ) Bool
-//!   (and (= x_1 (+ x_0 1)) (= y_1 (* 2 y_0)) )
+//!     (and (= x_1 (+ x_0 1)) (= y_1 (* 2 y_0)) )
 //! )
 //!
 //! (declare-fun x_0 () Int)
