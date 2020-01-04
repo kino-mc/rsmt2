@@ -5,17 +5,13 @@ use rsmt2::{parse::*, *};
 type Typ = String;
 type Ident = String;
 type Expr = String;
-type Val = bool;
+type Val = String;
 
 #[derive(Clone, Copy)]
 struct Parser;
 impl<'a> ValueParser<Val, &'a str> for Parser {
     fn parse_value(self, input: &'a str) -> SmtRes<Val> {
-        match input {
-            "true" => Ok(true),
-            "false" => Ok(false),
-            _ => bail!("unexpected value `{}`", input),
-        }
+        Ok(input.into())
     }
 }
 impl<'a> ExprParser<Expr, (), &'a str> for Parser {
@@ -39,11 +35,7 @@ impl<'a> ModelParser<Ident, Typ, Val, &'a str> for Parser {
         _args: &[(Ident, Typ)],
         _out: &Typ,
     ) -> SmtRes<Val> {
-        match input {
-            "true" => Ok(true),
-            "false" => Ok(false),
-            _ => bail!("unexpected value `{}`", input),
-        }
+        Ok(input.into())
     }
 }
 
@@ -54,9 +46,7 @@ pub mod cvc4 {
     fn set_logic() {
         let conf = SmtConf::cvc4();
         let mut solver = Solver::new(conf, Parser).expect("solver creation");
-        solver
-            .set_logic(::rsmt2::Logic::QF_UF)
-            .expect("setting logic");
+        solver.set_logic(rsmt2::Logic::QF_UF).expect("set-logic");
     }
 
     #[test]
@@ -77,14 +67,14 @@ pub mod cvc4 {
         let values = solver.get_model().expect("get-model");
         assert_eq!(
             format!("{:?}", values),
-            r#"[("a", [], "Bool", true), ("b", [], "Bool", false)]"#
+            r#"[("a", [], "Bool", "true"), ("b", [], "Bool", "false")]"#
         );
 
         let values = solver.get_values(&["a", "b", "(and a (not b))"]);
         match values {
             Ok(values) => assert_eq!(
                 format!("{:?}", values),
-                r#"[("a", true), ("b", false), ("(and a (not b))", true)]"#
+                r#"[("a", "true"), ("b", "false"), ("(and a (not b))", "true")]"#
             ),
             Err(e) => assert_eq!(
                 &e.to_ml_string(),
@@ -103,9 +93,7 @@ pub mod z3 {
     fn set_logic() {
         let conf = SmtConf::z3();
         let mut solver = Solver::new(conf, Parser).expect("solver creation");
-        solver
-            .set_logic(::rsmt2::Logic::QF_UF)
-            .expect("setting logic");
+        solver.set_logic(rsmt2::Logic::QF_UF).expect("set-logic");
     }
 
     #[test]
@@ -126,7 +114,7 @@ pub mod z3 {
         let model = solver.get_model().expect("get-model");
         assert_eq!(
             format!("{:?}", model),
-            r#"[("a", [], "Bool", true), ("b", [], "Bool", false)]"#
+            r#"[("a", [], "Bool", "true"), ("b", [], "Bool", "false")]"#
         );
 
         let values = solver
@@ -135,8 +123,173 @@ pub mod z3 {
 
         assert_eq!(
             format!("{:?}", values),
-            r#"[("a", true), ("b", false), ("(and a (not b))", true)]"#
+            r#"[("a", "true"), ("b", "false"), ("(and a (not b))", "true")]"#
         );
+    }
+
+    #[test]
+    fn actlits_0() {
+        let mut solver = Solver::default(()).unwrap();
+        solver.declare_const("x", "Int").unwrap();
+
+        solver.declare_const("actlit", "Bool").unwrap();
+        solver
+            .assert(
+                "\
+                 (=> actlit \
+                 (and (> x 0) (< x 3) (= (mod x 3) 0))\
+                 )\
+                 ",
+            )
+            .unwrap();
+        assert! {
+            ! solver.check_sat_assuming( Some("actlit") ).unwrap()
+        }
+        solver.assert("(not actlit)").unwrap();
+
+        solver.declare_const("other_actlit", "Bool").unwrap();
+        solver
+            .assert(
+                "\
+                 (=> other_actlit \
+                 (and (> x 7) (= (mod x 2) 0))\
+                 )\
+                 ",
+            )
+            .unwrap();
+        assert! {
+            solver.check_sat_assuming( Some("other_actlit") ).unwrap()
+        }
+        solver.assert("(not other_actlit)").unwrap();
+
+        solver.kill().unwrap()
+    }
+
+    #[test]
+    fn actlits_1() {
+        let mut solver = match Solver::default(()) {
+            Ok(kid) => kid,
+            Err(e) => panic!("Could not spawn solver kid: {:?}", e),
+        };
+
+        solver.declare_const("x", "Int").unwrap();
+
+        let actlit = solver.get_actlit().unwrap();
+        solver.assert_act(&actlit, "(> x 0)").unwrap();
+        solver.assert_act(&actlit, "(< x 3)").unwrap();
+        solver.assert_act(&actlit, "(= (mod x 3) 0)").unwrap();
+
+        assert! {
+            ! solver.check_sat_act( Some(& actlit) ).unwrap()
+        }
+        solver.de_actlit(actlit).unwrap();
+        // At this point `actlit` has been consumed. So it's a bit safer than the
+        // version above, since use-after-deactivate is not possible.
+
+        let actlit = solver.get_actlit().unwrap();
+        solver.assert_act(&actlit, "(> x 7)").unwrap();
+        solver.assert_act(&actlit, "(= (mod x 2) 0)").unwrap();
+        assert! {
+            solver.check_sat_act( Some(& actlit) ).unwrap()
+        }
+        solver.de_actlit(actlit).unwrap();
+
+        solver.kill().unwrap()
+    }
+}
+
+#[cfg(test)]
+pub mod yices_2 {
+    use super::*;
+    #[test]
+    fn set_logic() {
+        let conf = SmtConf::yices_2();
+        let mut solver = Solver::new(conf, Parser).expect("solver creation");
+        solver.set_logic(rsmt2::Logic::QF_UF).expect("set-logic");
+    }
+
+    #[test]
+    fn scenario_1() {
+        let conf = SmtConf::yices_2();
+        let mut solver = Solver::new(conf, Parser).expect("solver creation");
+
+        solver.set_logic(Logic::QF_LIA).expect("set-logic");
+
+        solver
+            .declare_const("a", "Bool")
+            .expect("declaring a: Bool");
+        solver
+            .declare_const("b", "Bool")
+            .expect("declaring b: Bool");
+        solver.assert("(and a (not b))").expect("assertion");
+        let is_sat = solver
+            .check_sat()
+            .map_err(|e| println!("{}", e.to_ml_string()))
+            .expect("check-sat");
+        assert!(is_sat);
+
+        let values = solver
+            .get_values(&["a", "b", "(and a (not b))"])
+            .expect("get-value");
+
+        assert_eq!(
+            format!("{:?}", values),
+            r#"[("a", "true"), ("b", "false"), ("(and a (not b))", "true")]"#
+        );
+
+        let model = solver.get_model();
+        match model {
+            Ok(model) => assert_eq!(
+                format!("{:?}", model),
+                r#"[("a", [], "Bool", "true"), ("b", [], "Bool", "false")]"#
+            ),
+            Err(e) => assert_eq!(
+                &e.to_ml_string(),
+                "- Note: model production is not active for this SmtConf (`conf.models()`)\n\
+                 - parse error: expected `model` on `=`"
+            ),
+        }
+    }
+
+    #[test]
+    fn actlits_1() {
+        use rsmt2::parse::*;
+        use rsmt2::*;
+
+        let mut conf = SmtConf::yices_2();
+        conf.incremental();
+
+        let mut solver = match Solver::new(conf, Parser) {
+            Ok(kid) => kid,
+            Err(e) => panic!("Could not spawn solver kid: {:?}", e),
+        };
+        solver.set_logic(Logic::QF_LIA).expect("set logic");
+
+        solver.declare_const("x", "Int").expect("declare const");
+
+        let actlit = solver.get_actlit().expect("get actlit");
+        let mut buf: Vec<u8> = vec![];
+        actlit.write(&mut buf).unwrap();
+        assert_eq! {
+            "|rsmt2 actlit 0|",
+            ::std::str::from_utf8(& buf).unwrap()
+        }
+
+        solver.assert_act(&actlit, "(> x 7)").expect("assert act 1");
+        solver
+            .assert_act(&actlit, "(= (* x 2) 24)")
+            .expect("assert act 2");
+        assert! {
+            solver.check_sat_act( Some(& actlit) ).expect("check sat act")
+        }
+
+        let model = solver.get_values(&["x"]).expect("get value");
+
+        assert_eq!(format!("{:?}", model), r#"[("x", "12")]"#);
+
+        solver.de_actlit(actlit).unwrap();
+
+        solver.kill().unwrap()
     }
 }
 

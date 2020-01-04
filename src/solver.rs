@@ -208,6 +208,12 @@ impl<Parser> Solver<Parser> {
     pub fn default_cvc4(parser: Parser) -> SmtRes<Self> {
         Self::new(SmtConf::cvc4(), parser)
     }
+    /// Creates a solver kid with the default yices 2 configuration.
+    ///
+    /// Mostly used in tests, same as `Self::new( SmtConf::yices_2(), parser )`.
+    pub fn default_yices_2(parser: Parser) -> SmtRes<Self> {
+        Self::new(SmtConf::yices_2(), parser)
+    }
 
     /// Returns the configuration of the solver.
     pub fn conf(&self) -> &SmtConf {
@@ -244,6 +250,7 @@ impl<Parser> Solver<Parser> {
         let file = OpenOptions::new()
             .create(true)
             .write(true)
+            .truncate(true)
             .open(path)
             .chain_err(|| format!("while opening tee file `{}`", path.to_string_lossy()))?;
         self.tee(file)
@@ -990,21 +997,29 @@ impl<Parser> Solver<Parser> {
     where
         Actlits: IntoIterator<Item = &'a Actlit>,
     {
-        tee_write! {
-          self, |w| write_str(w, "(check-sat-assuming (") ?
-        }
-        for actlit in actlits {
-            tee_write! {
-              self, |w| {
-                write!(w, " ") ? ;
-                actlit.write(w) ?
-              }
+        match self.conf.get_check_sat_assuming() {
+            Some(ref cmd) => {
+                tee_write! {
+                  self, |w| write!(w, "({} (", cmd) ?
+                }
+                for actlit in actlits {
+                    tee_write! {
+                      self, |w| {
+                        write!(w, " ") ? ;
+                        actlit.write(w) ?
+                      }
+                    }
+                }
+                tee_write! {
+                  self, |w| write_str(w, ") )\n") ?
+                }
+                Ok(future_check_sat())
+            }
+            None => {
+                let msg = format!("{} does not support check-sat-assuming", self.conf.desc());
+                Err(msg.into())
             }
         }
-        tee_write! {
-          self, |w| write_str(w, " ) )\n") ?
-        }
-        Ok(future_check_sat())
     }
 
     /// Parse the result of a check-sat, turns `unknown` results into errors.
@@ -1127,18 +1142,18 @@ impl<Parser> Solver<Parser> {
         match self.conf.get_check_sat_assuming() {
             Some(ref cmd) => {
                 tee_write! {
-                  self, |w| write!(w, "({}\n ", cmd) ?
+                  self, |w| write!(w, "({} (\n ", cmd) ?
                 }
                 for sym in bool_vars {
                     tee_write! {
                       self, |w| {
-                        write_str(w, " ") ? ;
+                        write_str(w, "  ") ? ;
                         sym.sym_to_smt2(w, info) ?
                       }
                     }
                 }
                 tee_write! {
-                  self, |w| write_str(w, "\n)\n") ?
+                  self, |w| write_str(w, "\n))\n") ?
                 }
                 Ok(future_check_sat())
             }

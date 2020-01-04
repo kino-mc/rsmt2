@@ -24,7 +24,17 @@
 //! module.
 //!
 //!
+//! # Supported Backend Solvers
 //!
+//! This crate supports the following solvers:
+//!
+//! - [z3][z3]: full support
+//! - [cvc4][cvc4]: full support in theory, but only partially tested. Note that `get-value` is
+//!   known to crash some versions of CVC4.
+//! - [yices 2][yices 2]: full support in theory, but only partially tested. Command `get-model`
+//!   will only work on Yices 2 > `2.6.1`, and needs to be activated in [SmtConf][SmtConf] with
+//!   [`conf.models()`](struct.SmtConf.html#method.models). To understand why, see
+//!   <https://github.com/SRI-CSL/yices2/issues/162>.
 //!
 //!
 //!
@@ -312,6 +322,9 @@
 //!
 //! [rsmt2]: https://github.com/kino-mc/rsmt2 (rsmt2 github repository)
 //! [z3]: https://github.com/Z3Prover/z3 (z3 github repository)
+//! [cvc4]: https://cvc4.github.io/ (cvc4 github pages)
+//! [yices 2]: https://yices.csl.sri.com/ (yices 2 official page)
+//! [SmtConf]: struct.SmtConf.html (SmtConf type)
 //! [changes]: https://github.com/kino-mc/rsmt2/blob/master/CHANGES.md (List of changes on github)
 //! [solver]: struct.Solver.html (Solver type)
 //! [push]: struct.Solver.html#method.push (Solver's push function)

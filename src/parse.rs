@@ -210,7 +210,7 @@ impl<'a> SmtParser<BufReader<&'a [u8]>> {
     }
 }
 impl<R: BufRead> SmtParser<R> {
-    /// Creates an smt parser.
+    /// Creates an SMT parser.
     pub fn new(input: R) -> Self {
         SmtParser {
             input,

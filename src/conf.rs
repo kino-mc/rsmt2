@@ -24,6 +24,14 @@ fn supported(keyword: &'static str) -> ConfItem {
 }
 
 /// Solver styles.
+///
+/// - [z3][z3]: full support
+/// - [cvc4][cvc4]: full support in theory, but only partially tested. Note that `get-value` is
+///   known to crash some versions of CVC4.
+/// - [yices 2][yices 2]: full support in theory, but only partially tested. Command `get-model`
+///   will only work on Yices 2 > `2.6.1`, and needs to be activated in [SmtConf][SmtConf] with
+///   [`conf.models()`](struct.SmtConf.html#method.models). To understand why, see
+///   <https://github.com/SRI-CSL/yices2/issues/162>.
 #[derive(Debug, Clone, Copy)]
 #[allow(dead_code)]
 pub enum SmtStyle {
@@ -31,8 +39,12 @@ pub enum SmtStyle {
     Z3,
     /// CVC4-style smt solver.
     ///
-    /// **NB**: CVC4 hasn't been properly tested yet.
+    /// **NB**: CVC4 has only been partially tested at this point.
     CVC4,
+    /// Yices-2-style smt solver.
+    ///
+    /// Yices 2 has only been partially tested at this point.
+    Yices2,
 }
 
 impl SmtStyle {
@@ -48,7 +60,7 @@ impl SmtStyle {
                 incremental: true,
                 parse_success: false,
                 unsat_cores: false,
-                check_sat_assuming: supported("check-sat"),
+                check_sat_assuming: supported("check-sat-assuming"),
             },
             CVC4 => SmtConf {
                 style: self,
@@ -65,6 +77,16 @@ impl SmtStyle {
                 unsat_cores: false,
                 check_sat_assuming: unsupported(),
             },
+            Yices2 => SmtConf {
+                style: self,
+                cmd,
+                options: vec![],
+                models: false,
+                incremental: false,
+                parse_success: false,
+                unsat_cores: false,
+                check_sat_assuming: supported("check-sat-assuming"),
+            },
         }
     }
 
@@ -74,13 +96,17 @@ impl SmtStyle {
         match s {
             "z3" | "Z3" => Some(Z3),
             "cvc4" | "CVC4" => Some(CVC4),
+            "Yices2" | "yices2" | "YICES2" | "Yices 2" | "yices 2" | "YICES 2" => Some(CVC4),
             _ => None,
         }
     }
     /// Legal string representations of solver styles.
     #[allow(dead_code)]
     pub fn str_keys() -> Vec<&'static str> {
-        vec!["z3", "Z3", "cvc4", "CVC4"]
+        vec![
+            "z3", "Z3", "cvc4", "CVC4", "Yices2", "yices2", "YICES2", "Yices 2", "yices 2",
+            "YICES 2",
+        ]
     }
 
     /// Default command for a solver style.
@@ -89,6 +115,7 @@ impl SmtStyle {
         match self {
             Z3 => "z3".to_string(),
             CVC4 => "cvc4".to_string(),
+            Yices2 => "yices-smt2".to_string(),
         }
     }
     /// Default command for a solver style.
@@ -97,6 +124,7 @@ impl SmtStyle {
         match self {
             Z3 => "z3.exe".to_string(),
             CVC4 => "cvc4.exe".to_string(),
+            Yices2 => "yices-smt2.exe".to_string(),
         }
     }
 }
@@ -106,11 +134,20 @@ impl fmt::Display for SmtStyle {
         match *self {
             Z3 => write!(fmt, "z3"),
             CVC4 => write!(fmt, "cvc4"),
+            Yices2 => write!(fmt, "yices2"),
         }
     }
 }
 
 /// Configuration and solver specific info.
+///
+/// - [z3][z3]: full support
+/// - [cvc4][cvc4]: full support in theory, but only partially tested. Note that `get-value` is
+///   known to crash some versions of CVC4.
+/// - [yices 2][yices 2]: full support in theory, but only partially tested. Command `get-model`
+///   will only work on Yices 2 > `2.6.1`, and needs to be activated in [SmtConf][SmtConf] with
+///   [`conf.models()`](struct.SmtConf.html#method.models). To understand why, see
+///   <https://github.com/SRI-CSL/yices2/issues/162>.
 #[derive(Debug, Clone)]
 pub struct SmtConf {
     /// Solver style.
@@ -164,6 +201,22 @@ impl SmtConf {
         CVC4.default()
     }
 
+    /// Creates a new yices-2-like solver configuration.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// # use rsmt2::SmtConf ;
+    /// let conf = SmtConf::yices_2() ;
+    /// assert! {
+    ///     conf.get_cmd() == "yices-smt2" || conf.get_cmd() == "yices-smt2.exe"
+    /// }
+    /// ```
+    #[inline]
+    pub fn yices_2() -> Self {
+        Yices2.default()
+    }
+
     /// Spawns the solver.
     ///
     /// # Examples
@@ -190,6 +243,7 @@ impl SmtConf {
         match self.style {
             Z3 => "z3",
             CVC4 => "cvc4",
+            Yices2 => "yices2",
         }
     }
 
@@ -206,6 +260,7 @@ impl SmtConf {
         }
         match self.style {
             CVC4 => self.options.push("--produce-models".into()),
+            Yices2 => self.options.push("--smt2-model-format".into()),
             Z3 => (),
         }
     }
@@ -222,7 +277,7 @@ impl SmtConf {
             self.incremental = true
         }
         match self.style {
-            CVC4 => self.options.push("--incremental".into()),
+            CVC4 | Yices2 => self.options.push("--incremental".into()),
             Z3 => (),
         }
     }
@@ -291,7 +346,7 @@ impl SmtConf {
     /// ```rust
     /// # use rsmt2::SmtConf ;
     /// assert_eq! {
-    ///     SmtConf::z3().get_check_sat_assuming(), Some("check-sat")
+    ///     SmtConf::z3().get_check_sat_assuming(), Some("check-sat-assuming")
     /// }
     /// ```
     #[inline]
@@ -386,11 +441,11 @@ impl SmtConf {
     /// Adds information to a `get-value` error message if needed.
     pub fn enrich_get_values_error(&self, e: crate::errors::Error) -> crate::errors::Error {
         match self.style {
-            SmtStyle::Z3 => e,
             SmtStyle::CVC4 => e.chain_err(|| {
                 "some versions of CVC4 produce errors on `get-value` commands, \
                  consider using `get-model` instead"
             }),
+            SmtStyle::Z3 | SmtStyle::Yices2 => e,
         }
     }
 }
