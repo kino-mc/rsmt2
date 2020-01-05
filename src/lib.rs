@@ -12,8 +12,9 @@
 //!
 //!
 //! In rsmt2, solvers run in a separate process and communication is achieved *via* system pipes.
-//! For the moment, only [z3][z3] is officially supported. If you would like `rsmt2` to support
-//! other solvers, please open an issue on the [repository][rsmt2].
+//! This means that to use a solver, it needs to be available as a binary in your path. For the
+//! moment, only [z3][z3] is officially supported, although there is experimental support for
+//! [cvc4][cvc4] and [yices 2][yices 2].
 //!
 //! **NB**: most of the tests and documentation examples in this crate will not work unless you have
 //! [z3][z3] in your path under the name `z3`.
@@ -24,7 +25,7 @@
 //! module.
 //!
 //!
-//! # Supported Backend Solvers
+//! # Note on Backend Solvers
 //!
 //! This crate supports the following solvers:
 //!
@@ -32,7 +33,7 @@
 //! - [cvc4][cvc4]: full support in theory, but only partially tested. Note that `get-value` is
 //!   known to crash some versions of CVC4.
 //! - [yices 2][yices 2]: full support in theory, but only partially tested. Command `get-model`
-//!   will only work on Yices 2 > `2.6.1`, and needs to be activated in [SmtConf][SmtConf] with
+//!   will only work on Yices 2 > `2.6.1`, and needs to be activated in [`SmtConf`][SmtConf] with
 //!   [`conf.models()`](struct.SmtConf.html#method.models). To understand why, see
 //!   <https://github.com/SRI-CSL/yices2/issues/162>.
 //!
@@ -40,29 +41,26 @@
 //!
 //! # Very basic example
 //!
-//! String types already implement `rsmt2`'s SMT-printing traits. It's not a scalable approach, but
+//! String types already implement rsmt2's SMT-printing traits. It's not a scalable approach, but
 //! it's useful for testing and explaining things. Let's create a solver first.
 //!
+//! This is typically done by creating an [`SmtConf`][SmtConf] solver configuration. This
+//! configuration lets rsmt2 know which solver you plan on using, as well as override the command
+//! used to launch it or activate model production.
+//!
 //! ```rust
-//! fn do_smt_stuff() -> ::rsmt2::SmtRes<()> {
-//!     let parser = () ;
-//!     use rsmt2::SmtConf ;
+//! let parser = ();
+//! use rsmt2::SmtConf;
 //!
-//!     let solver = SmtConf::z3().spawn(parser) ? ;
+//! let conf = SmtConf::z3();
+//! let mut solver = conf.spawn(parser).unwrap();
 //!
-//!     // Alternatively
-//!     use rsmt2::Solver ;
-//!     let _solver = Solver::new(SmtConf::z3(), parser) ? ;
-//!
-//!     // Another alternative, using the default configuration
-//!     let _solver = Solver::default(parser) ? ;
-//!     Ok(())
-//! }
-//! do_smt_stuff().unwrap()
+//! let is_sat = solver.check_sat().unwrap();
+//! assert!(is_sat)
 //! ```
 //!
 //! Notice that all three functions spawning a solver take a parser used to parse identifiers,
-//! values and/or expressions. `rsmt2` parses everything else (keywords and such), and lets users
+//! values and/or expressions. rsmt2 parses everything else (keywords and such), and lets users
 //! handle the important parts. See the [`parse`][parse_mod] module documentation for more details.
 //!
 //! Our current parser `()` is enough for this example. We can even perform `check-sat`s since,
@@ -71,15 +69,15 @@
 //!
 //! ```rust
 //! # fn do_smt_stuff() -> ::rsmt2::SmtRes<()> {
-//! use rsmt2::Solver ;
-//! let mut solver = Solver::default(()) ? ;
+//! use rsmt2::Solver;
+//! let mut solver = Solver::default(())?;
 //!
-//! solver.declare_const("n", "Int") ? ;
+//! solver.declare_const("n", "Int")?;
 //! //     ^^^^^^^^^^^^^~~~ same as `declare-fun` for a nullary symbol
-//! solver.declare_const("m", "Int") ? ;
-//! solver.assert("(= (+ (* n n) (* m m)) 7)") ? ;
+//! solver.declare_const("m", "Int")?;
+//! solver.assert("(= (+ (* n n) (* m m)) 7)")?;
 //!
-//! let is_sat = solver.check_sat() ? ;
+//! let is_sat = solver.check_sat()?;
 //! assert! { ! is_sat }
 //! # Ok(())
 //! # }
@@ -104,15 +102,15 @@
 //! of `define_fun`.
 //!
 //! ```rust
-//! use rsmt2::{ Solver, SmtRes } ;
-//! use rsmt2::parse::{ IdentParser, ModelParser } ;
+//! use rsmt2::{ Solver, SmtRes };
+//! use rsmt2::parse::{ IdentParser, ModelParser };
 //!
 //! #[derive(Clone, Copy)]
-//! struct Parser ;
+//! struct Parser;
 //!
-//!   //       Types ~~~~~~~~~~~~vvvvvv
 //! impl<'a> IdentParser<String, String, & 'a str> for Parser {
-//!     // Idents ~~~~~~~~~^^^^^^          ^^^^^^^^~~~~ Input
+//!     // Idents ~~~~~~~^^^^^^  ^^^^^^  ^^^^^^^^~~~~ Input
+//!     //     Types ~~~~~~~~~~~~|
 //!     fn parse_ident(self, input: & 'a str) -> SmtRes<String> {
 //!         Ok(input.into())
 //!     }
@@ -121,9 +119,9 @@
 //!     }
 //! }
 //!
-//!   // Types ~~~~~~~~~~~~~~~~~~vvvvvv  vvvvvv~~~~~~~~~~~~~~ Values
 //! impl<'a> ModelParser<String, String, String, & 'a str> for Parser {
-//!     // Idents ~~~~~~~~~^^^^^^                  ^^^^^^^^~~~~ Input
+//!     // Idents ~~~~~~~^^^^^^  ^^^^^^  ^^^^^^  ^^^^^^^^~~~~ Input
+//!     //         Types ~~~~~~~~|            |~~~~~ Values
 //!     fn parse_value(
 //!       self, input: & 'a str,
 //!       ident: & String, params: & [ (String, String) ], typ: & String,
@@ -133,22 +131,22 @@
 //! }
 //!
 //! # fn do_smt_stuff() -> ::rsmt2::SmtRes<()> {
-//! let mut solver = Solver::default(Parser) ? ;
+//! let mut solver = Solver::default(Parser)?;
 //!
 //! solver.define_fun(
 //!          "sq", & [ ("n", "Int") ], "Int", "(* n n)"
 //!     // fn sq        (n:   Int)  ->  Int   { n * n }
-//! ) ? ;
-//! solver.declare_const("n", "Int") ? ;
-//! solver.declare_const("m", "Int") ? ;
+//! )?;
+//! solver.declare_const("n", "Int")?;
+//! solver.declare_const("m", "Int")?;
 //!
-//! solver.assert("(= (+ (sq n) (sq m)) 29)") ? ;
-//! solver.assert("(and (< n 5) (> n 0) (> m 0))") ? ;
+//! solver.assert("(= (+ (sq n) (sq m)) 29)")?;
+//! solver.assert("(and (< n 5) (> n 0) (> m 0))")?;
 //!
-//! let is_sat = solver.check_sat() ? ;
+//! let is_sat = solver.check_sat()?;
 //! assert! { is_sat }
-//! let mut model = solver.get_model() ? ;
-//! model.sort() ; // Order might vary, sorting for assert below.
+//! let mut model = solver.get_model()?;
+//! model.sort(); // Order might vary, sorting for assert below.
 //! assert_eq! {
 //!     model,
 //!     vec![
@@ -179,10 +177,10 @@
 //! unmodified code):
 //!
 //! ```rust
-//! # use rsmt2::{ Solver, SmtRes } ;
-//! # use rsmt2::parse::{ IdentParser, ValueParser } ;
+//! # use rsmt2::{ Solver, SmtRes };
+//! # use rsmt2::parse::{ IdentParser, ValueParser };
 //! # #[derive(Clone, Copy)]
-//! # struct Parser ;
+//! # struct Parser;
 //! # impl<'a> IdentParser<String, String, & 'a str> for Parser {
 //! #     fn parse_ident(self, input: & 'a str) -> SmtRes<String> {
 //! #         Ok(input.into())
@@ -197,19 +195,19 @@
 //! #     }
 //! # }
 //! # fn do_smt_stuff() -> ::rsmt2::SmtRes<()> {
-//! # let mut solver = Solver::default(Parser) ? ;
+//! # let mut solver = Solver::default(Parser)?;
 //! solver.define_fun(
 //!     "sq", & [ ("n", "Int") ], "Int", "(* n n)"
-//! ) ? ;
-//! solver.declare_const("n", "Int") ? ;
-//! solver.declare_const("m", "Int") ? ;
+//! )?;
+//! solver.declare_const("n", "Int")?;
+//! solver.declare_const("m", "Int")?;
 //!
-//! solver.assert("(= (+ (sq n) (sq m)) 29)") ? ;
-//! solver.assert("(and (< n 5) (> n 0) (> m 0))") ? ;
+//! solver.assert("(= (+ (sq n) (sq m)) 29)")?;
+//! solver.assert("(and (< n 5) (> n 0) (> m 0))")?;
 //!
-//! let my_check_sat = solver.print_check_sat() ? ;
+//! let my_check_sat = solver.print_check_sat()?;
 //! // Solver is working, we can do other things.
-//! let is_sat = solver.parse_check_sat(my_check_sat) ? ;
+//! let is_sat = solver.parse_check_sat(my_check_sat)?;
 //! assert! { is_sat }
 //! # Ok(())
 //! # }
@@ -344,15 +342,15 @@ extern crate error_chain;
 
 /// Errors.
 ///
-/// Aggregates I/O errors and `rsmt2` specific errors.
+/// Aggregates I/O errors and rsmt2 specific errors.
 pub mod errors {
     error_chain! {
         types {
-            Error, ErrorKind, ResExt, SmtRes ;
+            Error, ErrorKind, ResExt, SmtRes;
         }
 
         foreign_links {
-            Io(::std::io::Error) #[doc = "IO error."] ;
+            Io(::std::io::Error) #[doc = "IO error."];
         }
 
         errors {
@@ -452,7 +450,7 @@ pub mod future {
 
 pub mod example;
 
-/// Traits your types must implement so that `rsmt2` can use them.
+/// Traits your types must implement so that rsmt2 can use them.
 pub mod print {
     pub use crate::common::{Expr2Smt, Sort2Smt, Sym2Smt};
 }

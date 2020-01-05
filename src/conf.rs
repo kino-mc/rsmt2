@@ -32,6 +32,10 @@ fn supported(keyword: &'static str) -> ConfItem {
 ///   will only work on Yices 2 > `2.6.1`, and needs to be activated in [SmtConf][SmtConf] with
 ///   [`conf.models()`](struct.SmtConf.html#method.models). To understand why, see
 ///   <https://github.com/SRI-CSL/yices2/issues/162>.
+///   
+/// [z3]: https://github.com/Z3Prover/z3 (z3 github repository)
+/// [cvc4]: https://cvc4.github.io/ (cvc4 github pages)
+/// [yices 2]: https://yices.csl.sri.com/ (yices 2 official page)
 #[derive(Debug, Clone, Copy)]
 #[allow(dead_code)]
 pub enum SmtStyle {
@@ -148,6 +152,10 @@ impl fmt::Display for SmtStyle {
 ///   will only work on Yices 2 > `2.6.1`, and needs to be activated in [SmtConf][SmtConf] with
 ///   [`conf.models()`](struct.SmtConf.html#method.models). To understand why, see
 ///   <https://github.com/SRI-CSL/yices2/issues/162>.
+///   
+/// [z3]: https://github.com/Z3Prover/z3 (z3 github repository)
+/// [cvc4]: https://cvc4.github.io/ (cvc4 github pages)
+/// [yices 2]: https://yices.csl.sri.com/ (yices 2 official page)
 #[derive(Debug, Clone)]
 pub struct SmtConf {
     /// Solver style.
