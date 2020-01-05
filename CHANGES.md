@@ -1,4 +1,4 @@
-# v0.11.0-beta
+# v0.11.0-beta.0
 
 - slightly improved CVC4 support
 - added support for Yices 2
