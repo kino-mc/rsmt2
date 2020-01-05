@@ -8,7 +8,7 @@ macro_rules! smtry {
             Ok(something) => something,
             Err(e) => panic!( $($msg),+ , e)
         }
-    ) ;
+    );
 }
 
 pub mod print_time;

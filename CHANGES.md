@@ -1,8 +1,14 @@
+# v0.11.0-beta.2
+
+- `Solver::set_custom_logic`
+- more documentation improvements
+- fixed some problems in code/doc formatting (internal)
+
 # v0.11.0-beta.0
 
 - slightly improved CVC4 support
 - added support for Yices 2
-- some (slight) documentation documentation improvements
+- some (slight) documentation improvements
 - fixed some problems in code/doc formatting (internal)
 
 # v0.10.0

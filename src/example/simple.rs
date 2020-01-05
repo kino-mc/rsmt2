@@ -25,11 +25,11 @@
 //! use print-time information.
 //!
 //! ```rust
-//! extern crate rsmt2 ;
+//! extern crate rsmt2;
 //!
-//! use rsmt2::print::Expr2Smt ;
-//! use rsmt2::SmtRes ;
-//! use rsmt2::example::simple::{ Op, Cst } ;
+//! use rsmt2::print::Expr2Smt;
+//! use rsmt2::SmtRes;
+//! use rsmt2::example::simple::{ Op, Cst };
 //!
 //! /// An example of expression.
 //! pub enum Expr {
@@ -50,19 +50,19 @@
 //!         & self, w: & mut Writer, _: ()
 //!     ) -> SmtRes<()>
 //!     where Writer: ::std::io::Write {
-//!         let mut stack = vec![ (false, vec![self], false) ] ;
+//!         let mut stack = vec![ (false, vec![self], false) ];
 //!         while let Some((space, mut to_write, closing_paren)) = stack.pop() {
 //!             if let Some(next) = to_write.pop() {
 //!                 if space {
 //!                     write!(w, " ") ?
 //!                 }
 //!                 // We have something to print, push the rest back.
-//!                 stack.push((space, to_write, closing_paren)) ;
+//!                 stack.push((space, to_write, closing_paren));
 //!                 match * next {
 //!                     Expr::C(cst) => write!(w, "{}", cst) ?,
 //!                     Expr::V(ref var) => write!(w, "{}", var) ?,
 //!                     Expr::O(op, ref sub_terms) => {
-//!                         write!(w, "({}", op) ? ;
+//!                         write!(w, "({}", op) ?;
 //!                         stack.push((true, sub_terms.iter().rev().collect(), true))
 //!                     },
 //!                 }
@@ -86,25 +86,25 @@
 //! [`Solver`][solver] which wraps a z3 process and provides most of the SMT-LIB 2.5 commands.
 //!
 //! ```rust
-//! extern crate rsmt2 ;
+//! extern crate rsmt2;
 //!
-//! use rsmt2::Solver ;
-//! use rsmt2::example::simple::{ Op, Cst, Expr } ;
+//! use rsmt2::Solver;
+//! use rsmt2::example::simple::{ Op, Cst, Expr };
 //! # fn main() {
 //!
 //! let mut solver = Solver::default(()).expect(
 //!     "could not spawn solver kid"
-//! ) ;
+//! );
 //!
-//! let v_1 = "v_1".to_string() ;
-//! let v_2 = "v_2".to_string() ;
+//! let v_1 = "v_1".to_string();
+//! let v_2 = "v_2".to_string();
 //!
 //! solver.declare_const( & v_1, & "Bool" ).expect(
 //!     "while declaring v_1"
-//! ) ;
+//! );
 //! solver.declare_const( & v_2, & "Int" ).expect(
 //!     "while declaring v_2"
-//! ) ;
+//! );
 //!
 //! let expr = Expr::O(
 //!     Op::Disj, vec![
@@ -113,11 +113,11 @@
 //!         ),
 //!         Expr::V( v_1.clone() )
 //!     ]
-//! ) ;
+//! );
 //!
 //! solver.assert( & expr ).expect(
 //!     "while asserting an expression"
-//! ) ;
+//! );
 //!
 //! if solver.check_sat().expect("during check sat") {
 //!     ()
@@ -142,16 +142,16 @@
 //!
 //! ```rust
 //! # #[macro_use]
-//! # extern crate error_chain ;
-//! extern crate rsmt2 ;
+//! # extern crate error_chain;
+//! extern crate rsmt2;
 //!
-//! use rsmt2::SmtRes ;
-//! use rsmt2::parse::{ IdentParser, ModelParser } ;
-//! use rsmt2::example::simple::Cst ;
+//! use rsmt2::SmtRes;
+//! use rsmt2::parse::{ IdentParser, ModelParser };
+//! use rsmt2::example::simple::Cst;
 //!
 //! /// Empty parser structure, we will not maintain any context.
 //! #[derive(Clone, Copy)]
-//! pub struct Parser ;
+//! pub struct Parser;
 //! impl<'a> IdentParser<String, String, & 'a str> for Parser {
 //!     fn parse_ident(self, input: & 'a str) -> SmtRes<String> {
 //!         Ok( input.to_string() )
@@ -173,16 +173,16 @@
 //!             "true" => Ok( Cst::B(true) ),
 //!             "false" => Ok( Cst::B(false) ),
 //!             int => {
-//!                 use std::str::FromStr ;
-//!                 let s = int.trim() ;
+//!                 use std::str::FromStr;
+//!                 let s = int.trim();
 //!                 if let Ok(res) = isize::from_str(s) {
 //!                     return Ok( Cst::I(res) )
 //!                 } else if s.len() >= 4 {
 //!                     if & s[0 .. 1] == "("
 //!                     && & s[s.len() - 1 ..] == ")" {
-//!                         let s = & s[1 .. s.len() - 1].trim() ;
+//!                         let s = & s[1 .. s.len() - 1].trim();
 //!                         if & s[0 .. 1] == "-" {
-//!                             let s = & s[1..].trim() ;
+//!                             let s = & s[1..].trim();
 //!                             if let Ok(res) = isize::from_str(s) {
 //!                                 return Ok( Cst::I(- res) )
 //!                             }
@@ -202,13 +202,13 @@
 //!
 //! ```rust
 //!
-//! use rsmt2::SmtRes ;
-//! use rsmt2::parse::{ SmtParser, IdentParser, ModelParser } ;
-//! use rsmt2::example::simple::Cst ;
+//! use rsmt2::SmtRes;
+//! use rsmt2::parse::{ SmtParser, IdentParser, ModelParser };
+//! use rsmt2::example::simple::Cst;
 //!
 //!
 //! #[derive(Clone, Copy)]
-//! struct Parser ;
+//! struct Parser;
 //! impl<'a, Br> ModelParser<
 //!     String, String, Cst, & 'a mut SmtParser<Br>
 //! > for Parser
@@ -217,7 +217,7 @@
 //!         self, input: & 'a mut SmtParser<Br>,
 //!         _ident: & String, _signature: & [ (String, String) ], _type: & String
 //!     ) -> SmtRes<Cst> {
-//!         use std::str::FromStr ;
+//!         use std::str::FromStr;
 //!         if let Some(b) = input.try_bool() ? {
 //!             Ok( Cst::B(b) )
 //!         } else if let Some(int) = input.try_int(
@@ -239,29 +239,29 @@
 //!
 //! ```rust
 //! # #[macro_use]
-//! # extern crate error_chain ;
-//! extern crate rsmt2 ;
+//! # extern crate error_chain;
+//! extern crate rsmt2;
 //!
-//! use rsmt2::{ SmtRes, Solver } ;
+//! use rsmt2::{ SmtRes, Solver };
 //! use rsmt2::example::simple::{
 //!     Cst, Op, Expr, Parser
-//! } ;
+//! };
 //!
 //! # fn main() {
 //!
 //! let mut solver = Solver::default(Parser).expect(
 //!     "could not spawn solver kid"
-//! ) ;
+//! );
 //!
-//! let v_1 = "v_1".to_string() ;
-//! let v_2 = "v_2".to_string() ;
+//! let v_1 = "v_1".to_string();
+//! let v_2 = "v_2".to_string();
 //!
 //! solver.declare_const( & v_1, & "Bool" ).expect(
 //!     "while declaring v_1"
-//! ) ;
+//! );
 //! solver.declare_const( & v_2, & "Int" ).expect(
 //!     "while declaring v_2"
-//! ) ;
+//! );
 //!
 //! let expr = Expr::O(
 //!     Op::Disj, vec![
@@ -270,22 +270,22 @@
 //!         ),
 //!         Expr::V( v_1.clone() )
 //!     ]
-//! ) ;
+//! );
 //!
 //! solver.assert( & expr ).expect(
 //!     "while asserting an expression"
-//! ) ;
+//! );
 //!
 //! if solver.check_sat().expect("during check sat") {
 //!
 //!     let model = solver.get_model_const().expect(
 //!         "while getting model"
-//!     ) ;
+//!     );
 //!
-//!     let mut okay = false ;
+//!     let mut okay = false;
 //!     for (ident, typ, value) in model {
 //!         if ident == v_1 {
-//!             assert_eq!( typ, "Bool" ) ;
+//!             assert_eq!( typ, "Bool" );
 //!             match value {
 //!                 Cst::B(true) => okay = true,
 //!                 Cst::B(false) => (),
@@ -294,7 +294,7 @@
 //!                 ),
 //!             }
 //!         } else if ident == v_2 {
-//!             assert_eq!( typ, "Int" ) ;
+//!             assert_eq!( typ, "Int" );
 //!             match value {
 //!                 Cst::I(i) if -7 >= i => okay = true,
 //!                 Cst::I(_) => (),

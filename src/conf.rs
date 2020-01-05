@@ -182,8 +182,8 @@ impl SmtConf {
     /// # Examples
     ///
     /// ```rust
-    /// # use rsmt2::SmtConf ;
-    /// let conf = SmtConf::z3() ;
+    /// # use rsmt2::SmtConf;
+    /// let conf = SmtConf::z3();
     /// assert! {
     ///     conf.get_cmd() == "z3" || conf.get_cmd() == "z3.exe"
     /// }
@@ -198,8 +198,8 @@ impl SmtConf {
     /// # Examples
     ///
     /// ```rust
-    /// # use rsmt2::SmtConf ;
-    /// let conf = SmtConf::cvc4() ;
+    /// # use rsmt2::SmtConf;
+    /// let conf = SmtConf::cvc4();
     /// assert! {
     ///     conf.get_cmd() == "cvc4" || conf.get_cmd() == "cvc4.exe"
     /// }
@@ -214,8 +214,8 @@ impl SmtConf {
     /// # Examples
     ///
     /// ```rust
-    /// # use rsmt2::SmtConf ;
-    /// let conf = SmtConf::yices_2() ;
+    /// # use rsmt2::SmtConf;
+    /// let conf = SmtConf::yices_2();
     /// assert! {
     ///     conf.get_cmd() == "yices-smt2" || conf.get_cmd() == "yices-smt2.exe"
     /// }
@@ -230,8 +230,8 @@ impl SmtConf {
     /// # Examples
     ///
     /// ```rust
-    /// # use rsmt2::SmtConf ;
-    /// let _solver = SmtConf::z3().spawn(()).unwrap() ;
+    /// # use rsmt2::SmtConf;
+    /// let _solver = SmtConf::z3().spawn(()).unwrap();
     /// ```
     #[inline]
     pub fn spawn<Parser>(self, parser: Parser) -> SmtRes<Solver<Parser>> {
@@ -243,7 +243,7 @@ impl SmtConf {
     /// # Examples
     ///
     /// ```rust
-    /// # use rsmt2::SmtConf ;
+    /// # use rsmt2::SmtConf;
     /// assert_eq! { SmtConf::z3().desc(), "z3" }
     /// ```
     #[inline]
@@ -295,8 +295,8 @@ impl SmtConf {
     /// # Examples
     ///
     /// ```rust
-    /// # use rsmt2::SmtConf ;
-    /// let conf = SmtConf::z3() ;
+    /// # use rsmt2::SmtConf;
+    /// let conf = SmtConf::z3();
     /// assert! {
     ///     conf.get_cmd() == "z3" || conf.get_cmd() == "z3.exe"
     /// }
@@ -311,7 +311,7 @@ impl SmtConf {
     /// # Examples
     ///
     /// ```rust
-    /// # use rsmt2::SmtConf ;
+    /// # use rsmt2::SmtConf;
     /// assert_eq! {
     ///     SmtConf::z3().get_options(), & [ "-in", "-smt2" ]
     /// }
@@ -326,7 +326,7 @@ impl SmtConf {
     /// # Examples
     ///
     /// ```rust
-    /// # use rsmt2::SmtConf ;
+    /// # use rsmt2::SmtConf;
     /// assert! { ! SmtConf::z3().get_print_success() }
     /// ```
     #[inline]
@@ -339,7 +339,7 @@ impl SmtConf {
     /// # Examples
     ///
     /// ```rust
-    /// # use rsmt2::SmtConf ;
+    /// # use rsmt2::SmtConf;
     /// assert! { ! SmtConf::z3().get_unsat_cores() }
     /// ```
     #[inline]
@@ -352,7 +352,7 @@ impl SmtConf {
     /// # Examples
     ///
     /// ```rust
-    /// # use rsmt2::SmtConf ;
+    /// # use rsmt2::SmtConf;
     /// assert_eq! {
     ///     SmtConf::z3().get_check_sat_assuming(), Some("check-sat-assuming")
     /// }
@@ -367,9 +367,9 @@ impl SmtConf {
     /// # Examples
     ///
     /// ```rust
-    /// # use rsmt2::SmtConf ;
-    /// let mut conf = SmtConf::z3() ;
-    /// conf.option("arith.euclidean_solver=true") ;
+    /// # use rsmt2::SmtConf;
+    /// let mut conf = SmtConf::z3();
+    /// conf.option("arith.euclidean_solver=true");
     /// assert_eq! {
     ///     conf.get_options(),
     ///     & [ "-in", "-smt2", "arith.euclidean_solver=true" ]
@@ -386,9 +386,9 @@ impl SmtConf {
     /// # Examples
     ///
     /// ```rust
-    /// # use rsmt2::SmtConf ;
-    /// let mut conf = SmtConf::z3() ;
-    /// conf.cmd("my_custom_z3_command") ;
+    /// # use rsmt2::SmtConf;
+    /// let mut conf = SmtConf::z3();
+    /// conf.cmd("my_custom_z3_command");
     /// assert_eq! { conf.get_cmd(), "my_custom_z3_command" }
     /// ```
     #[inline]
@@ -417,9 +417,9 @@ impl SmtConf {
     /// # Examples
     ///
     /// ```rust
-    /// # use rsmt2::SmtConf ;
-    /// let mut conf = SmtConf::z3() ;
-    /// conf.print_success() ;
+    /// # use rsmt2::SmtConf;
+    /// let mut conf = SmtConf::z3();
+    /// conf.print_success();
     /// assert! { conf.get_print_success() }
     /// ```
     #[inline]
@@ -433,9 +433,9 @@ impl SmtConf {
     /// # Examples
     ///
     /// ```rust
-    /// # use rsmt2::SmtConf ;
-    /// let mut conf = SmtConf::z3() ;
-    /// conf.unsat_cores() ;
+    /// # use rsmt2::SmtConf;
+    /// let mut conf = SmtConf::z3();
+    /// conf.unsat_cores();
     /// assert! { conf.get_unsat_cores() }
     /// ```
     #[inline]

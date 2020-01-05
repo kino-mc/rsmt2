@@ -79,17 +79,17 @@
 //! types and values.
 //!
 //! ```rust
-//! # extern crate rsmt2 ;
-//! # use rsmt2::parse::SmtParser ;
+//! # extern crate rsmt2;
+//! # use rsmt2::parse::SmtParser;
 //! # fn main() {
-//! use rsmt2::parse::{ IdentParser, ModelParser } ;
-//! use rsmt2::SmtRes ;
+//! use rsmt2::parse::{ IdentParser, ModelParser };
+//! use rsmt2::SmtRes;
 //! let txt = "\
 //!   ( model (define-fun a () Int (- 17)) )
-//! " ;
-//! let mut parser = SmtParser::of_str(txt) ;
+//! ";
+//! let mut parser = SmtParser::of_str(txt);
 //!
-//! struct Parser ;
+//! struct Parser;
 //! impl<'a, 'b> ModelParser<
 //!     String, String, String, & 'a str
 //! > for & 'b Parser {
@@ -109,7 +109,7 @@
 //!     }
 //! }
 //!
-//! let model = parser.get_model_const( false, & Parser ).expect("model") ;
+//! let model = parser.get_model_const( false, & Parser ).expect("model");
 //! assert_eq!( model, vec![ ("a".into(), "Int".into(), "(- 17)".into()) ] )
 //! # }
 //! ```
@@ -122,17 +122,17 @@
 //! [`try_int`][try_int] and [`try_sym`][try_sym].
 //!
 //! ```
-//! # extern crate rsmt2 ;
-//! # use rsmt2::parse::SmtParser ;
+//! # extern crate rsmt2;
+//! # use rsmt2::parse::SmtParser;
 //! # fn main() {
-//! use rsmt2::parse::{ IdentParser, ModelParser } ;
-//! use rsmt2::errors::SmtRes ;
+//! use rsmt2::parse::{ IdentParser, ModelParser };
+//! use rsmt2::errors::SmtRes;
 //! let txt = "\
 //!     ( model (define-fun a () Int (- 17)) )
-//! " ;
-//! let mut parser = SmtParser::of_str(txt) ;
+//! ";
+//! let mut parser = SmtParser::of_str(txt);
 //!
-//! struct Parser ;
+//! struct Parser;
 //! impl<'a, 'b, Br: ::std::io::BufRead> ModelParser<
 //!     String, String, String, & 'a mut SmtParser<Br>
 //! > for & 'b Parser {
@@ -140,7 +140,7 @@
 //!         self, input: & 'a mut SmtParser<Br>,
 //!         _: & String, _: & [ (String, String) ], _: & String,
 //!     ) -> SmtRes<String> {
-//!         input.tag("(- 17))") ? ; Ok( "-17".into() )
+//!         input.tag("(- 17))") ?; Ok( "-17".into() )
 //!         //               ^~~~~ eating more input than we should...
 //!     }
 //! }
@@ -148,19 +148,19 @@
 //!     String, String, & 'a mut SmtParser<Br>
 //! > for & 'b Parser {
 //!     fn parse_ident(self, input: & 'a mut SmtParser<Br>) -> SmtRes<String> {
-//!         input.tag("a") ? ; Ok( "a".into() )
+//!         input.tag("a") ?; Ok( "a".into() )
 //!     }
 //!     fn parse_type(self, input: & 'a mut SmtParser<Br>) -> SmtRes<String> {
-//!         input.tag("Int") ? ; Ok( "Int".into() )
+//!         input.tag("Int") ?; Ok( "Int".into() )
 //!     }
 //! }
 //!
-//! use rsmt2::errors::ErrorKind ;
+//! use rsmt2::errors::ErrorKind;
 //! match * parser.get_model_const( false, & Parser ).unwrap_err().kind() {
 //!     ErrorKind::ParseError(ref msg, ref token) => {
 //!         assert_eq!(
 //!             msg, "expected `(` opening define-fun or `)` closing model"
-//!         ) ;
+//!         );
 //!         assert_eq!(token, "eof")
 //!     },
 //!     ref error => panic!("unexpected error: {}", error)
@@ -250,32 +250,32 @@ impl<R: BufRead> SmtParser<R> {
     /// between (nested) parens.
     ///
     /// ```
-    /// # extern crate rsmt2 ;
-    /// # use rsmt2::parse::SmtParser ;
+    /// # extern crate rsmt2;
+    /// # use rsmt2::parse::SmtParser;
     /// # fn main() {
     /// let txt = "\
-    ///     token  ; a comment\n\n next_token ; more comments\n\
-    ///     (+ |quoted ident, ; a comment\n parens don't count)| 7)42 false\
-    /// " ;
-    /// let mut parser = SmtParser::of_str(txt) ;
+    ///     token ; a comment\n\n next_token; more comments\n\
+    ///     (+ |quoted ident,; a comment\n parens don't count)| 7)42 false\
+    /// ";
+    /// let mut parser = SmtParser::of_str(txt);
     ///
-    /// assert_eq!( parser.get_sexpr().unwrap(), "token" ) ;
-    /// assert_eq!( parser.buff_rest(), "  ; a comment\n" ) ;
+    /// assert_eq!( parser.get_sexpr().unwrap(), "token" );
+    /// assert_eq!( parser.buff_rest(), " ; a comment\n" );
     ///
-    /// assert_eq!( parser.get_sexpr().unwrap(), "next_token" ) ;
-    /// assert_eq!( parser.buff_rest(), " ; more comments\n" ) ;
+    /// assert_eq!( parser.get_sexpr().unwrap(), "next_token" );
+    /// assert_eq!( parser.buff_rest(), "; more comments\n" );
     ///
     /// assert_eq!(
     ///     parser.get_sexpr().unwrap(),
-    ///     "(+ |quoted ident, ; a comment\n parens don't count)| 7)"
-    /// ) ;
-    /// assert_eq!( parser.buff_rest(), "42 false" ) ;
+    ///     "(+ |quoted ident,; a comment\n parens don't count)| 7)"
+    /// );
+    /// assert_eq!( parser.buff_rest(), "42 false" );
     ///
-    /// assert_eq!( parser.get_sexpr().unwrap(), "42" ) ;
-    /// assert_eq!( parser.buff_rest(), " false" ) ;
+    /// assert_eq!( parser.get_sexpr().unwrap(), "42" );
+    /// assert_eq!( parser.buff_rest(), " false" );
     ///
-    /// assert_eq!( parser.get_sexpr().unwrap(), "false" ) ;
-    /// assert_eq!( parser.buff_rest(), "" ) ;
+    /// assert_eq!( parser.get_sexpr().unwrap(), "false" );
+    /// assert_eq!( parser.buff_rest(), "" );
     /// # }
     /// ```
     pub fn get_sexpr(&mut self) -> SmtRes<&str> {
@@ -334,7 +334,7 @@ impl<R: BufRead> SmtParser<R> {
                             }
                             _ => {
                                 if !c.is_whitespace() && op_paren == 0 {
-                                    // print!("... `") ;
+                                    // print!("... `");
                                     'token: for c in chars {
                                         if c.is_whitespace() {
                                             break 'token;
@@ -399,31 +399,31 @@ impl<R: BufRead> SmtParser<R> {
     /// Parsing a tag or loading an s-expression fetches new lines, this does not.
     ///
     /// ```
-    /// # extern crate rsmt2 ;
-    /// # use rsmt2::parse::SmtParser ;
+    /// # extern crate rsmt2;
+    /// # use rsmt2::parse::SmtParser;
     /// # fn main() {
-    /// let txt = "  token  ; a comment\n\n next token ; last comment" ;
-    /// let mut parser = SmtParser::of_str(txt) ;
+    /// let txt = "  token ; a comment\n\n next token; last comment";
+    /// let mut parser = SmtParser::of_str(txt);
     ///
-    /// parser.spc_cmt() ;
-    /// assert_eq!( parser.buff_rest(), "" ) ;
-    /// assert_eq!( parser.buff(), "" ) ;
+    /// parser.spc_cmt();
+    /// assert_eq!( parser.buff_rest(), "" );
+    /// assert_eq!( parser.buff(), "" );
     ///
-    /// assert!( parser.try_tag("token").expect("token") ) ;
-    /// assert_eq!( parser.buff_rest(), "  ; a comment\n" ) ;
-    /// assert_eq!( parser.buff(), "  token  ; a comment\n" ) ;
+    /// assert!( parser.try_tag("token").expect("token") );
+    /// assert_eq!( parser.buff_rest(), " ; a comment\n" );
+    /// assert_eq!( parser.buff(), "  token ; a comment\n" );
     ///
-    /// parser.spc_cmt() ;
-    /// assert_eq!( parser.buff_rest(), "" ) ;
-    /// assert_eq!( parser.buff(), "  token  ; a comment\n" ) ;
+    /// parser.spc_cmt();
+    /// assert_eq!( parser.buff_rest(), "" );
+    /// assert_eq!( parser.buff(), "  token ; a comment\n" );
     ///
-    /// assert!( parser.try_tag("next token").expect("token") ) ;
-    /// assert_eq!( parser.buff_rest(), " ; last comment" ) ;
-    /// assert_eq!( parser.buff(), txt ) ;
+    /// assert!( parser.try_tag("next token").expect("token") );
+    /// assert_eq!( parser.buff_rest(), "; last comment" );
+    /// assert_eq!( parser.buff(), txt );
     ///
-    /// parser.spc_cmt() ;
-    /// assert_eq!( parser.buff_rest(), "" ) ;
-    /// assert_eq!( parser.buff(), txt ) ;
+    /// parser.spc_cmt();
+    /// assert_eq!( parser.buff_rest(), "" );
+    /// assert_eq!( parser.buff(), txt );
     /// # }
     /// ```
     pub fn spc_cmt(&mut self) {
@@ -454,21 +454,21 @@ impl<R: BufRead> SmtParser<R> {
     /// non-commented character after the original cursor position.
     ///
     /// ```
-    /// # extern crate rsmt2 ;
-    /// # use rsmt2::parse::SmtParser ;
+    /// # extern crate rsmt2;
+    /// # use rsmt2::parse::SmtParser;
     /// # fn main() {
     /// let txt = "\
-    ///   a tag is anything  |(>_<)|  ; a comment\n\n next token ; last comment\
-    /// " ;
-    /// let mut parser = SmtParser::of_str(txt) ;
-    /// assert!( parser.try_tag("a tag is anything").expect("tag") ) ;
-    /// assert_eq!( parser.buff_rest(), "  |(>_<)|  ; a comment\n" ) ;
-    /// assert!( ! parser.try_tag("not the token").expect("tag") ) ;
-    /// assert_eq!( parser.buff_rest(), "|(>_<)|  ; a comment\n" ) ;
-    /// assert!( parser.try_tag("|(>_<)|").expect("tag") ) ;
-    /// assert!( ! parser.try_tag("not the next token").expect("tag") ) ;
-    /// assert_eq!( parser.buff_rest(), "next token ; last comment" ) ;
-    /// assert!( parser.try_tag("next token").expect("tag") ) ;
+    ///   a tag is anything  |(>_<)| ; a comment\n\n next token; last comment\
+    /// ";
+    /// let mut parser = SmtParser::of_str(txt);
+    /// assert!( parser.try_tag("a tag is anything").expect("tag") );
+    /// assert_eq!( parser.buff_rest(), "  |(>_<)| ; a comment\n" );
+    /// assert!( ! parser.try_tag("not the token").expect("tag") );
+    /// assert_eq!( parser.buff_rest(), "|(>_<)| ; a comment\n" );
+    /// assert!( parser.try_tag("|(>_<)|").expect("tag") );
+    /// assert!( ! parser.try_tag("not the next token").expect("tag") );
+    /// assert_eq!( parser.buff_rest(), "next token; last comment" );
+    /// assert!( parser.try_tag("next token").expect("tag") );
     /// # }
     /// ```
     pub fn try_tag(&mut self, tag: &str) -> SmtRes<bool> {
@@ -538,35 +538,35 @@ impl<R: BufRead> SmtParser<R> {
     /// non-commented character after the original cursor position.
     ///
     /// ```
-    /// # extern crate rsmt2 ;
-    /// # use rsmt2::parse::SmtParser ;
+    /// # extern crate rsmt2;
+    /// # use rsmt2::parse::SmtParser;
     /// # fn main() {
     /// let txt = "\
     ///   a word is anything  |(>_<)|  last; comment\
-    /// " ;
-    /// let mut parser = SmtParser::of_str(txt) ;
-    /// assert!( parser.try_word("a word is").expect("word") ) ;
-    /// assert_eq!( parser.buff_rest(), " anything  |(>_<)|  last; comment" ) ;
-    /// assert!( ! parser.try_word("a").expect("word") ) ;
-    /// assert_eq!( parser.buff_rest(), "anything  |(>_<)|  last; comment" ) ;
-    /// assert!( ! parser.try_word("any").expect("word") ) ;
-    /// assert_eq!( parser.buff_rest(), "anything  |(>_<)|  last; comment" ) ;
-    /// assert!( ! parser.try_word("anythin").expect("word") ) ;
-    /// assert_eq!( parser.buff_rest(), "anything  |(>_<)|  last; comment" ) ;
-    /// assert!( parser.try_word("anything").expect("word") ) ;
-    /// assert_eq!( parser.buff_rest(), "  |(>_<)|  last; comment" ) ;
-    /// assert!( parser.try_word("|").expect("word") ) ;
-    /// assert_eq!( parser.buff_rest(), "(>_<)|  last; comment" ) ;
-    /// assert!( parser.try_tag("(").expect("tag") ) ;
-    /// assert_eq!( parser.buff_rest(), ">_<)|  last; comment" ) ;
-    /// assert!( parser.try_word(">_<").expect("word") ) ;
-    /// assert_eq!( parser.buff_rest(), ")|  last; comment" ) ;
-    /// assert!( parser.try_tag(")").expect("tag") ) ;
-    /// assert_eq!( parser.buff_rest(), "|  last; comment" ) ;
-    /// assert!( parser.try_word("|").expect("word") ) ;
-    /// assert_eq!( parser.buff_rest(), "  last; comment" ) ;
-    /// assert!( parser.try_word("last").expect("word") ) ;
-    /// assert_eq!( parser.buff_rest(), "; comment" ) ;
+    /// ";
+    /// let mut parser = SmtParser::of_str(txt);
+    /// assert!( parser.try_word("a word is").expect("word") );
+    /// assert_eq!( parser.buff_rest(), " anything  |(>_<)|  last; comment" );
+    /// assert!( ! parser.try_word("a").expect("word") );
+    /// assert_eq!( parser.buff_rest(), "anything  |(>_<)|  last; comment" );
+    /// assert!( ! parser.try_word("any").expect("word") );
+    /// assert_eq!( parser.buff_rest(), "anything  |(>_<)|  last; comment" );
+    /// assert!( ! parser.try_word("anythin").expect("word") );
+    /// assert_eq!( parser.buff_rest(), "anything  |(>_<)|  last; comment" );
+    /// assert!( parser.try_word("anything").expect("word") );
+    /// assert_eq!( parser.buff_rest(), "  |(>_<)|  last; comment" );
+    /// assert!( parser.try_word("|").expect("word") );
+    /// assert_eq!( parser.buff_rest(), "(>_<)|  last; comment" );
+    /// assert!( parser.try_tag("(").expect("tag") );
+    /// assert_eq!( parser.buff_rest(), ">_<)|  last; comment" );
+    /// assert!( parser.try_word(">_<").expect("word") );
+    /// assert_eq!( parser.buff_rest(), ")|  last; comment" );
+    /// assert!( parser.try_tag(")").expect("tag") );
+    /// assert_eq!( parser.buff_rest(), "|  last; comment" );
+    /// assert!( parser.try_word("|").expect("word") );
+    /// assert_eq!( parser.buff_rest(), "  last; comment" );
+    /// assert!( parser.try_word("last").expect("word") );
+    /// assert_eq!( parser.buff_rest(), "; comment" );
     /// # }
     /// ```
     pub fn try_word(&mut self, word: &str) -> SmtRes<bool> {
@@ -589,25 +589,25 @@ impl<R: BufRead> SmtParser<R> {
     /// non-commented character after the original cursor position.
     ///
     /// ```
-    /// # extern crate rsmt2 ;
-    /// # use rsmt2::parse::SmtParser ;
+    /// # extern crate rsmt2;
+    /// # use rsmt2::parse::SmtParser;
     /// # fn main() {
     /// let txt = "\
-    ///     a tag is anything  |(>_<)|  ; a comment\n\n next token ; last comment\
-    /// " ;
-    /// let mut parser = SmtParser::of_str(txt) ;
+    ///     a tag is anything  |(>_<)| ; a comment\n\n next token; last comment\
+    /// ";
+    /// let mut parser = SmtParser::of_str(txt);
     /// assert!(
     ///     parser.try_tags(
     ///         &[ "a", "tag", "is anything", "|", "(", ">_<", ")", "|" ]
     ///     ).expect("tags")
-    /// ) ;
-    /// assert_eq!( parser.buff_rest(), "  ; a comment\n" ) ;
+    /// );
+    /// assert_eq!( parser.buff_rest(), " ; a comment\n" );
     /// assert!(
     ///     ! parser.try_tags(
     ///         & [ "next", "token", "something else?" ]
     ///     ).expect("tags")
-    /// ) ;
-    /// assert_eq!( parser.buff_rest(), "next token ; last comment" )
+    /// );
+    /// assert_eq!( parser.buff_rest(), "next token; last comment" )
     /// # }
     /// ```
     pub fn try_tags<'a, Tags, S>(&mut self, tags: &'a Tags) -> SmtRes<bool>
@@ -686,31 +686,31 @@ impl<R: BufRead> SmtParser<R> {
     /// Tries to parse a boolean.
     ///
     /// ```
-    /// # extern crate rsmt2 ;
-    /// # use rsmt2::parse::SmtParser ;
+    /// # extern crate rsmt2;
+    /// # use rsmt2::parse::SmtParser;
     /// # fn main() {
     /// let txt = "\
     ///     true fls  true_ly_bad_ident false; comment\
-    /// " ;
-    /// let mut parser = SmtParser::of_str(txt) ;
-    /// assert_eq!( parser.try_bool().expect("bool"), Some(true) ) ;
+    /// ";
+    /// let mut parser = SmtParser::of_str(txt);
+    /// assert_eq!( parser.try_bool().expect("bool"), Some(true) );
     /// assert_eq!(
     ///     parser.buff_rest(), " fls  true_ly_bad_ident false; comment"
-    /// ) ;
-    /// assert_eq!( parser.try_bool().expect("bool"), None ) ;
+    /// );
+    /// assert_eq!( parser.try_bool().expect("bool"), None );
     /// assert_eq!(
     ///     parser.buff_rest(), "fls  true_ly_bad_ident false; comment"
-    /// ) ;
-    /// parser.tag("fls").expect("tag") ;
-    /// assert_eq!( parser.try_bool().expect("bool"), None ) ;
+    /// );
+    /// parser.tag("fls").expect("tag");
+    /// assert_eq!( parser.try_bool().expect("bool"), None );
     /// assert_eq!(
     ///     parser.buff_rest(), "true_ly_bad_ident false; comment"
-    /// ) ;
-    /// parser.tag("true_ly_bad_ident").expect("tag") ;
-    /// assert_eq!( parser.try_bool().expect("bool"), Some(false) ) ;
+    /// );
+    /// parser.tag("true_ly_bad_ident").expect("tag");
+    /// assert_eq!( parser.try_bool().expect("bool"), Some(false) );
     /// assert_eq!(
     ///     parser.buff_rest(), "; comment"
-    /// ) ;
+    /// );
     /// # }
     /// ```
     pub fn try_bool(&mut self) -> SmtRes<Option<bool>> {
@@ -810,10 +810,10 @@ impl<R: BufRead> SmtParser<R> {
     /// # Examples
     ///
     /// ```
-    /// # extern crate rsmt2 ;
-    /// # use rsmt2::parse::SmtParser ;
+    /// # extern crate rsmt2;
+    /// # use rsmt2::parse::SmtParser;
     /// # fn main() {
-    /// use std::str::FromStr ;
+    /// use std::str::FromStr;
     /// fn to_int(
     ///     input: & str, positive: bool
     /// ) -> Result<isize, <isize as FromStr>::Err> {
@@ -823,46 +823,46 @@ impl<R: BufRead> SmtParser<R> {
     /// }
     /// let txt = "\
     ///     666 (- 11) false; comment\n(+ 31) (= tru)\
-    /// " ;
-    /// let mut parser = SmtParser::of_str(txt) ;
-    /// println!("666") ;
-    /// assert_eq!( parser.try_int(to_int).expect("int"), Some(666) ) ;
+    /// ";
+    /// let mut parser = SmtParser::of_str(txt);
+    /// println!("666");
+    /// assert_eq!( parser.try_int(to_int).expect("int"), Some(666) );
     /// assert_eq!(
     ///     parser.buff_rest(), " (- 11) false; comment\n"
-    /// ) ;
+    /// );
     ///
-    /// println!("- 11") ;
-    /// assert_eq!( parser.try_int(to_int).expect("int"), Some(- 11) ) ;
+    /// println!("- 11");
+    /// assert_eq!( parser.try_int(to_int).expect("int"), Some(- 11) );
     /// assert_eq!(
     ///     parser.buff_rest(), " false; comment\n"
-    /// ) ;
+    /// );
     ///
-    /// assert_eq!( parser.try_int(to_int).expect("int"), None ) ;
-    /// parser.tag("false").expect("tag") ;
+    /// assert_eq!( parser.try_int(to_int).expect("int"), None );
+    /// parser.tag("false").expect("tag");
     ///
-    /// println!("31") ;
-    /// assert_eq!( parser.try_int(to_int).expect("int"), Some(31) ) ;
+    /// println!("31");
+    /// assert_eq!( parser.try_int(to_int).expect("int"), Some(31) );
     /// assert_eq!(
     ///     parser.buff_rest(), " (= tru)"
-    /// ) ;
+    /// );
     ///
-    /// assert_eq!( parser.try_int(to_int).expect("int"), None ) ;
+    /// assert_eq!( parser.try_int(to_int).expect("int"), None );
     ///
-    /// let txt = " 7.0 " ;
-    /// println!("{}", txt) ;
-    /// let mut parser = SmtParser::of_str(txt) ;
-    /// assert_eq!( parser.try_int(to_int).expect("int"), None ) ;
+    /// let txt = " 7.0 ";
+    /// println!("{}", txt);
+    /// let mut parser = SmtParser::of_str(txt);
+    /// assert_eq!( parser.try_int(to_int).expect("int"), None );
     /// assert_eq!(
     ///     parser.buff_rest(), " 7.0 "
-    /// ) ;
+    /// );
     ///
-    /// let txt = " 00 " ;
-    /// println!("{}", txt) ;
-    /// let mut parser = SmtParser::of_str(txt) ;
-    /// assert_eq!( parser.try_int(to_int).expect("int"), None ) ;
+    /// let txt = " 00 ";
+    /// println!("{}", txt);
+    /// let mut parser = SmtParser::of_str(txt);
+    /// assert_eq!( parser.try_int(to_int).expect("int"), None );
     /// assert_eq!(
     ///     parser.buff_rest(), " 00 "
-    /// ) ;
+    /// );
     /// # }
     /// ```
     pub fn try_int<F, T, Err>(&mut self, f: F) -> SmtRes<Option<T>>
@@ -945,60 +945,60 @@ impl<R: BufRead> SmtParser<R> {
     /// in its buffer once it's parsed.
     ///
     /// ```
-    /// # extern crate rsmt2 ;
-    /// # use rsmt2::parse::SmtParser ;
+    /// # extern crate rsmt2;
+    /// # use rsmt2::parse::SmtParser;
     /// # fn main() {
-    /// use std::str::FromStr ;
+    /// use std::str::FromStr;
     /// fn to_rat(
     ///     num: & str, den: & str, positive: bool
     /// ) -> Result<(isize, usize), String> {
     ///     let num = isize::from_str(num).map(
     ///         |num| if positive { num } else { - num }
-    ///     ).map_err(|e| format!("{}", e)) ? ;
-    ///     let den = usize::from_str(den).map_err(|e| format!("{}", e)) ? ;
+    ///     ).map_err(|e| format!("{}", e)) ?;
+    ///     let den = usize::from_str(den).map_err(|e| format!("{}", e)) ?;
     ///     Ok((num, den))
     /// }
     /// let txt = "\
     ///     0.0 666.0 7.42 (- 11.0) false; comment\n(/ 31 27) (- (/ 63 0)) (= tru)\
-    /// " ;
-    /// let mut parser = SmtParser::of_str(txt) ;
-    /// assert_eq!( parser.try_rat(to_rat).expect("rat"), Some((0, 1)) ) ;
+    /// ";
+    /// let mut parser = SmtParser::of_str(txt);
+    /// assert_eq!( parser.try_rat(to_rat).expect("rat"), Some((0, 1)) );
     /// assert_eq!(
     ///     parser.buff_rest(), " 666.0 7.42 (- 11.0) false; comment\n"
-    /// ) ;
-    /// assert_eq!( parser.try_rat(to_rat).expect("rat"), Some((666, 1)) ) ;
+    /// );
+    /// assert_eq!( parser.try_rat(to_rat).expect("rat"), Some((666, 1)) );
     /// assert_eq!(
     ///     parser.buff_rest(), " 7.42 (- 11.0) false; comment\n"
-    /// ) ;
-    /// assert_eq!( parser.try_rat(to_rat).expect("rat"), Some((742, 100)) ) ;
+    /// );
+    /// assert_eq!( parser.try_rat(to_rat).expect("rat"), Some((742, 100)) );
     /// assert_eq!(
     ///     parser.buff_rest(), " (- 11.0) false; comment\n"
-    /// ) ;
-    /// assert_eq!( parser.try_rat(to_rat).expect("rat"), Some((- 11, 1)) ) ;
+    /// );
+    /// assert_eq!( parser.try_rat(to_rat).expect("rat"), Some((- 11, 1)) );
     /// assert_eq!(
     ///     parser.buff_rest(), " false; comment\n"
-    /// ) ;
-    /// assert_eq!( parser.try_rat(to_rat).expect("rat"), None ) ;
-    /// parser.tag("false").expect("tag") ;
-    /// assert_eq!( parser.try_rat(to_rat).expect("rat"), Some((31, 27)) ) ;
+    /// );
+    /// assert_eq!( parser.try_rat(to_rat).expect("rat"), None );
+    /// parser.tag("false").expect("tag");
+    /// assert_eq!( parser.try_rat(to_rat).expect("rat"), Some((31, 27)) );
     /// assert_eq!(
     ///     parser.buff_rest(), " (- (/ 63 0)) (= tru)"
-    /// ) ;
-    /// assert_eq!( parser.try_rat(to_rat).expect("rat"), (Some((- 63, 0))) ) ;
+    /// );
+    /// assert_eq!( parser.try_rat(to_rat).expect("rat"), (Some((- 63, 0))) );
     ///
-    /// let txt = " 7 " ;
-    /// let mut parser = SmtParser::of_str(txt) ;
-    /// assert_eq!( parser.try_rat(to_rat).expect("rat"), None ) ;
+    /// let txt = " 7 ";
+    /// let mut parser = SmtParser::of_str(txt);
+    /// assert_eq!( parser.try_rat(to_rat).expect("rat"), None );
     /// assert_eq!(
     ///     parser.buff_rest(), " 7 "
-    /// ) ;
+    /// );
     ///
-    /// let txt = " (- 7) " ;
-    /// let mut parser = SmtParser::of_str(txt) ;
-    /// assert_eq!( parser.try_rat(to_rat).expect("rat"), None ) ;
+    /// let txt = " (- 7) ";
+    /// let mut parser = SmtParser::of_str(txt);
+    /// assert_eq!( parser.try_rat(to_rat).expect("rat"), None );
     /// assert_eq!(
     ///     parser.buff_rest(), " (- 7) "
-    /// ) ;
+    /// );
     /// # }
     /// ```
     pub fn try_rat<F, T, Err>(&mut self, f: F) -> SmtRes<Option<T>>
@@ -1127,33 +1127,33 @@ impl<R: BufRead> SmtParser<R> {
     /// in its buffer once it's parsed.
     ///
     /// ```
-    /// # extern crate rsmt2 ;
-    /// # use rsmt2::parse::SmtParser ;
+    /// # extern crate rsmt2;
+    /// # use rsmt2::parse::SmtParser;
     /// # fn main() {
     /// fn sym(input: & str) -> Result<String, String> {
     ///     Ok( input.into() )
     /// }
     /// let txt = "\
     ///     ident (- 11) +~stuff; comment\n |some stuff \n [{}!+)(}|\
-    /// " ;
-    /// let mut parser = SmtParser::of_str(txt) ;
-    /// assert_eq!( parser.try_sym(sym).expect("sym"), Some("ident".into()) ) ;
+    /// ";
+    /// let mut parser = SmtParser::of_str(txt);
+    /// assert_eq!( parser.try_sym(sym).expect("sym"), Some("ident".into()) );
     /// assert_eq!(
     ///     parser.buff_rest(), " (- 11) +~stuff; comment\n"
-    /// ) ;
-    /// assert_eq!( parser.try_sym(sym).expect("sym"), None ) ;
+    /// );
+    /// assert_eq!( parser.try_sym(sym).expect("sym"), None );
     /// assert_eq!(
     ///     parser.buff_rest(), "(- 11) +~stuff; comment\n"
-    /// ) ;
-    /// parser.tag("(- 11)").expect("tag") ;
-    /// assert_eq!( parser.try_sym(sym).expect("sym"), Some("+~stuff".into()) ) ;
+    /// );
+    /// parser.tag("(- 11)").expect("tag");
+    /// assert_eq!( parser.try_sym(sym).expect("sym"), Some("+~stuff".into()) );
     /// assert_eq!(
     ///     parser.buff_rest(), "; comment\n"
-    /// ) ;
+    /// );
     /// assert_eq!(
     ///     parser.try_sym(sym).expect("sym"),
     ///     Some("|some stuff \n [{}!+)(}|".into())
-    /// ) ;
+    /// );
     /// # }
     /// ```
     pub fn try_sym<F, T, Err>(&mut self, f: F) -> SmtRes<Option<T>>
@@ -1201,15 +1201,15 @@ impl<R: BufRead> SmtParser<R> {
     /// # Examples
     ///
     /// ```
-    /// # extern crate rsmt2 ;
-    /// # use rsmt2::parse::SmtParser ;
+    /// # extern crate rsmt2;
+    /// # use rsmt2::parse::SmtParser;
     /// # fn main() {
-    /// use rsmt2::parse::{ IdentParser, ValueParser } ;
-    /// use rsmt2::SmtRes ;
+    /// use rsmt2::parse::{ IdentParser, ValueParser };
+    /// use rsmt2::SmtRes;
     /// let txt = "\
     ///     ( error \"huge panic\" )
-    /// " ;
-    /// let mut parser = SmtParser::of_str(txt) ;
+    /// ";
+    /// let mut parser = SmtParser::of_str(txt);
     /// if let Err(e) = parser.try_error() {
     /// #    for e in e.iter() {
     /// #        for line in format!("{}", e).lines() {
