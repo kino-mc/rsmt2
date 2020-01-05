@@ -2,8 +2,8 @@
 //!
 //! See [`CHANGES.md`][changes] for the list of changes.
 //!
-//! If you use this library consider contacting us on the [repository][rsmt2]
-//! so that we can add your project to the readme.
+//! If you use this library consider contacting us on the [repository][rsmt2] so that we can add
+//! your project to the readme.
 //!
 //!
 //!
@@ -11,30 +11,37 @@
 //! # Description
 //!
 //!
-//! In rsmt2, solvers run in a separate process and communication is achieved
-//! *via* system pipes. For the moment, only [z3][z3] is officially supported.
-//! If you would like `rsmt2` to support other solvers, please open an issue on
-//! the [repository][rsmt2].
+//! In rsmt2, solvers run in a separate process and communication is achieved *via* system pipes.
+//! For the moment, only [z3][z3] is officially supported. If you would like `rsmt2` to support
+//! other solvers, please open an issue on the [repository][rsmt2].
 //!
-//! **NB**: most of the tests and documentation examples in this crate will not
-//! work unless you have [z3][z3] in your path under the name `z3`.
+//! **NB**: most of the tests and documentation examples in this crate will not work unless you have
+//! [z3][z3] in your path under the name `z3`.
 //!
-//! This library does **not** have a structure for S-expressions. It must be
-//! provided by the user, as well as the relevant printing and parsing
-//! functions. Printing-related traits are discussed in the
-//! [`print`][print_mod] module, and parsing-related traits are in the
-//! [`parse`][parse_mod] module.
+//! This library does **not** have a structure for S-expressions. It must be provided by the user,
+//! as well as the relevant printing and parsing functions. Printing-related traits are discussed in
+//! the [`print`][print_mod] module, and parsing-related traits are in the [`parse`][parse_mod]
+//! module.
 //!
 //!
+//! # Supported Backend Solvers
 //!
+//! This crate supports the following solvers:
+//!
+//! - [z3][z3]: full support
+//! - [cvc4][cvc4]: full support in theory, but only partially tested. Note that `get-value` is
+//!   known to crash some versions of CVC4.
+//! - [yices 2][yices 2]: full support in theory, but only partially tested. Command `get-model`
+//!   will only work on Yices 2 > `2.6.1`, and needs to be activated in [SmtConf][SmtConf] with
+//!   [`conf.models()`](struct.SmtConf.html#method.models). To understand why, see
+//!   <https://github.com/SRI-CSL/yices2/issues/162>.
 //!
 //!
 //!
 //! # Very basic example
 //!
-//! String types already implement `rsmt2`'s SMT-printing traits. It's not a
-//! scalable approach, but it's useful for testing and explaining things. Let's
-//! create a solver first.
+//! String types already implement `rsmt2`'s SMT-printing traits. It's not a scalable approach, but
+//! it's useful for testing and explaining things. Let's create a solver first.
 //!
 //! ```rust
 //! fn do_smt_stuff() -> ::rsmt2::SmtRes<()> {
@@ -54,15 +61,13 @@
 //! do_smt_stuff().unwrap()
 //! ```
 //!
-//! Notice that all three functions spawning a solver take a parser used to
-//! parse identifiers, values and/or expressions. `rsmt2` parses everything
-//! else (keywords and such), and lets users handle the important parts. See
-//! the [`parse`][parse_mod] module documentation for more details.
+//! Notice that all three functions spawning a solver take a parser used to parse identifiers,
+//! values and/or expressions. `rsmt2` parses everything else (keywords and such), and lets users
+//! handle the important parts. See the [`parse`][parse_mod] module documentation for more details.
 //!
-//! Our current parser `()` is enough for this example. We can even perform
-//! `check-sat`s since, unlike `get-model` for instance, it does not require
-//! any user-data-structure-specific parsing. Let's declare a few symbols and
-//! perform a check-sat.
+//! Our current parser `()` is enough for this example. We can even perform `check-sat`s since,
+//! unlike `get-model` for instance, it does not require any user-data-structure-specific parsing.
+//! Let's declare a few symbols and perform a check-sat.
 //!
 //! ```rust
 //! # fn do_smt_stuff() -> ::rsmt2::SmtRes<()> {
@@ -81,23 +86,22 @@
 //! # do_smt_stuff().unwrap()
 //! ```
 //!
-//! We already knew there's no pair of integers the sum of the squares of which
-//! is equal to `7`, but now we **proved** it.
+//! We already knew there's no pair of integers the sum of the squares of which is equal to `7`, but
+//! now we **proved** it.
 //!
 //!
 //!
 //!
 //! # Parsing things
 //!
-//! If we want to be able to retrieve models, we need a parser that can parse
-//! two things: identifiers, types and values. That is, we need a parser that
-//! implements [`IdentParser`][ident_parser] (identifiers and types) and
-//! [`ModelParser`][model_parser] (values). The previous parser `()` doesn't,
-//! so `solver.get_model()` won't even compile.
+//! If we want to be able to retrieve models, we need a parser that can parse two things:
+//! identifiers, types and values. That is, we need a parser that implements
+//! [`IdentParser`][ident_parser] (identifiers and types) and [`ModelParser`][model_parser]
+//! (values). The previous parser `()` doesn't, so `solver.get_model()` won't even compile.
 //!
-//! There's different ways to implement these traits, discussed in the
-//! [`parse`][parse_mod] module documentation. Let us be lazy and just have
-//! rsmt2 do the work for us. Note the (unnecessary) use of `define_fun`.
+//! There's different ways to implement these traits, discussed in the [`parse`][parse_mod] module
+//! documentation. Let us be lazy and just have rsmt2 do the work for us. Note the (unnecessary) use
+//! of `define_fun`.
 //!
 //! ```rust
 //! use rsmt2::{ Solver, SmtRes } ;
@@ -163,18 +167,16 @@
 //!
 //! # Asynchronous check-sats.
 //!
-//! The check-sat command above is blocking, in that the caller cannot do
-//! anything until the backend solver answers. Using the `print_check_sat...`
-//! and `parse_check_sat...` functions, users can issue the check-sat command,
-//! work on something else, and get the result later on.
+//! The check-sat command above is blocking, in that the caller cannot do anything until the backend
+//! solver answers. Using the `print_check_sat...` and `parse_check_sat...` functions, users can
+//! issue the check-sat command, work on something else, and get the result later on.
 //!
-//! The `print_check_sat...` functions return a [`FutureCheckSat`][future]
-//! required by the `parse_check_sat...` functions to guarantee statically that
-//! the parse request makes sense. `FutureCheckSat` is equivalent to unit and
-//! exists only at compile time.
+//! The `print_check_sat...` functions return a [`FutureCheckSat`][future] required by the
+//! `parse_check_sat...` functions to guarantee statically that the parse request makes sense.
+//! `FutureCheckSat` is equivalent to unit and exists only at compile time.
 //!
-//! Rewriting the previous example in an asynchronous fashion yields (omitting
-//! most of the unmodified code):
+//! Rewriting the previous example in an asynchronous fashion yields (omitting most of the
+//! unmodified code):
 //!
 //! ```rust
 //! # use rsmt2::{ Solver, SmtRes } ;
@@ -218,8 +220,7 @@
 //!
 //! # Other SMT-LIB 2 commands
 //!
-//! Refer to [`Solver`][solver]'s documentation for the complete list of
-//! SMT-LIB 2 commands.
+//! Refer to [`Solver`][solver]'s documentation for the complete list of SMT-LIB 2 commands.
 //!
 //!
 //!
@@ -228,9 +229,8 @@
 //!
 //! # Activation literals
 //!
-//! Module [`actlit`][actlit_mod] discusses rsmt2's API for *activation
-//! literals*, a alternative to [`push`][push]/[`pop`][pop] that's more limited
-//! but more efficient.
+//! Module [`actlit`][actlit_mod] discusses rsmt2's API for *activation literals*, a alternative to
+//! [`push`][push]/[`pop`][pop] that's more limited but more efficient.
 //!
 //!
 //!
@@ -243,9 +243,9 @@
 //!
 //! # Custom data structures
 //!
-//! Module [`example::simple`][simple_mod]'s documentation discusses in detail
-//! how to use rsmt2 with a custom data structure. This includes implementing
-//! the [print traits][print_mod] and writing a more evolved parser.
+//! Module [`example::simple`][simple_mod]'s documentation discusses in detail how to use rsmt2 with
+//! a custom data structure. This includes implementing the [print traits][print_mod] and writing a
+//! more evolved parser.
 //!
 //!
 //!
@@ -256,26 +256,23 @@
 //!
 //! # Print-time information
 //!
-//! Module [`example::print_time`][print_time_mod]'s documentation showcases
-//! print-time information. Proper documentation is somewhat lacking as it is a
-//! rather advanced topic, and no one asked for more details about it.
+//! Module [`example::print_time`][print_time_mod]'s documentation showcases print-time information.
+//! Proper documentation is somewhat lacking as it is a rather advanced topic, and no one asked for
+//! more details about it.
 //!
 //! Print-time information is the reason for
 //!
 //! - the `Info` type parameter in the [`...2Smt`][print_mod] traits,
 //! - all the `..._with` solver functions, such as `assert_with`.
 //!
-//! Users can call these functions to pass information down to their own
-//! printers as commands are written on the solver's input. The typical
-//! use-case is *print-time unrolling* when working with transition systems.
-//! Given a transition relation `T` over a current and next state `s[0]` and
-//! `s[1]`, *unrolling* consists in creating a sequence of states `s[0]`,
-//! `s[1]`, `s[2]`, ... such that `T(s[0], s[1]) and T(s[1], s[2]) and ...`.
-//! Such a sequence is called a *trace*.
+//! Users can call these functions to pass information down to their own printers as commands are
+//! written on the solver's input. The typical use-case is *print-time unrolling* when working with
+//! transition systems. Given a transition relation `T` over a current and next state `s[0]` and
+//! `s[1]`, *unrolling* consists in creating a sequence of states `s[0]`, `s[1]`, `s[2]`, ... such
+//! that `T(s[0], s[1]) and T(s[1], s[2]) and ...`. Such a sequence is called a *trace*.
 //!
-//! Say the state `s` is some variables `(x, y)` and the transition relation is
-//! `T(s[0], s[1]) = (x[1] == x[0] + 1) && (y[1] == 2 * y[0])`. Then in
-//! SMT-LIB, unrolling `T` twice looks like
+//! Say the state `s` is some variables `(x, y)` and the transition relation is `T(s[0], s[1]) =
+//! (x[1] == x[0] + 1) && (y[1] == 2 * y[0])`. Then in SMT-LIB, unrolling `T` twice looks like
 //!
 //! ```lisp
 //! (define-fun trans ( (x_0 Int) (y_0 Int) (x_1 Int) (y_1 Int) ) Bool
@@ -296,27 +293,24 @@
 //! (assert (trans x_1 y_1 x_2 y_2))
 //! ```
 //!
-//! In a model-checker, at each point of the unrolling one wants to
-//! (conditionally) assert terms about a state, or a pair of succeeding states,
-//! but never more. Also, the "same" term will typically be asserted for many
-//! different states / pair of states.
+//! In a model-checker, at each point of the unrolling one wants to (conditionally) assert terms
+//! about a state, or a pair of succeeding states, but never more. Also, the "same" term will
+//! typically be asserted for many different states / pair of states.
 //!
-//! Notice that if we want to assert `P(s) = x > 0` for `s[0]` and `s[1]`, then
-//! in theory we have to create two terms `x_0 > 0` and `x_1 > 0`. By
-//! extension, these are called *unrollings* of `P`. Now, these terms can end
-//! up being pretty big, and memory can become a problem, even with
+//! Notice that if we want to assert `P(s) = x > 0` for `s[0]` and `s[1]`, then in theory we have to
+//! create two terms `x_0 > 0` and `x_1 > 0`. By extension, these are called *unrollings* of `P`.
+//! Now, these terms can end up being pretty big, and memory can become a problem, even with
 //! [hashconsing][hashconsing].
 //!
-//! Creating a different term for each unrolling of `P`, asserting it, and then
-//! (usually) discarding them right away is not practical time- and
-//! memory-wise. It is better if the term structure has a notion of "current
-//! `x`" (`x_0`) and "next `x`" (`x_1`), and to decide how to print them *at
-//! print-time* by passing an *offset* that's essentially an integer. It
-//! represents the offset for the "current" state.
+//! Creating a different term for each unrolling of `P`, asserting it, and then (usually) discarding
+//! them right away is not practical time- and memory-wise. It is better if the term structure has a
+//! notion of "current `x`" (`x_0`) and "next `x`" (`x_1`), and to decide how to print them *at
+//! print-time* by passing an *offset* that's essentially an integer. It represents the offset for
+//! the "current" state.
 //!
-//! So, from the term `x_1 > x_0` for instance, passing an offset of `3` to the
-//! printer would cause `x_0` to be printed as `x_3` and `x_1` as `x_4`.
-//! Without creating anything, just from the original term.
+//! So, from the term `x_1 > x_0` for instance, passing an offset of `3` to the printer would cause
+//! `x_0` to be printed as `x_3` and `x_1` as `x_4`. Without creating anything, just from the
+//! original term.
 //!
 //! This is the workflow showcased (but only partially explained) by
 //! [`example::print_time`][print_time_mod].
@@ -326,28 +320,24 @@
 //!
 //!
 //!
-//! [rsmt2]: https://github.com/kino-mc/rsmt2
-//! (rsmt2 github repository)
-//! [z3]: https://github.com/Z3Prover/z3
-//! (z3 github repository)
-//! [changes]: https://github.com/kino-mc/rsmt2/blob/master/CHANGES.md
-//! (List of changes on github)
+//! [rsmt2]: https://github.com/kino-mc/rsmt2 (rsmt2 github repository)
+//! [z3]: https://github.com/Z3Prover/z3 (z3 github repository)
+//! [cvc4]: https://cvc4.github.io/ (cvc4 github pages)
+//! [yices 2]: https://yices.csl.sri.com/ (yices 2 official page)
+//! [SmtConf]: struct.SmtConf.html (SmtConf type)
+//! [changes]: https://github.com/kino-mc/rsmt2/blob/master/CHANGES.md (List of changes on github)
 //! [solver]: struct.Solver.html (Solver type)
 //! [push]: struct.Solver.html#method.push (Solver's push function)
 //! [pop]: struct.Solver.html#method.pop (Solver's pop function)
-//! [ident_parser]: parse/trait.IdentParser.html
-//! (IdentParser trait)
-//! [model_parser]: parse/trait.ModelParser.html
-//! (ValueParser trait)
+//! [ident_parser]: parse/trait.IdentParser.html (IdentParser trait)
+//! [model_parser]: parse/trait.ModelParser.html (ValueParser trait)
 //! [parse_mod]: parse/index.html (parse module)
 //! [print_mod]: print/index.html (print module)
 //! [simple_mod]: example/simple/index.html (rsmt2 simple example)
 //! [print_time_mod]: example/print_time/index.html (rsmt2 complex example)
 //! [actlit_mod]: actlit/index.html (rsmt2 complex example)
-//! [hashconsing]: https://crates.io/crates/hashconsing
-//! (hashconsing crate on crates.io)
-//! [future]: future/struct.FutureCheckSat.html
-//! (FutureCheckSat struct)
+//! [hashconsing]: https://crates.io/crates/hashconsing (hashconsing crate on crates.io)
+//! [future]: future/struct.FutureCheckSat.html (FutureCheckSat struct)
 
 #[macro_use]
 extern crate error_chain;
@@ -418,6 +408,27 @@ pub mod errors {
             } else {
                 false
             }
+        }
+    }
+
+    impl Error {
+        /// Multi-line, pretty representation of a chain of errors.
+        pub fn to_ml_string(&self) -> String {
+            let mut s = String::new();
+            let mut pref = "";
+            for e in self.iter() {
+                let e_str = e.to_string();
+                let lines = e_str.lines();
+                let mut sub_pref = "- ";
+                for line in lines {
+                    s.push_str(pref);
+                    s.push_str(sub_pref);
+                    s.push_str(line);
+                    pref = "\n";
+                    sub_pref = "  ";
+                }
+            }
+            s
         }
     }
 }

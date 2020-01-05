@@ -1,31 +1,28 @@
 //! A simple example
 //!
-//! This example uses the types defined in this module, they will
-//! systematically be imported in the code samples.
+//! This example uses the types defined in this module, they will systematically be imported in the
+//! code samples.
 //!
 //!
-//! We first need to define the expression type, and make it implement the
-//! [`Expr2Smt`][expr2smt] trait that writes it as an SMT-LIB 2 expression in a
-//! writer.
+//! We first need to define the expression type, and make it implement the [`Expr2Smt`][expr2smt]
+//! trait that writes it as an SMT-LIB 2 expression in a writer.
 //!
 //! ## Print functions
 //!
-//! Since the structure for S-expressions is provided by users, they also need
-//! to provide functions to print it in SMT Lib 2.
+//! Since the structure for S-expressions is provided by users, they also need to provide functions
+//! to print it in SMT Lib 2.
 //!
-//! To use all SMT Lib 2 commands in a type-safe manner, the library requires
-//! printers over
+//! To use all SMT Lib 2 commands in a type-safe manner, the library requires printers over
 //!
 //! * sorts: `Sort2Smt` trait (*e.g.* for `declare-fun`),
 //! * symbols: `Sym2Smt` trait (*e.g.* for `declare-fun`),
 //! * expressions: `Expr2Smt` trait (*e.g.* for `assert`).
 //!
-//! All user-provided printing functions take some *information*. That way,
-//! users can pass some information to, say, `assert` that can modify printing.
-//! This is typically used when dealing with transition systems to perform
-//! "print-time unrolling". See the [`example::print_time`][print_time_mod]
-//! module if you're interested; the example below will not use print-time
-//! information.
+//! All user-provided printing functions take some *information*. That way, users can pass some
+//! information to, say, `assert` that can modify printing. This is typically used when dealing with
+//! transition systems to perform "print-time unrolling". See the
+//! [`example::print_time`][print_time_mod] module if you're interested; the example below will not
+//! use print-time information.
 //!
 //! ```rust
 //! extern crate rsmt2 ;
@@ -83,11 +80,10 @@
 //! # fn main() {}
 //! ```
 //!
-//! For convenience, all the `...2Smt` traits are implemented for `& str`. This
-//! is useful for testing and maybe *very* simple application. Here, we won't
-//! implement `Sym2Smt` or `Sort2Smt` and rely on `& str` for symbols and
-//! sorts. Using a solver then boils down to creating a [`Solver`][solver]
-//! which wraps a z3 process and provides most of the SMT-LIB 2.5 commands.
+//! For convenience, all the `...2Smt` traits are implemented for `& str`. This is useful for
+//! testing and maybe *very* simple application. Here, we won't implement `Sym2Smt` or `Sort2Smt`
+//! and rely on `& str` for symbols and sorts. Using a solver then boils down to creating a
+//! [`Solver`][solver] which wraps a z3 process and provides most of the SMT-LIB 2.5 commands.
 //!
 //! ```rust
 //! extern crate rsmt2 ;
@@ -133,18 +129,16 @@
 //! # }
 //! ```
 //!
-//! Note the `unit` parameter that we passed to the `solver` function:
-//! `solver(& mut kid, ())`. This is actually the parser the solver should use
-//! when it needs to parse values, symbols, types... In the example above, we
-//! only asked for the satisfiability of the assertions. If we had asked for a
-//! model, the compiler would have complained by saying that our parser `()`
-//! does not implement the right parsing traits.
+//! Note the `unit` parameter that we passed to the `solver` function: `solver(& mut kid, ())`. This
+//! is actually the parser the solver should use when it needs to parse values, symbols, types... In
+//! the example above, we only asked for the satisfiability of the assertions. If we had asked for a
+//! model, the compiler would have complained by saying that our parser `()` does not implement the
+//! right parsing traits.
 //!
 //! ## The parser
 //!
-//! This example will only use `get_model`, which only requires `IdentParser`
-//! and `ModelParser`. In most cases, an empty parser `struct` with the right
-//! implementations should be enough.
+//! This example will only use `get_model`, which only requires `IdentParser` and `ModelParser`. In
+//! most cases, an empty parser `struct` with the right implementations should be enough.
 //!
 //! ```rust
 //! # #[macro_use]
@@ -203,8 +197,8 @@
 //! # fn main() {}
 //! ```
 //!
-//! As a side note, it would have been simpler to implement `ModelParser` with
-//! a [`& mut SmtParser`][smt_parser], as it provides the parsers we needed.
+//! As a side note, it would have been simpler to implement `ModelParser` with a [`& mut
+//! SmtParser`][smt_parser], as it provides the parsers we needed.
 //!
 //! ```rust
 //!
@@ -240,8 +234,8 @@
 //! }
 //! ```
 //!
-//! Anyway, once we pass `Parser` to the solver creation function, and all
-//! conditions are met to ask the solver for a model.
+//! Anyway, once we pass `Parser` to the solver creation function, and all conditions are met to ask
+//! the solver for a model.
 //!
 //! ```rust
 //! # #[macro_use]
@@ -324,12 +318,9 @@
 //! ```
 //!
 //! [solver]: struct.Solver.html (Solver type)
-//! [simple_example_mod]: simple/index.html
-//! (Simple helper types)
-//! [expr2smt]: print/trait.Expr2Smt.html
-//! (Expr2Smt trait)
-//! [print_time_mod]: ../print_time/index.html
-//! (Print-time information example)
+//! [simple_example_mod]: simple/index.html (Simple helper types)
+//! [expr2smt]: print/trait.Expr2Smt.html (Expr2Smt trait)
+//! [print_time_mod]: ../print_time/index.html (Print-time information example)
 //! [smt_parser]: parse/struct.SmtParser.html (SmtParser structure)
 
 use crate::{
@@ -341,8 +332,7 @@ use crate::{
 #[cfg(test)]
 use crate::example::get_solver;
 
-/// Operators. Just implements `Display`, never manipulated directly by the
-/// solver.
+/// Operators. Just implements `Display`, never manipulated directly by the solver.
 #[derive(Copy, Clone)]
 pub enum Op {
     Add,

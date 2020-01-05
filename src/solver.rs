@@ -1,7 +1,6 @@
 //! Wrapper around an SMT Lib 2 compliant solver.
 //!
-//! The underlying solver runs in a separate process, communication goes
-//! through system pipes.
+//! The underlying solver runs in a separate process, communication goes through system pipes.
 
 use std::fs::File;
 use std::io::{BufReader, BufWriter, Write};
@@ -24,8 +23,7 @@ pub static actlit_suff: &str = "|";
 ///
 /// Obtained by a solver's [`get_actlit`][get actlit].
 ///
-/// [get actlit]: ../trait.Solver.html#method.get_actlit
-/// (get_actlit documentation)
+/// [get actlit]: ../trait.Solver.html#method.get_actlit (get_actlit documentation)
 #[derive(Debug)]
 pub struct Actlit {
     /// ID of the actlit.
@@ -70,8 +68,8 @@ fn future_check_sat() -> FutureCheckSat {
 
 /// Solver providing most of the SMT-LIB 2.5 commands.
 ///
-/// Note the [`tee` function][tee fun], which takes a file writer to which it
-/// will write everything sent to the solver.
+/// Note the [`tee` function][tee fun], which takes a file writer to which it will write everything
+/// sent to the solver.
 ///
 /// [tee fun]: #method.tee (tee function)
 pub struct Solver<Parser> {
@@ -210,6 +208,12 @@ impl<Parser> Solver<Parser> {
     pub fn default_cvc4(parser: Parser) -> SmtRes<Self> {
         Self::new(SmtConf::cvc4(), parser)
     }
+    /// Creates a solver kid with the default yices 2 configuration.
+    ///
+    /// Mostly used in tests, same as `Self::new( SmtConf::yices_2(), parser )`.
+    pub fn default_yices_2(parser: Parser) -> SmtRes<Self> {
+        Self::new(SmtConf::yices_2(), parser)
+    }
 
     /// Returns the configuration of the solver.
     pub fn conf(&self) -> &SmtConf {
@@ -246,6 +250,7 @@ impl<Parser> Solver<Parser> {
         let file = OpenOptions::new()
             .create(true)
             .write(true)
+            .truncate(true)
             .open(path)
             .chain_err(|| format!("while opening tee file `{}`", path.to_string_lossy()))?;
         self.tee(file)
@@ -258,8 +263,8 @@ impl<Parser> Solver<Parser> {
 
     /// Kills the solver kid.
     ///
-    /// The windows version just prints `(exit)` on the kid's `stdin`. Anything
-    /// else seems to cause problems.
+    /// The windows version just prints `(exit)` on the kid's `stdin`. Anything else seems to cause
+    /// problems.
     ///
     /// This function is automatically called when the solver is dropped.
     #[cfg(windows)]
@@ -271,8 +276,8 @@ impl<Parser> Solver<Parser> {
     }
     /// Kills the solver kid.
     ///
-    /// The windows version just prints `(exit)` on the kid's `stdin`. Anything
-    /// else seems to cause problems.
+    /// The windows version just prints `(exit)` on the kid's `stdin`. Anything else seems to cause
+    /// problems.
     ///
     /// This function is automatically called when the solver is dropped.
     #[cfg(not(windows))]
@@ -347,8 +352,7 @@ impl<Parser> Solver<Parser> {
     /// - [`print_check_sat`][print]
     /// - [`parse_check_sat`][get]
     ///
-    /// If you want a more natural way to handle unknown results, see
-    /// `parse_check_sat_or_unk`.
+    /// If you want a more natural way to handle unknown results, see `parse_check_sat_or_unk`.
     ///
     /// # Examples
     ///
@@ -418,8 +422,7 @@ impl<Parser> Solver<Parser> {
         self.parse_check_sat_or_unk(future)
     }
 
-    /// Resets the underlying solver. Restarts the kid process if no reset
-    /// command is supported.
+    /// Resets the underlying solver. Restarts the kid process if no reset command is supported.
     ///
     /// # Examples
     ///
@@ -609,7 +612,7 @@ impl<Parser> Solver<Parser> {
     /// # Examples
     ///
     /// ```
-    /// # use rsmt2::Solver ;
+    /// # use rsmt2::{SmtConf, Solver};
     /// let mut solver = Solver::default(()).unwrap() ;
     /// solver.set_logic( ::rsmt2::Logic::QF_UF ).unwrap() ;
     /// ```
@@ -830,6 +833,7 @@ impl<Parser> Solver<Parser> {
         Exprs: IntoIterator<Item = &'a Expr>,
     {
         self.get_values_with(exprs, ())
+            .map_err(|e| self.conf.enrich_get_values_error(e))
     }
 }
 
@@ -873,8 +877,7 @@ impl<Parser> Solver<Parser> {
         Ok(next_actlit)
     }
 
-    /// Deactivates an activation literal, alias for
-    /// `solver.set_actlit(actlit, false)`.
+    /// Deactivates an activation literal, alias for `solver.set_actlit(actlit, false)`.
     ///
     /// See the [`actlit`'s module doc][actlits] for more details.
     ///
@@ -912,8 +915,7 @@ impl<Parser> Solver<Parser> {
         Ok(())
     }
 
-    /// Asserts an expression without print information, guarded by an activation
-    /// literal.
+    /// Asserts an expression without print information, guarded by an activation literal.
     ///
     /// See the [`actlit`'s module doc][actlits] for more details.
     ///
@@ -994,21 +996,29 @@ impl<Parser> Solver<Parser> {
     where
         Actlits: IntoIterator<Item = &'a Actlit>,
     {
-        tee_write! {
-          self, |w| write_str(w, "(check-sat-assuming (") ?
-        }
-        for actlit in actlits {
-            tee_write! {
-              self, |w| {
-                write!(w, " ") ? ;
-                actlit.write(w) ?
-              }
+        match self.conf.get_check_sat_assuming() {
+            Some(ref cmd) => {
+                tee_write! {
+                  self, |w| write!(w, "({} (", cmd) ?
+                }
+                for actlit in actlits {
+                    tee_write! {
+                      self, |w| {
+                        write!(w, " ") ? ;
+                        actlit.write(w) ?
+                      }
+                    }
+                }
+                tee_write! {
+                  self, |w| write_str(w, ") )\n") ?
+                }
+                Ok(future_check_sat())
+            }
+            None => {
+                let msg = format!("{} does not support check-sat-assuming", self.conf.desc());
+                Err(msg.into())
             }
         }
-        tee_write! {
-          self, |w| write_str(w, " ) )\n") ?
-        }
-        Ok(future_check_sat())
     }
 
     /// Parse the result of a check-sat, turns `unknown` results into errors.
@@ -1131,18 +1141,18 @@ impl<Parser> Solver<Parser> {
         match self.conf.get_check_sat_assuming() {
             Some(ref cmd) => {
                 tee_write! {
-                  self, |w| write!(w, "({}\n ", cmd) ?
+                  self, |w| write!(w, "({} (\n ", cmd) ?
                 }
                 for sym in bool_vars {
                     tee_write! {
                       self, |w| {
-                        write_str(w, " ") ? ;
+                        write_str(w, "  ") ? ;
                         sym.sym_to_smt2(w, info) ?
                       }
                     }
                 }
                 tee_write! {
-                  self, |w| write_str(w, "\n)\n") ?
+                  self, |w| write_str(w, "\n))\n") ?
                 }
                 Ok(future_check_sat())
             }
@@ -1215,8 +1225,7 @@ impl<Parser> Solver<Parser> {
 
     /// Get-values command.
     ///
-    /// Notice that the input expression type and the output one have no reason
-    /// to be the same.
+    /// Notice that the input expression type and the output one have no reason to be the same.
     fn get_values_with<'a, Info, Expr, Exprs, PExpr, PValue>(
         &mut self,
         exprs: Exprs,
@@ -1336,12 +1345,11 @@ impl<Parser> Solver<Parser> {
 
     /// Defines a new nullary sort.
     ///
-    /// When using [`define_sort`][def], rust complains because it does not know
-    /// what the `Arg` type parameter is, since the `args` parameter is empty. So
-    /// this function can be useful.
+    /// When using [`define_sort`][def], rust complains because it does not know what the `Arg` type
+    /// parameter is, since the `args` parameter is empty. So this function can be useful.
     ///
-    /// This could be fixed with a default type for `Arg`, like `Body` for
-    /// instance, but this is currently not possible in a function.
+    /// This could be fixed with a default type for `Arg`, like `Body` for instance, but this is
+    /// currently not possible in a function.
     ///
     /// [def]: #method.define_sort
     /// (define_sort function)
@@ -1655,13 +1663,11 @@ impl<Parser> Solver<Parser> {
         Ok(())
     }
 
-    /// Asserts an expression with some print information, guarded by an
-    /// activation literal.
+    /// Asserts an expression with some print information, guarded by an activation literal.
     ///
     /// See the [`actlit`'s module doc][actlits] for more details.
     ///
-    /// [actlits]: actlit/index.html
-    /// (actlit module documentation)
+    /// [actlits]: actlit/index.html (actlit module documentation)
     #[inline]
     pub fn assert_act_with<Info, Expr>(
         &mut self,

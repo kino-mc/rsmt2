@@ -1,11 +1,9 @@
 //! Activation literal type and helpers.
 //!
-//! For an explanation of what activation literal are, see
-//! [the discussion below][why actlits].
+//! For an explanation of what activation literal are, see [the discussion below][why actlits].
 //!
-//! **NB**: while `rmst2`'s actlit API declares some constant symbols in the
-//! underlying solver, these will not appear in the result of
-//! [`get_model`](get_model) queries.
+//! **NB**: while `rmst2`'s actlit API declares some constant symbols in the underlying solver,
+//! these will not appear in the result of [`get_model`](get_model) queries.
 //!
 //!
 //! # Relevant functions on solvers
@@ -25,8 +23,8 @@
 //!
 //! # Usage
 //!
-//! First, one can of course create activation literals by hand, and use them
-//! in `check-sat`s with [`check_sat_assuming`][check sat ass]:
+//! First, one can of course create activation literals by hand, and use them in `check-sat`s with
+//! [`check_sat_assuming`][check sat ass]:
 //!
 //! ```
 //! use rsmt2::* ;
@@ -95,12 +93,11 @@
 //! ```
 //!
 //!
-//! **NB**: under the hood, `rmst2` declares a constant boolean symbol for each
-//! actlit. Hence, there is a (very low) risk of collision with the user's
-//! symbol. The internal actlits are named `"|rsmt2 actlit <uid>|"`. Any symbol
-//! starting with `"|rsmt2 actlit "` is assumed to be a `rsmt2` actlit. In
-//! particular, such symbols will be pruned out of `get_model` queries (if at
-//! least one actlit was requested since the last reset).
+//! **NB**: under the hood, `rmst2` declares a constant boolean symbol for each actlit. Hence, there
+//! is a (very low) risk of collision with the user's symbol. The internal actlits are named
+//! `"|rsmt2 actlit <uid>|"`. Any symbol starting with `"|rsmt2 actlit "` is assumed to be a `rsmt2`
+//! actlit. In particular, such symbols will be pruned out of `get_model` queries (if at least one
+//! actlit was requested since the last reset).
 //!
 //! ```
 //! use rsmt2::* ;
@@ -173,13 +170,11 @@
 //!
 //! # Discussion on activation literals
 //!
-//! The activation literal technique is a much more efficient alternative to
-//! the `push`/`pop` SMT-LIB commands. When a `pop` command is issued, solvers
-//! usually reset themselves and re-declare/assert whatever was before the last
-//! push.
+//! The activation literal technique is a much more efficient alternative to the `push`/`pop`
+//! SMT-LIB commands. When a `pop` command is issued, solvers usually reset themselves and
+//! re-declare/assert whatever was before the last push.
 //!
-//! Activation literals are boolean nullary symbols controlling the activation
-//! of some assertions.
+//! Activation literals are boolean nullary symbols controlling the activation of some assertions.
 //!
 //! For instance
 //!
@@ -229,26 +224,22 @@
 //! (get-value (x))
 //! ```
 //!
-//! This is much more efficient than `push`/`pop`: the conditional `check-sat`s
-//! basically force the activation literals directly in the SAT part of the SMT
-//! solver. Long story short, this means everything the solver learns during
-//! the checks is still valid afterwards. Conversely, after a `pop` solvers are
-//! usually unable to decide what to keep from the checks before the `pop`, and
+//! This is much more efficient than `push`/`pop`: the conditional `check-sat`s basically force the
+//! activation literals directly in the SAT part of the SMT solver. Long story short, this means
+//! everything the solver learns during the checks is still valid afterwards. Conversely, after a
+//! `pop` solvers are usually unable to decide what to keep from the checks before the `pop`, and
 //! thus drop everything.
 //!
-//! Actlits are **not** equivalent to `push`/`pop` however. Pushing a scope
-//! allows to declare/define function symbols and then discard them, while
-//! keeping whatever's outside of the scope. Actlits (mostly) just guard
-//! assertions and cannot accomplish this.
+//! Actlits are **not** equivalent to `push`/`pop` however. Pushing a scope allows to declare/define
+//! function symbols and then discard them, while keeping whatever's outside of the scope. Actlits
+//! (mostly) just guard assertions and cannot accomplish this.
 //!
-//! [why actlits]: #discussion-on-activation-literals
-//! (Activation literals, why?)
+//! [why actlits]: #discussion-on-activation-literals (Activation literals, why?)
 //! [SActlit]: struct.SActlit.html (SActlit documentation)
 //! [Actlit]: struct.Actlit.html (Actlit documentation)
 //! [phantom]: https://doc.rust-lang.org/std/marker/struct.PhantomData.html
 //! (PhantomData documentation)
-//! [check sat ass]: ../trait.Solver.html#method.check_sat_assuming
-//! (check_sat_assuming function)
+//! [check sat ass]: ../trait.Solver.html#method.check_sat_assuming (check_sat_assuming function)
 //! [get_model]: ../trait.Solver.html#method.get_model (get_model function)
 
 pub use crate::solver::Actlit;
