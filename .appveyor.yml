@@ -19,4 +19,4 @@ build: false
 test_script:
   - cargo build --verbose
   - cargo build --verbose --release
-  - cargo test --verbose --skip cvc4 --skip yices_2
+  - cargo test --verbose -- --skip cvc4 --skip yices_2
