@@ -108,14 +108,14 @@ impl<Parser> Write for Solver<Parser> {
 macro_rules! tee_write {
   ($slf:expr, |$w:ident| $($tail:tt)*) => ({
     if let Some(ref mut $w) = $slf.tee {
-      $($tail)* ;
-      writeln!($w) ? ;
+      $($tail)*;
+      writeln!($w)?;
       $w.flush() ?
     }
-    let $w = & mut $slf.stdin ;
-    $($tail)* ;
+    let $w = & mut $slf.stdin;
+    $($tail)*;
     $w.flush() ?
-  }) ;
+  });
 }
 
 impl<Parser> ::std::ops::Drop for Solver<Parser> {
@@ -333,9 +333,9 @@ impl<Parser> Solver<Parser> {
     /// # Examples
     ///
     /// ```
-    /// # use rsmt2::Solver ;
-    /// let mut solver = Solver::default(()).unwrap() ;
-    /// solver.assert("(= 0 1)").unwrap() ;
+    /// # use rsmt2::Solver;
+    /// let mut solver = Solver::default(()).unwrap();
+    /// solver.assert("(= 0 1)").unwrap();
     /// ```
     #[inline]
     pub fn assert<Expr>(&mut self, expr: &Expr) -> SmtRes<()>
@@ -357,19 +357,19 @@ impl<Parser> Solver<Parser> {
     /// # Examples
     ///
     /// ```
-    /// # use rsmt2::Solver ;
-    /// # let mut solver = Solver::default(()).unwrap() ;
-    /// solver.declare_const("x", "Int").unwrap() ;
-    /// solver.declare_const("y", "Int").unwrap() ;
+    /// # use rsmt2::Solver;
+    /// # let mut solver = Solver::default(()).unwrap();
+    /// solver.declare_const("x", "Int").unwrap();
+    /// solver.declare_const("y", "Int").unwrap();
     ///
-    /// solver.push(1).unwrap() ;
-    /// solver.assert("(= (+ x y) 0)").unwrap() ;
-    /// let maybe_sat = solver.check_sat().unwrap() ;
+    /// solver.push(1).unwrap();
+    /// solver.assert("(= (+ x y) 0)").unwrap();
+    /// let maybe_sat = solver.check_sat().unwrap();
     /// assert_eq! { maybe_sat, true }
-    /// solver.pop(1).unwrap() ;
+    /// solver.pop(1).unwrap();
     ///
-    /// solver.assert("(= (+ (* x x y) (* y y x)) 7654321)").unwrap() ;
-    /// let sat_res = & solver.check_sat() ;
+    /// solver.assert("(= (+ (* x x y) (* y y x)) 7654321)").unwrap();
+    /// let sat_res = & solver.check_sat();
     ///
     /// match * sat_res {
     ///     Err(ref e) => match * e.kind() {
@@ -398,19 +398,19 @@ impl<Parser> Solver<Parser> {
     /// # Examples
     ///
     /// ```
-    /// # use rsmt2::Solver ;
-    /// # let mut solver = Solver::default(()).unwrap() ;
-    /// solver.declare_const("x", "Int").unwrap() ;
-    /// solver.declare_const("y", "Int").unwrap() ;
+    /// # use rsmt2::Solver;
+    /// # let mut solver = Solver::default(()).unwrap();
+    /// solver.declare_const("x", "Int").unwrap();
+    /// solver.declare_const("y", "Int").unwrap();
     ///
-    /// solver.push(1).unwrap() ;
-    /// solver.assert("(= (+ x y) 0)").unwrap() ;
-    /// let maybe_sat = solver.check_sat_or_unk().unwrap() ;
+    /// solver.push(1).unwrap();
+    /// solver.assert("(= (+ x y) 0)").unwrap();
+    /// let maybe_sat = solver.check_sat_or_unk().unwrap();
     /// assert_eq! { maybe_sat, Some(true) }
-    /// solver.pop(1).unwrap() ;
+    /// solver.pop(1).unwrap();
     ///
-    /// solver.assert("(= (+ (* x x y) (* y y x)) 7654321)").unwrap() ;
-    /// let maybe_sat = solver.check_sat_or_unk().unwrap() ;
+    /// solver.assert("(= (+ (* x x y) (* y y x)) 7654321)").unwrap();
+    /// let maybe_sat = solver.check_sat_or_unk().unwrap();
     /// // Unknown ~~~~~~~~~~~~~vvvv
     /// assert_eq! { maybe_sat, None }
     /// ```
@@ -427,11 +427,11 @@ impl<Parser> Solver<Parser> {
     /// # Examples
     ///
     /// ```
-    /// # use rsmt2::Solver ;
-    /// let mut solver = Solver::default(()).unwrap() ;
-    /// solver.assert("(= 0 1)").unwrap() ;
+    /// # use rsmt2::Solver;
+    /// let mut solver = Solver::default(()).unwrap();
+    /// solver.assert("(= 0 1)").unwrap();
     /// assert! { ! solver.check_sat().unwrap() }
-    /// solver.reset().unwrap() ;
+    /// solver.reset().unwrap();
     /// assert! { solver.check_sat().unwrap() }
     /// ```
     #[inline]
@@ -448,8 +448,8 @@ impl<Parser> Solver<Parser> {
     /// # Examples
     ///
     /// ```
-    /// # use rsmt2::Solver ;
-    /// let mut solver = Solver::default(()).unwrap() ;
+    /// # use rsmt2::Solver;
+    /// let mut solver = Solver::default(()).unwrap();
     /// solver.declare_const("x", "Int").unwrap()
     /// ```
     #[inline]
@@ -464,8 +464,8 @@ impl<Parser> Solver<Parser> {
     /// Declares a new function symbol.
     ///
     /// ```
-    /// # use rsmt2::Solver ;
-    /// let mut solver = Solver::default(()).unwrap() ;
+    /// # use rsmt2::Solver;
+    /// let mut solver = Solver::default(()).unwrap();
     /// solver.declare_fun(
     ///     "my_symbol", & [ "Int", "Real", "Bool" ], "Bool"
     /// ).unwrap()
@@ -491,8 +491,8 @@ impl<Parser> Solver<Parser> {
     /// # Examples
     ///
     /// ```
-    /// # use rsmt2::Solver ;
-    /// let mut solver = Solver::default(()).unwrap() ;
+    /// # use rsmt2::Solver;
+    /// let mut solver = Solver::default(()).unwrap();
     /// solver.define_const(
     ///     "seven", "Int", "7"
     /// ).unwrap()
@@ -517,8 +517,8 @@ impl<Parser> Solver<Parser> {
     /// # Examples
     ///
     /// ```
-    /// # use rsmt2::Solver ;
-    /// let mut solver = Solver::default(()).unwrap() ;
+    /// # use rsmt2::Solver;
+    /// let mut solver = Solver::default(()).unwrap();
     /// solver.define_fun(
     ///     "abs", & [ ("n", "Int") ], "Int", "(ite (< x 0) (- x) x)"
     /// ).unwrap()
@@ -547,22 +547,22 @@ impl<Parser> Solver<Parser> {
     /// # Examples
     ///
     /// ```
-    /// # use rsmt2::Solver ;
-    /// let mut solver = Solver::default(()).unwrap() ;
-    /// solver.declare_const("x", "Int").unwrap() ;
-    /// solver.declare_const("y", "Int").unwrap() ;
-    /// solver.assert("(= x y)").unwrap() ;
-    /// let sat = solver.check_sat().unwrap() ;
-    /// assert!(sat) ;
+    /// # use rsmt2::Solver;
+    /// let mut solver = Solver::default(()).unwrap();
+    /// solver.declare_const("x", "Int").unwrap();
+    /// solver.declare_const("y", "Int").unwrap();
+    /// solver.assert("(= x y)").unwrap();
+    /// let sat = solver.check_sat().unwrap();
+    /// assert!(sat);
     ///
-    /// solver.push(1).unwrap() ;
-    /// solver.assert("(= x (+ x 1))").unwrap() ;
-    /// let sat = solver.check_sat().unwrap() ;
-    /// assert!(! sat) ;
-    /// solver.pop(1).unwrap() ;
+    /// solver.push(1).unwrap();
+    /// solver.assert("(= x (+ x 1))").unwrap();
+    /// let sat = solver.check_sat().unwrap();
+    /// assert!(! sat);
+    /// solver.pop(1).unwrap();
     ///
-    /// let sat = solver.check_sat().unwrap() ;
-    /// assert!(sat) ;
+    /// let sat = solver.check_sat().unwrap();
+    /// assert!(sat);
     /// ```
     #[inline]
     pub fn push(&mut self, n: u8) -> SmtRes<()> {
@@ -613,15 +613,39 @@ impl<Parser> Solver<Parser> {
     ///
     /// ```
     /// # use rsmt2::{SmtConf, Solver};
-    /// let mut solver = Solver::default(()).unwrap() ;
-    /// solver.set_logic( ::rsmt2::Logic::QF_UF ).unwrap() ;
+    /// let mut solver = Solver::default(()).unwrap();
+    /// solver.set_logic( ::rsmt2::Logic::QF_UF ).unwrap();
     /// ```
     #[inline]
     pub fn set_logic(&mut self, logic: Logic) -> SmtRes<()> {
         tee_write! {
           self, |w| {
-            write_str(w, "(set-logic ") ? ;
-            logic.to_smt2(w, ()) ? ;
+            write_str(w, "(set-logic ")?;
+            logic.to_smt2(w, ())?;
+            write_str(w, ")\n") ?
+          }
+        }
+        Ok(())
+    }
+
+    /// Sets a custom logic.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use rsmt2::{SmtConf, Solver};
+    /// let mut solver = Solver::default(()).unwrap();
+    /// solver.set_custom_logic("QF_UFBV").unwrap();
+    /// ```
+    #[inline]
+    pub fn set_custom_logic<Str>(&mut self, logic: Str) -> SmtRes<()>
+    where
+        Str: AsRef<str>,
+    {
+        tee_write! {
+          self, |w| {
+            write_str(w, "(set-logic ")?;
+            write_str(w, logic.as_ref())?;
             write_str(w, ")\n") ?
           }
         }
@@ -633,8 +657,8 @@ impl<Parser> Solver<Parser> {
     /// # Examples
     ///
     /// ```
-    /// # use rsmt2::Solver ;
-    /// let mut solver = Solver::default(()).unwrap() ;
+    /// # use rsmt2::Solver;
+    /// let mut solver = Solver::default(()).unwrap();
     /// solver.define_fun_rec(
     ///     "abs", & [ ("n", "Int") ], "Int", "(ite (< x 0) (abs (- x)) x)"
     /// ).unwrap()
@@ -663,8 +687,8 @@ impl<Parser> Solver<Parser> {
     /// # Examples
     ///
     /// ```
-    /// # use rsmt2::Solver ;
-    /// let mut solver = Solver::default(()).unwrap() ;
+    /// # use rsmt2::Solver;
+    /// let mut solver = Solver::default(()).unwrap();
     /// solver.define_funs_rec( & [
     ///     ("abs_1", & [ ("n", "Int") ], "Int", "(ite (< x 0) (abs_2 (- x)) x)"),
     ///     ("abs_2", & [ ("n", "Int") ], "Int", "(ite (< x 0) (abs_3 (- x)) x)"),
@@ -698,23 +722,23 @@ impl<Parser> Solver<Parser> {
     /// # Examples
     ///
     /// ```norun
-    /// # use rsmt2::Solver ;
-    /// let mut solver = Solver::default(()).unwrap() ;
+    /// # use rsmt2::Solver;
+    /// let mut solver = Solver::default(()).unwrap();
     /// solver.declare_datatypes( & [
     ///     ( "Tree", 1, ["T"],
     ///         [ "leaf", "(node (value T) (children (TreeList T)))" ] ),
     ///     ( "TreeList", 1, ["T"],
     ///         [ "nil", "(cons (car (Tree T)) (cdr (TreeList T)))" ]),
-    /// ] ).unwrap() ;
+    /// ] ).unwrap();
     ///
-    /// solver.declare_const( "t1", "(Tree Int)" ).unwrap() ;
-    /// solver.declare_const( "t2", "(Tree Bool)" ).unwrap() ;
+    /// solver.declare_const( "t1", "(Tree Int)" ).unwrap();
+    /// solver.declare_const( "t2", "(Tree Bool)" ).unwrap();
     ///
-    /// solver.assert("(> (value t1) 20)").unwrap() ;
-    /// solver.assert("(not (is-leaf t2))").unwrap() ;
-    /// solver.assert("(not (value t2))").unwrap() ;
+    /// solver.assert("(> (value t1) 20)").unwrap();
+    /// solver.assert("(not (is-leaf t2))").unwrap();
+    /// solver.assert("(not (value t2))").unwrap();
     ///
-    /// let sat = solver.check_sat().unwrap() ;
+    /// let sat = solver.check_sat().unwrap();
     /// assert! { sat } panic! { "aaa" }
     /// ```
     pub fn declare_datatypes<'a, Sort, Param, ParamList, Def, DefList, All>(
@@ -741,8 +765,8 @@ impl<Parser> Solver<Parser> {
         for &(ref sort, arity, _, _) in def_iter.clone() {
             tee_write! {
               self, |w| {
-                write!(w, " (") ? ;
-                sort.sort_to_smt2(w) ? ;
+                write!(w, " (")?;
+                sort.sort_to_smt2(w)?;
                 write!(w, " {})", arity) ?
               }
             }
@@ -755,13 +779,13 @@ impl<Parser> Solver<Parser> {
         for &(_, arity, ref params, ref defs) in def_iter {
             tee_write! {
               self, |w| {
-                write!(w, " (") ? ;
+                write!(w, " (")?;
 
                 if arity > 0 {
-                  write!(w, "par (") ? ;
+                  write!(w, "par (")?;
                   for param in params {
-                    write!(w, " ") ? ;
-                    param.sort_to_smt2(w) ? ;
+                    write!(w, " ")?;
+                    param.sort_to_smt2(w)?;
                   }
                   write!(w, " ) (") ?
                 }
@@ -771,7 +795,7 @@ impl<Parser> Solver<Parser> {
             for def in defs {
                 tee_write! {
                   self, |w| {
-                    write!(w, " ") ? ;
+                    write!(w, " ")?;
                     def.sort_to_smt2(w) ?
                   }
                 }
@@ -779,7 +803,7 @@ impl<Parser> Solver<Parser> {
 
             tee_write! {
               self, |w| {
-                write!(w, " )") ? ;
+                write!(w, " )")?;
 
                 if arity > 0 {
                   write!(w, " )") ?
@@ -903,7 +927,7 @@ impl<Parser> Solver<Parser> {
             } else {
               write!(w, "(assert (not ") ?
             }
-            actlit.write(w) ? ;
+            actlit.write(w)?;
             if b {
               writeln!(w, ")") ?
             } else {
@@ -960,18 +984,18 @@ impl<Parser> Solver<Parser> {
     /// # Examples
     ///
     /// ```
-    /// use rsmt2::Solver ;
+    /// use rsmt2::Solver;
     ///
-    /// let mut solver = Solver::default(()).unwrap() ;
+    /// let mut solver = Solver::default(()).unwrap();
     ///
-    /// solver.declare_const("x", "Int").unwrap() ;
-    /// solver.declare_const("y", "Int").unwrap() ;
+    /// solver.declare_const("x", "Int").unwrap();
+    /// solver.declare_const("y", "Int").unwrap();
     ///
-    /// solver.assert("(= (+ x y) 0)").unwrap() ;
+    /// solver.assert("(= (+ x y) 0)").unwrap();
     ///
-    /// let future = solver.print_check_sat().unwrap() ;
+    /// let future = solver.print_check_sat().unwrap();
     /// // Do stuff while the solver works.
-    /// let sat = solver.parse_check_sat(future).unwrap() ;
+    /// let sat = solver.parse_check_sat(future).unwrap();
     /// assert! { sat }
     /// ```
     ///
@@ -1004,7 +1028,7 @@ impl<Parser> Solver<Parser> {
                 for actlit in actlits {
                     tee_write! {
                       self, |w| {
-                        write!(w, " ") ? ;
+                        write!(w, " ")?;
                         actlit.write(w) ?
                       }
                     }
@@ -1104,7 +1128,7 @@ impl<Parser> Solver<Parser> {
         for e in exprs {
             tee_write! {
               self, |w| {
-                write_str(w, "\n  ") ? ;
+                write_str(w, "\n  ")?;
                 e.expr_to_smt2(w, info) ?
               }
             }
@@ -1146,7 +1170,7 @@ impl<Parser> Solver<Parser> {
                 for sym in bool_vars {
                     tee_write! {
                       self, |w| {
-                        write_str(w, "  ") ? ;
+                        write_str(w, "  ")?;
                         sym.sym_to_smt2(w, info) ?
                       }
                     }
@@ -1250,16 +1274,16 @@ impl<Parser> Solver<Parser> {
     /// # Examples
     ///
     /// ```
-    /// # use rsmt2::Solver ;
-    /// let mut solver = Solver::default(()).unwrap() ;
-    /// solver.declare_sort("A", 0).unwrap() ;
-    /// solver.declare_const("x", "A").unwrap() ;
-    /// solver.declare_const("y", "A").unwrap() ;
-    /// solver.declare_fun("f", & [ "A" ], "A").unwrap() ;
-    /// solver.assert("(= (f (f x)) x)").unwrap() ;
-    /// solver.assert("(= (f x) y)").unwrap() ;
-    /// solver.assert("(not (= x y))").unwrap() ;
-    /// let sat = solver.check_sat().unwrap() ;
+    /// # use rsmt2::Solver;
+    /// let mut solver = Solver::default(()).unwrap();
+    /// solver.declare_sort("A", 0).unwrap();
+    /// solver.declare_const("x", "A").unwrap();
+    /// solver.declare_const("y", "A").unwrap();
+    /// solver.declare_fun("f", & [ "A" ], "A").unwrap();
+    /// solver.assert("(= (f (f x)) x)").unwrap();
+    /// solver.assert("(= (f x) y)").unwrap();
+    /// solver.assert("(not (= x y))").unwrap();
+    /// let sat = solver.check_sat().unwrap();
     /// ```
     #[inline]
     pub fn declare_sort<Sort>(&mut self, sort: &Sort, arity: u8) -> SmtRes<()>
@@ -1268,8 +1292,8 @@ impl<Parser> Solver<Parser> {
     {
         tee_write! {
           self, |w| {
-            write_str(w, "(declare-sort ") ? ;
-            sort.sort_to_smt2(w) ? ;
+            write_str(w, "(declare-sort ")?;
+            sort.sort_to_smt2(w)?;
             writeln!(w, " {})", arity) ?
           }
         }
@@ -1284,23 +1308,23 @@ impl<Parser> Solver<Parser> {
     /// arguments.
     ///
     /// ```
-    /// # use rsmt2::Solver ;
-    /// let mut solver = Solver::default(()).unwrap() ;
-    /// solver.define_sort("MySet", & ["T"], "(Array T Bool)").unwrap() ;
-    /// solver.define_null_sort("IList", "(List Int)").unwrap() ;
+    /// # use rsmt2::Solver;
+    /// let mut solver = Solver::default(()).unwrap();
+    /// solver.define_sort("MySet", & ["T"], "(Array T Bool)").unwrap();
+    /// solver.define_null_sort("IList", "(List Int)").unwrap();
     /// solver.define_sort(
     ///     "List-Set", & ["T"], "(Array (List T) Bool)"
-    /// ).unwrap() ;
-    /// solver.define_null_sort("I", "Int").unwrap() ;
+    /// ).unwrap();
+    /// solver.define_null_sort("I", "Int").unwrap();
     ///
-    /// solver.declare_const("s1", "(MySet I)").unwrap() ;
-    /// solver.declare_const("s2", "(List-Set Int)").unwrap() ;
-    /// solver.declare_const("a", "I").unwrap() ;
-    /// solver.declare_const("l", "IList").unwrap() ;
+    /// solver.declare_const("s1", "(MySet I)").unwrap();
+    /// solver.declare_const("s2", "(List-Set Int)").unwrap();
+    /// solver.declare_const("a", "I").unwrap();
+    /// solver.declare_const("l", "IList").unwrap();
     ///
-    /// solver.assert("(= (select s1 a) true)").unwrap() ;
-    /// solver.assert("(= (select s2 l) false)").unwrap() ;
-    /// let sat = solver.check_sat().unwrap() ;
+    /// solver.assert("(= (select s1 a) true)").unwrap();
+    /// solver.assert("(= (select s2 l) false)").unwrap();
+    /// let sat = solver.check_sat().unwrap();
     /// ```
     ///
     /// [def]: #method.define_null_sort
@@ -1320,23 +1344,23 @@ impl<Parser> Solver<Parser> {
     {
         tee_write! {
           self, |w| {
-            write_str(w, "( define-sort ") ? ;
-            sort.sort_to_smt2(w) ? ;
-            write_str(w, "\n   ( ") ? ;
+            write_str(w, "( define-sort ")?;
+            sort.sort_to_smt2(w)?;
+            write_str(w, "\n   ( ")?;
           }
         }
         for arg in args {
             tee_write! {
               self, |w| {
-                arg.sort_to_smt2(w) ? ;
+                arg.sort_to_smt2(w)?;
                 write_str(w, " ") ?
               }
             }
         }
         tee_write! {
           self, |w| {
-            write_str(w, ")\n   ") ? ;
-            body.sort_to_smt2(w) ? ;
+            write_str(w, ")\n   ")?;
+            body.sort_to_smt2(w)?;
             write_str(w, "\n)\n") ?
           }
         }
@@ -1380,10 +1404,10 @@ impl<Parser> Solver<Parser> {
     {
         tee_write! {
           self, |w| {
-            write_str(w, "(declare-const ") ? ;
-            symbol.sym_to_smt2(w, info) ? ;
-            write_str(w, " ") ? ;
-            out_sort.sort_to_smt2(w) ? ;
+            write_str(w, "(declare-const ")?;
+            symbol.sym_to_smt2(w, info)?;
+            write_str(w, " ")?;
+            out_sort.sort_to_smt2(w)?;
             write_str(w, ")\n") ?
           }
         }
@@ -1408,23 +1432,23 @@ impl<Parser> Solver<Parser> {
     {
         tee_write! {
           self, |w| {
-            write_str(w, "(declare-fun ") ? ;
-            symbol.sym_to_smt2(w, info) ? ;
+            write_str(w, "(declare-fun ")?;
+            symbol.sym_to_smt2(w, info)?;
             write_str(w, " ( ") ?
           }
         }
         for arg in args {
             tee_write! {
               self, |w| {
-                arg.sort_to_smt2(w) ? ;
+                arg.sort_to_smt2(w)?;
                 write_str(w, " ") ?
               }
             }
         }
         tee_write! {
           self, |w| {
-            write_str(w, ") ") ? ;
-            out.sort_to_smt2(w) ? ;
+            write_str(w, ") ")?;
+            out.sort_to_smt2(w)?;
             write_str(w, ")\n") ?
           }
         }
@@ -1448,12 +1472,12 @@ impl<Parser> Solver<Parser> {
     {
         tee_write! {
           self, |w| {
-            write_str(w, "(define-const ") ? ;
-            symbol.sym_to_smt2(w, info) ? ;
-            write_str(w, " ") ? ;
-            out_sort.sort_to_smt2(w) ? ;
-            write_str(w, " ") ? ;
-            body.expr_to_smt2(w, info) ? ;
+            write_str(w, "(define-const ")?;
+            symbol.sym_to_smt2(w, info)?;
+            write_str(w, " ")?;
+            out_sort.sort_to_smt2(w)?;
+            write_str(w, " ")?;
+            body.expr_to_smt2(w, info)?;
             write_str(w, ")\n") ?
           }
         }
@@ -1481,8 +1505,8 @@ impl<Parser> Solver<Parser> {
     {
         tee_write! {
           self, |w| {
-            write_str(w, "(define-fun ") ? ;
-            symbol.sym_to_smt2(w, info) ? ;
+            write_str(w, "(define-fun ")?;
+            symbol.sym_to_smt2(w, info)?;
             write_str(w, " ( ") ?
           }
         }
@@ -1490,20 +1514,20 @@ impl<Parser> Solver<Parser> {
             let (ref sym, ref sort) = *arg;
             tee_write! {
               self, |w| {
-                write_str(w, "(") ? ;
-                sym.sym_to_smt2(w, info) ? ;
-                write_str(w, " ") ? ;
-                sort.sort_to_smt2(w) ? ;
+                write_str(w, "(")?;
+                sym.sym_to_smt2(w, info)?;
+                write_str(w, " ")?;
+                sort.sort_to_smt2(w)?;
                 write_str(w, ") ") ?
               }
             }
         }
         tee_write! {
           self, |w| {
-            write_str(w, ") ") ? ;
-            out.sort_to_smt2(w) ? ;
-            write_str(w, "\n   ") ? ;
-            body.expr_to_smt2(w, info) ? ;
+            write_str(w, ") ")?;
+            out.sort_to_smt2(w)?;
+            write_str(w, "\n   ")?;
+            body.expr_to_smt2(w, info)?;
             write_str(w, "\n)\n") ?
           }
         }
@@ -1554,8 +1578,8 @@ impl<Parser> Solver<Parser> {
 
             tee_write! {
               self, |w| {
-                write_str(w, "   (") ? ;
-                sym.sym_to_smt2(w, info) ? ;
+                write_str(w, "   (")?;
+                sym.sym_to_smt2(w, info)?;
                 write_str(w, " ( ") ?
               }
             }
@@ -1563,11 +1587,11 @@ impl<Parser> Solver<Parser> {
             for arg in args.as_ref() {
                 tee_write! {
                   self, |w| {
-                    let (ref sym, ref sort) = * arg ;
-                    write_str(w, "(") ? ;
-                    sym.sym_to_smt2(w, info) ? ;
-                    write_str(w, " ") ? ;
-                    sort.sort_to_smt2(w) ? ;
+                    let (ref sym, ref sort) = * arg;
+                    write_str(w, "(")?;
+                    sym.sym_to_smt2(w, info)?;
+                    write_str(w, " ")?;
+                    sort.sort_to_smt2(w)?;
                     write_str(w, ") ") ?
                   }
                 }
@@ -1575,8 +1599,8 @@ impl<Parser> Solver<Parser> {
 
             tee_write! {
               self, |w| {
-                write_str(w, ") ") ? ;
-                out.sort_to_smt2(w) ? ;
+                write_str(w, ") ")?;
+                out.sort_to_smt2(w)?;
                 write_str(w, ")\n") ?
               }
             }
@@ -1590,7 +1614,7 @@ impl<Parser> Solver<Parser> {
             let (_, _, _, ref body) = *fun;
             tee_write! {
               self, |w| {
-                write_str(w, "\n   ") ? ;
+                write_str(w, "\n   ")?;
                 body.expr_to_smt2(w, info) ?
               }
             }
@@ -1628,8 +1652,8 @@ impl<Parser> Solver<Parser> {
         tee_write! {
           self, |w| {
             // Signature.
-            write_str(w, "   (") ? ;
-            symbol.sym_to_smt2(w, info) ? ;
+            write_str(w, "   (")?;
+            symbol.sym_to_smt2(w, info)?;
             write_str(w, " ( ") ?
           }
         }
@@ -1638,10 +1662,10 @@ impl<Parser> Solver<Parser> {
             let (ref sym, ref sort) = *arg;
             tee_write! {
               self, |w| {
-                write_str(w, "(") ? ;
-                sym.sym_to_smt2(w, info) ? ;
-                write_str(w, " ") ? ;
-                sort.sort_to_smt2(w) ? ;
+                write_str(w, "(")?;
+                sym.sym_to_smt2(w, info)?;
+                write_str(w, " ")?;
+                sort.sort_to_smt2(w)?;
                 write_str(w, ") ") ?
               }
             }
@@ -1649,14 +1673,14 @@ impl<Parser> Solver<Parser> {
 
         tee_write! {
           self, |w| {
-            write_str(w, ") ") ? ;
-            out.sort_to_smt2(w) ? ;
-            write_str(w, ")\n") ? ;
-            write_str(w, " ) (") ? ;
+            write_str(w, ") ")?;
+            out.sort_to_smt2(w)?;
+            write_str(w, ")\n")?;
+            write_str(w, " ) (")?;
 
             // Body.
-            write_str(w, "\n   ") ? ;
-            body.expr_to_smt2(w, info) ? ;
+            write_str(w, "\n   ")?;
+            body.expr_to_smt2(w, info)?;
             write_str(w, "\n )\n)\n") ?
           }
         }
@@ -1681,10 +1705,10 @@ impl<Parser> Solver<Parser> {
     {
         tee_write! {
           self, |w| {
-            write_str(w, "(assert\n  (=>\n    ") ? ;
-            actlit.write(w) ? ;
-            write_str(w, "\n    ") ? ;
-            expr.expr_to_smt2(w, info) ? ;
+            write_str(w, "(assert\n  (=>\n    ")?;
+            actlit.write(w)?;
+            write_str(w, "\n    ")?;
+            expr.expr_to_smt2(w, info)?;
             write_str(w, "\n  )\n)\n") ?
           }
         }
@@ -1700,8 +1724,8 @@ impl<Parser> Solver<Parser> {
     {
         tee_write! {
           self, |w| {
-            write_str(w, "(assert\n  ") ? ;
-            expr.expr_to_smt2(w, info) ? ;
+            write_str(w, "(assert\n  ")?;
+            expr.expr_to_smt2(w, info)?;
             write_str(w, "\n)\n") ?
           }
         }

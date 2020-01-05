@@ -27,32 +27,32 @@
 //! [`check_sat_assuming`][check sat ass]:
 //!
 //! ```
-//! use rsmt2::* ;
+//! use rsmt2::*;
 //!
-//! let mut solver = Solver::default(()).unwrap() ;
-//! solver.declare_const("x", "Int").unwrap() ;
+//! let mut solver = Solver::default(()).unwrap();
+//! solver.declare_const("x", "Int").unwrap();
 //!
-//! solver.declare_const("actlit", "Bool").unwrap() ;
+//! solver.declare_const("actlit", "Bool").unwrap();
 //! solver.assert("\
 //!     (=> actlit \
 //!         (and (> x 0) (< x 3) (= (mod x 3) 0))\
 //!     )\
-//! ").unwrap() ;
+//! ").unwrap();
 //! assert!{
 //!     ! solver.check_sat_assuming( Some("actlit") ).unwrap()
 //! }
-//! solver.assert("(not actlit)").unwrap() ;
+//! solver.assert("(not actlit)").unwrap();
 //!
-//! solver.declare_const("other_actlit", "Bool").unwrap() ;
+//! solver.declare_const("other_actlit", "Bool").unwrap();
 //! solver.assert("\
 //!     (=> other_actlit \
 //!         (and (> x 7) (= (mod x 2) 0))\
 //!     )\
-//! ").unwrap() ;
+//! ").unwrap();
 //! assert!{
 //!     solver.check_sat_assuming( Some("other_actlit") ).unwrap()
 //! }
-//! solver.assert("(not other_actlit)").unwrap() ;
+//! solver.assert("(not other_actlit)").unwrap();
 //!
 //! solver.kill().unwrap()
 //! ```
@@ -60,34 +60,34 @@
 //! The activation literal API makes this process more straightforward:
 //!
 //! ```
-//! use rsmt2::* ;
+//! use rsmt2::*;
 //!
 //! let mut solver = match Solver::default(()) {
 //!     Ok(kid) => kid,
 //!     Err(e) => panic!("Could not spawn solver kid: {:?}", e)
-//! } ;
+//! };
 //!
-//! solver.declare_const("x", "Int").unwrap() ;
+//! solver.declare_const("x", "Int").unwrap();
 //!
-//! let actlit = solver.get_actlit().unwrap() ;
-//! solver.assert_act(& actlit, "(> x 0)").unwrap() ;
-//! solver.assert_act(& actlit, "(< x 3)").unwrap() ;
-//! solver.assert_act(& actlit, "(= (mod x 3) 0)").unwrap() ;
+//! let actlit = solver.get_actlit().unwrap();
+//! solver.assert_act(& actlit, "(> x 0)").unwrap();
+//! solver.assert_act(& actlit, "(< x 3)").unwrap();
+//! solver.assert_act(& actlit, "(= (mod x 3) 0)").unwrap();
 //!
 //! assert!{
 //!     ! solver.check_sat_act( Some(& actlit) ).unwrap()
 //! }
-//! solver.de_actlit(actlit).unwrap() ;
+//! solver.de_actlit(actlit).unwrap();
 //! // At this point `actlit` has been consumed. So it's a bit safer than the
 //! // version above, since use-after-deactivate is not possible.
 //!
-//! let actlit = solver.get_actlit().unwrap() ;
-//! solver.assert_act(& actlit, "(> x 7)").unwrap() ;
-//! solver.assert_act(& actlit, "(= (mod x 2) 0)").unwrap() ;
+//! let actlit = solver.get_actlit().unwrap();
+//! solver.assert_act(& actlit, "(> x 7)").unwrap();
+//! solver.assert_act(& actlit, "(= (mod x 2) 0)").unwrap();
 //! assert!{
 //!     solver.check_sat_act( Some(& actlit) ).unwrap()
 //! }
-//! solver.de_actlit(actlit).unwrap() ;
+//! solver.de_actlit(actlit).unwrap();
 //!
 //! solver.kill().unwrap()
 //! ```
@@ -100,10 +100,10 @@
 //! actlit was requested since the last reset).
 //!
 //! ```
-//! use rsmt2::* ;
-//! use rsmt2::parse::* ;
+//! use rsmt2::*;
+//! use rsmt2::parse::*;
 //!
-//! struct Parser ;
+//! struct Parser;
 //! impl<'a, 'b> IdentParser<String, String, & 'a str> for & 'b Parser {
 //!     fn parse_ident(self, s: & 'a str) -> SmtRes<String> {
 //!         Ok(s.to_string())
@@ -126,32 +126,32 @@
 //! let mut solver = match Solver::default(& Parser) {
 //!     Ok(kid) => kid,
 //!     Err(e) => panic!("Could not spawn solver kid: {:?}", e)
-//! } ;
+//! };
 //!
-//! solver.declare_const("x", "Int").unwrap() ;
+//! solver.declare_const("x", "Int").unwrap();
 //!
-//! let actlit = solver.get_actlit().unwrap() ;
-//! let mut buf: Vec<u8> = vec![] ;
-//! actlit.write(& mut buf).unwrap() ;
+//! let actlit = solver.get_actlit().unwrap();
+//! let mut buf: Vec<u8> = vec![];
+//! actlit.write(& mut buf).unwrap();
 //! assert_eq!{
 //!     "|rsmt2 actlit 0|",
 //!     ::std::str::from_utf8(& buf).unwrap()
 //! }
 //!
-//! solver.assert_act(& actlit, "(> x 7)").unwrap() ;
-//! solver.assert_act(& actlit, "(= (mod x 2) 0)").unwrap() ;
+//! solver.assert_act(& actlit, "(> x 7)").unwrap();
+//! solver.assert_act(& actlit, "(= (mod x 2) 0)").unwrap();
 //! assert!{
 //!     solver.check_sat_act( Some(& actlit) ).unwrap()
 //! }
 //!
-//! let model = solver.get_model_const().unwrap() ;
-//! let mut model = model.into_iter() ;
+//! let model = solver.get_model_const().unwrap();
+//! let mut model = model.into_iter();
 //! if let Some((x, int, n)) = model.next() {
 //!     assert_eq!{ x, "x" }
 //!     assert_eq!{ int, "Int" }
-//!     use std::str::FromStr ;
-//!     let n = i64::from_str(& n).unwrap() ;
-//!     println!("{}", n) ;
+//!     use std::str::FromStr;
+//!     let n = i64::from_str(& n).unwrap();
+//!     println!("{}", n);
 //!     assert!{ n > 7 }
 //!     assert!{ n % 2 == 0 }
 //! } else {
@@ -161,7 +161,7 @@
 //!     model.next(), None
 //! }
 //!
-//! solver.de_actlit(actlit).unwrap() ;
+//! solver.de_actlit(actlit).unwrap();
 //!
 //! solver.kill().unwrap()
 //! ```
