@@ -613,8 +613,7 @@ impl<Parser> Solver<Parser> {
     ///
     /// ```
     /// # use rsmt2::{SmtConf, Solver};
-    /// let conf = SmtConf::cvc4();
-    /// let mut solver = Solver::new(conf, ()).unwrap() ;
+    /// let mut solver = Solver::default(()).unwrap() ;
     /// solver.set_logic( ::rsmt2::Logic::QF_UF ).unwrap() ;
     /// ```
     #[inline]
