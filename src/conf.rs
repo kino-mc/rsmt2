@@ -71,7 +71,7 @@ impl SmtStyle {
                 cmd,
                 options: vec![
                     "-q".into(),
-                    "--interactive".into(),
+                    "--no-interactive".into(),
                     "--lang".into(),
                     "smt2".into(),
                 ],

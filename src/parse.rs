@@ -642,21 +642,6 @@ impl<R: BufRead> SmtParser<R> {
         Ok(())
     }
 
-    /// Parses the annoying CVC4 prompt. Can't fail.
-    pub fn prompt(&mut self) -> SmtRes<()> {
-        loop {
-            let start_pos = self.pos();
-            self.spc_cmt();
-            if self.try_tag(">")? || self.try_tag("CVC4>")? || self.try_tag("...")? {
-                ()
-            } else {
-                self.backtrack_to(start_pos);
-                break;
-            }
-        }
-        Ok(())
-    }
-
     /// Generates a failure at the current position.
     pub fn fail_with<T, Str: Into<String>>(&mut self, msg: Str) -> SmtRes<T> {
         self.try_error()?;
@@ -1253,7 +1238,6 @@ impl<R: BufRead> SmtParser<R> {
     ///
     /// Returns `None` if the solver reported `unknown`.
     pub fn check_sat(&mut self) -> SmtRes<Option<bool>> {
-        self.prompt()?;
         self.spc_cmt();
         if self.try_tag("sat")? {
             Ok(Some(true))
@@ -1291,7 +1275,6 @@ impl<R: BufRead> SmtParser<R> {
         Parser: for<'a> IdentParser<Ident, Type, &'a mut Self>
             + for<'a> ModelParser<Ident, Type, Value, &'a mut Self>,
     {
-        self.prompt()?;
         self.spc_cmt();
         self.try_error()?;
         let mut model = Vec::new();
@@ -1327,7 +1310,6 @@ impl<R: BufRead> SmtParser<R> {
         Parser: for<'a> IdentParser<Ident, Type, &'a mut Self>
             + for<'a> ModelParser<Ident, Type, Value, &'a mut Self>,
     {
-        self.prompt()?;
         self.spc_cmt();
         self.try_error()?;
         let mut model = Vec::new();
@@ -1376,7 +1358,6 @@ impl<R: BufRead> SmtParser<R> {
         Parser:
             for<'a> ValueParser<Val, &'a mut Self> + for<'a> ExprParser<Expr, Info, &'a mut Self>,
     {
-        self.prompt()?;
         self.spc_cmt();
         self.try_error()?;
         let mut values = Vec::new();
