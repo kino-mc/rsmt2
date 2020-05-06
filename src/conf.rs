@@ -119,7 +119,7 @@ impl SmtStyle {
         match self {
             Z3 => "z3".to_string(),
             CVC4 => "cvc4".to_string(),
-            Yices2 => "yices-smt2".to_string(),
+            Yices2 => "yices".to_string(),
         }
     }
     /// Default command for a solver style.
@@ -128,7 +128,7 @@ impl SmtStyle {
         match self {
             Z3 => "z3.exe".to_string(),
             CVC4 => "cvc4.exe".to_string(),
-            Yices2 => "yices-smt2.exe".to_string(),
+            Yices2 => "yices.exe".to_string(),
         }
     }
 }
@@ -217,7 +217,7 @@ impl SmtConf {
     /// # use rsmt2::SmtConf;
     /// let conf = SmtConf::yices_2();
     /// assert! {
-    ///     conf.get_cmd() == "yices-smt2" || conf.get_cmd() == "yices-smt2.exe"
+    ///     conf.get_cmd() == "yices" || conf.get_cmd() == "yices.exe"
     /// }
     /// ```
     #[inline]
