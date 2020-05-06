@@ -1,5 +1,3 @@
-# Stupid mac files.
 .DS_Store
-
-# Target dir.
 target
+Cargo.lock
