@@ -7,7 +7,7 @@
       `SmtConf` and `Solver`, *e.g.* `Solver::default_z3()`
 - added example [`examples/custom_cmd.rs`][custom cmd example] demonstrating how to pass a custom
     command to a solver configuration
-- `Solver` now implements [`Read`][std read] in addition to [`Write`][std write]
+- `Solver` now implements [`std::io::Read`][std read] in addition to [`std::io::Write`][std write]
     - useful for performing custom queries and quick testing
 - added a `prelude` module containing common imports for convenience
 
