@@ -99,5 +99,8 @@ fn test_unknown_cmd() {
 
 #[test]
 fn test_rsc_test_smt2() {
-    assert_eq!(run_file("rsc/test.smt2", Some("z3")).unwrap(), "unsat\n")
+    assert_eq!(
+        run_file("rsc/test.smt2", Some("z3")).unwrap().trim(),
+        "unsat"
+    )
 }
