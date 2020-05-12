@@ -1,3 +1,20 @@
+# v0.11.0-beta.3
+
+- `SmtConf` and `Solver` creation now take a mandatory command argument to run the solver
+    - using default command for the solvers is not recommended as it is end-user-dependent and not
+      flexible
+    - if you still wish to use default commands, use the `default_<solver>` functions provided for
+      `SmtConf` and `Solver`, *e.g.* `Solver::default_z3()`
+- added example [`examples/custom_cmd.rs`][custom cmd example] demonstrating how to pass a custom
+    command to a solver configuration
+- `Solver` now implements [`std::io::Read`][std read] in addition to [`std::io::Write`][std write]
+    - useful for performing custom queries and quick testing
+- added a `prelude` module containing common imports for convenience
+
+[custom cmd example]: ./examples/custom_cmd.rs (Custom command example)
+[std read]: https://doc.rust-lang.org/std/io/trait.Read.html (Read trait on Rust std)
+[std write]: https://doc.rust-lang.org/std/io/trait.Write.html (Write trait on Rust std)
+
 # v0.11.0-beta.2
 
 - `Solver::set_custom_logic`

@@ -37,7 +37,10 @@
 //!   [`conf.models()`](struct.SmtConf.html#method.models). To understand why, see
 //!   <https://github.com/SRI-CSL/yices2/issues/162>.
 //!
-//!
+//! Since solver run as system processes on the end-user's system, it is hard to make any assumption
+//! regarding the command that will run a particular solver. For this reason you should make sure
+//! you allow your users to pass command that specifies how to run a given solver. You can take a
+//! look at the [`custom_cmd` example] for guidance.
 //!
 //! # Very basic example
 //!
@@ -52,7 +55,7 @@
 //! let parser = ();
 //! use rsmt2::SmtConf;
 //!
-//! let conf = SmtConf::z3();
+//! let conf = SmtConf::default_z3();
 //! let mut solver = conf.spawn(parser).unwrap();
 //!
 //! let is_sat = solver.check_sat().unwrap();
@@ -70,7 +73,7 @@
 //! ```rust
 //! # fn do_smt_stuff() -> ::rsmt2::SmtRes<()> {
 //! use rsmt2::Solver;
-//! let mut solver = Solver::default(())?;
+//! let mut solver = Solver::default_z3(())?;
 //!
 //! solver.declare_const("n", "Int")?;
 //! //     ^^^^^^^^^^^^^~~~ same as `declare-fun` for a nullary symbol
@@ -131,7 +134,7 @@
 //! }
 //!
 //! # fn do_smt_stuff() -> ::rsmt2::SmtRes<()> {
-//! let mut solver = Solver::default(Parser)?;
+//! let mut solver = Solver::default_z3(Parser)?;
 //!
 //! solver.define_fun(
 //!          "sq", & [ ("n", "Int") ], "Int", "(* n n)"
@@ -195,7 +198,7 @@
 //! #     }
 //! # }
 //! # fn do_smt_stuff() -> ::rsmt2::SmtRes<()> {
-//! # let mut solver = Solver::default(Parser)?;
+//! # let mut solver = Solver::default_z3(Parser)?;
 //! solver.define_fun(
 //!     "sq", & [ ("n", "Int") ], "Int", "(* n n)"
 //! )?;
@@ -336,9 +339,16 @@
 //! [actlit_mod]: actlit/index.html (rsmt2 complex example)
 //! [hashconsing]: https://crates.io/crates/hashconsing (hashconsing crate on crates.io)
 //! [future]: future/struct.FutureCheckSat.html (FutureCheckSat struct)
+//! [`custom_cmd` example]: https://github.com/kino-mc/rsmt2/tree/master/examples/custom_cmd.rs
+//! (Example of passing a custom solver command to rsmt2)
 
 #[macro_use]
 extern crate error_chain;
+
+/// Common rsmt2 type and helpers.
+pub mod prelude {
+    pub use super::{errors::SmtRes, parse::*, print::*, SmtConf, Solver};
+}
 
 /// Errors.
 ///

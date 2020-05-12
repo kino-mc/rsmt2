@@ -12,7 +12,7 @@ such as [Z3][z3].
 
 If you use this library consider contacting us on the [repository](https://github.com/kino-mc/rsmt2) so that we can add your project to the readme.
 
-See [`CHANGES.md`](https://github.com/kino-mc/rsmt2/blob/master/README.md) for
+See [`changes.md`](https://github.com/kino-mc/rsmt2/blob/master/README.md) for
 the list of changes.
 
 

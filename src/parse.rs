@@ -58,7 +58,7 @@
 //!     }
 //! }
 //!
-//! let mut solver = SmtConf::z3().spawn(Parser).unwrap();
+//! let mut solver = SmtConf::default_z3().spawn(Parser).unwrap();
 //! solver.declare_const("a", "Bool").unwrap();
 //! solver.declare_const("b", "Bool").unwrap();
 //! solver.assert("(and a (not b))").unwrap();
@@ -176,7 +176,7 @@
 
 use crate::common::*;
 
-use std::io::{BufRead, BufReader};
+use std::io::{BufRead, BufReader, Read};
 use std::process::ChildStdout;
 
 /// Alias for the underlying parser.
@@ -193,7 +193,7 @@ macro_rules! try_apply {
 }
 
 /// SMT-LIB 2.0 parser.
-pub struct SmtParser<R: BufRead> {
+pub struct SmtParser<R> {
     /// Reader being parsed.
     input: R,
     /// Buffer we are reading to.
@@ -203,6 +203,13 @@ pub struct SmtParser<R: BufRead> {
     /// Current position in the text.
     cursor: usize,
 }
+
+impl<R: Read> Read for SmtParser<R> {
+    fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+        self.input.read(buf)
+    }
+}
+
 impl<'a> SmtParser<BufReader<&'a [u8]>> {
     /// Constructor from a string, mostly for doc/test purposes.
     pub fn of_str(s: &'a str) -> Self {

@@ -12,6 +12,10 @@ keywords = ["SMT", "SAT", "satisfiability", "solver", "SMT-LIB"]
 license = "MIT/Apache-2.0"
 edition = "2018"
 
+[[example]]
+name = "custom_cmd"
+test = true
+
 [badges]
 travis-ci = { repository = "kino-mc/rsmt2", service = "github" }
 appveyor = { repository = "kino-mc/rsmt2" }
@@ -19,3 +23,6 @@ codecov = { repository = "kino-mc/rsmt2", service = "github" }
 
 [dependencies]
 error-chain = "^0"
+
+[dev-dependencies]
+clap = "^2"
