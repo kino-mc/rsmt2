@@ -29,7 +29,7 @@
 //! ```
 //! use rsmt2::*;
 //!
-//! let mut solver = Solver::default(()).unwrap();
+//! let mut solver = Solver::default_z3(()).unwrap();
 //! solver.declare_const("x", "Int").unwrap();
 //!
 //! solver.declare_const("actlit", "Bool").unwrap();
@@ -62,7 +62,7 @@
 //! ```
 //! use rsmt2::*;
 //!
-//! let mut solver = match Solver::default(()) {
+//! let mut solver = match Solver::default_z3(()) {
 //!     Ok(kid) => kid,
 //!     Err(e) => panic!("Could not spawn solver kid: {:?}", e)
 //! };
@@ -123,7 +123,7 @@
 //!     }
 //! }
 //!
-//! let mut solver = match Solver::default(& Parser) {
+//! let mut solver = match Solver::default_z3(& Parser) {
 //!     Ok(kid) => kid,
 //!     Err(e) => panic!("Could not spawn solver kid: {:?}", e)
 //! };

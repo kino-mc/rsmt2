@@ -52,9 +52,9 @@ pub enum SmtStyle {
 }
 
 impl SmtStyle {
-    /// Default configuration for a solver style.
-    pub fn default(self) -> SmtConf {
-        let cmd = self.cmd();
+    /// Configuration constructor.
+    pub fn new(self, cmd: impl Into<String>) -> SmtConf {
+        let cmd = cmd.into();
         match self {
             Z3 => SmtConf {
                 style: self,
@@ -92,6 +92,11 @@ impl SmtStyle {
                 check_sat_assuming: supported("check-sat-assuming"),
             },
         }
+    }
+
+    /// Default configuration for a solver style.
+    pub fn default(self) -> SmtConf {
+        self.new(self.cmd())
     }
 
     /// A solver style from a string.
@@ -183,13 +188,55 @@ impl SmtConf {
     ///
     /// ```rust
     /// # use rsmt2::SmtConf;
-    /// let conf = SmtConf::z3();
+    /// let conf = SmtConf::z3("my_z3_command");
+    /// assert!(conf.get_cmd() == "my_z3_command")
+    /// ```
+    #[inline]
+    pub fn z3(cmd: impl Into<String>) -> Self {
+        Z3.new(cmd)
+    }
+
+    /// Creates a new cvc4-like solver configuration.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// # use rsmt2::SmtConf;
+    /// let conf = SmtConf::cvc4("my_cvc4_command");
+    /// assert!(conf.get_cmd() == "my_cvc4_command")
+    /// ```
+    #[inline]
+    pub fn cvc4(cmd: impl Into<String>) -> Self {
+        CVC4.new(cmd)
+    }
+
+    /// Creates a new yices-2-like solver configuration.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// # use rsmt2::SmtConf;
+    /// let conf = SmtConf::yices_2("my_yices_2_command");
+    /// assert!(conf.get_cmd() == "my_yices_2_command")
+    /// ```
+    #[inline]
+    pub fn yices_2(cmd: impl Into<String>) -> Self {
+        Yices2.new(cmd)
+    }
+
+    /// Creates a new z3-like solver configuration.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// # use rsmt2::SmtConf;
+    /// let conf = SmtConf::default_z3();
     /// assert! {
     ///     conf.get_cmd() == "z3" || conf.get_cmd() == "z3.exe"
     /// }
     /// ```
     #[inline]
-    pub fn z3() -> Self {
+    pub fn default_z3() -> Self {
         Z3.default()
     }
 
@@ -199,13 +246,13 @@ impl SmtConf {
     ///
     /// ```rust
     /// # use rsmt2::SmtConf;
-    /// let conf = SmtConf::cvc4();
+    /// let conf = SmtConf::default_cvc4();
     /// assert! {
     ///     conf.get_cmd() == "cvc4" || conf.get_cmd() == "cvc4.exe"
     /// }
     /// ```
     #[inline]
-    pub fn cvc4() -> Self {
+    pub fn default_cvc4() -> Self {
         CVC4.default()
     }
 
@@ -215,13 +262,13 @@ impl SmtConf {
     ///
     /// ```rust
     /// # use rsmt2::SmtConf;
-    /// let conf = SmtConf::yices_2();
+    /// let conf = SmtConf::default_yices_2();
     /// assert! {
     ///     conf.get_cmd() == "yices" || conf.get_cmd() == "yices.exe"
     /// }
     /// ```
     #[inline]
-    pub fn yices_2() -> Self {
+    pub fn default_yices_2() -> Self {
         Yices2.default()
     }
 
@@ -231,7 +278,7 @@ impl SmtConf {
     ///
     /// ```rust
     /// # use rsmt2::SmtConf;
-    /// let _solver = SmtConf::z3().spawn(()).unwrap();
+    /// let _solver = SmtConf::default_z3().spawn(()).unwrap();
     /// ```
     #[inline]
     pub fn spawn<Parser>(self, parser: Parser) -> SmtRes<Solver<Parser>> {
@@ -244,7 +291,7 @@ impl SmtConf {
     ///
     /// ```rust
     /// # use rsmt2::SmtConf;
-    /// assert_eq! { SmtConf::z3().desc(), "z3" }
+    /// assert_eq! { SmtConf::default_z3().desc(), "z3" }
     /// ```
     #[inline]
     pub fn desc(&self) -> &str {
@@ -296,7 +343,7 @@ impl SmtConf {
     ///
     /// ```rust
     /// # use rsmt2::SmtConf;
-    /// let conf = SmtConf::z3();
+    /// let conf = SmtConf::default_z3();
     /// assert! {
     ///     conf.get_cmd() == "z3" || conf.get_cmd() == "z3.exe"
     /// }
@@ -313,7 +360,7 @@ impl SmtConf {
     /// ```rust
     /// # use rsmt2::SmtConf;
     /// assert_eq! {
-    ///     SmtConf::z3().get_options(), & [ "-in", "-smt2" ]
+    ///     SmtConf::default_z3().get_options(), & [ "-in", "-smt2" ]
     /// }
     /// ```
     #[inline]
@@ -327,7 +374,7 @@ impl SmtConf {
     ///
     /// ```rust
     /// # use rsmt2::SmtConf;
-    /// assert! { ! SmtConf::z3().get_print_success() }
+    /// assert! { ! SmtConf::default_z3().get_print_success() }
     /// ```
     #[inline]
     pub fn get_print_success(&self) -> bool {
@@ -340,7 +387,7 @@ impl SmtConf {
     ///
     /// ```rust
     /// # use rsmt2::SmtConf;
-    /// assert! { ! SmtConf::z3().get_unsat_cores() }
+    /// assert! { ! SmtConf::default_z3().get_unsat_cores() }
     /// ```
     #[inline]
     pub fn get_unsat_cores(&self) -> bool {
@@ -354,7 +401,7 @@ impl SmtConf {
     /// ```rust
     /// # use rsmt2::SmtConf;
     /// assert_eq! {
-    ///     SmtConf::z3().get_check_sat_assuming(), Some("check-sat-assuming")
+    ///     SmtConf::default_z3().get_check_sat_assuming(), Some("check-sat-assuming")
     /// }
     /// ```
     #[inline]
@@ -368,7 +415,7 @@ impl SmtConf {
     ///
     /// ```rust
     /// # use rsmt2::SmtConf;
-    /// let mut conf = SmtConf::z3();
+    /// let mut conf = SmtConf::default_z3();
     /// conf.option("arith.euclidean_solver=true");
     /// assert_eq! {
     ///     conf.get_options(),
@@ -387,7 +434,7 @@ impl SmtConf {
     ///
     /// ```rust
     /// # use rsmt2::SmtConf;
-    /// let mut conf = SmtConf::z3();
+    /// let mut conf = SmtConf::default_z3();
     /// conf.cmd("my_custom_z3_command");
     /// assert_eq! { conf.get_cmd(), "my_custom_z3_command" }
     /// ```
@@ -418,7 +465,7 @@ impl SmtConf {
     ///
     /// ```rust
     /// # use rsmt2::SmtConf;
-    /// let mut conf = SmtConf::z3();
+    /// let mut conf = SmtConf::default_z3();
     /// conf.print_success();
     /// assert! { conf.get_print_success() }
     /// ```
@@ -434,7 +481,7 @@ impl SmtConf {
     ///
     /// ```rust
     /// # use rsmt2::SmtConf;
-    /// let mut conf = SmtConf::z3();
+    /// let mut conf = SmtConf::default_z3();
     /// conf.unsat_cores();
     /// assert! { conf.get_unsat_cores() }
     /// ```

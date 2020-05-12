@@ -16,7 +16,7 @@ pub mod simple;
 
 #[cfg(test)]
 fn get_solver<Parser>(p: Parser) -> crate::Solver<Parser> {
-    match crate::Solver::default(p) {
+    match crate::Solver::default_z3(p) {
         Ok(solver) => solver,
         Err(e) => panic!("Could not spawn solver solver: {:?}", e),
     }

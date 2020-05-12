@@ -92,7 +92,7 @@
 //! use rsmt2::example::simple::{ Op, Cst, Expr };
 //! # fn main() {
 //!
-//! let mut solver = Solver::default(()).expect(
+//! let mut solver = Solver::default_z3(()).expect(
 //!     "could not spawn solver kid"
 //! );
 //!
@@ -249,7 +249,7 @@
 //!
 //! # fn main() {
 //!
-//! let mut solver = Solver::default(Parser).expect(
+//! let mut solver = Solver::default_z3(Parser).expect(
 //!     "could not spawn solver kid"
 //! );
 //!

@@ -44,14 +44,14 @@ pub mod cvc4 {
     use super::*;
     #[test]
     fn set_logic() {
-        let conf = SmtConf::cvc4();
+        let conf = SmtConf::default_cvc4();
         let mut solver = Solver::new(conf, Parser).expect("solver creation");
         solver.set_logic(rsmt2::Logic::QF_UF).expect("set-logic");
     }
 
     #[test]
     fn scenario_1() {
-        let mut conf = SmtConf::cvc4();
+        let mut conf = SmtConf::default_cvc4();
         conf.models();
         let mut solver = Solver::new(conf, Parser).expect("solver creation");
         solver
@@ -91,14 +91,14 @@ pub mod z3 {
     use super::*;
     #[test]
     fn set_logic() {
-        let conf = SmtConf::z3();
+        let conf = SmtConf::default_z3();
         let mut solver = Solver::new(conf, Parser).expect("solver creation");
         solver.set_logic(rsmt2::Logic::QF_UF).expect("set-logic");
     }
 
     #[test]
     fn scenario_1() {
-        let mut conf = SmtConf::z3();
+        let mut conf = SmtConf::default_z3();
         conf.models();
         let mut solver = Solver::new(conf, Parser).expect("solver creation");
         solver
@@ -114,7 +114,7 @@ pub mod z3 {
         let model = solver.get_model().expect("get-model");
         assert_eq!(
             format!("{:?}", model),
-            r#"[("a", [], "Bool", "true"), ("b", [], "Bool", "false")]"#
+            r#"[("b", [], "Bool", "false"), ("a", [], "Bool", "true")]"#
         );
 
         let values = solver
@@ -129,7 +129,7 @@ pub mod z3 {
 
     #[test]
     fn actlits_0() {
-        let mut solver = Solver::default(()).unwrap();
+        let mut solver = Solver::default_z3(()).unwrap();
         solver.declare_const("x", "Int").unwrap();
 
         solver.declare_const("actlit", "Bool").unwrap();
@@ -167,7 +167,7 @@ pub mod z3 {
 
     #[test]
     fn actlits_1() {
-        let mut solver = match Solver::default(()) {
+        let mut solver = match Solver::default_z3(()) {
             Ok(kid) => kid,
             Err(e) => panic!("Could not spawn solver kid: {:?}", e),
         };
@@ -203,14 +203,14 @@ pub mod yices_2 {
     use super::*;
     #[test]
     fn set_logic() {
-        let conf = SmtConf::yices_2();
+        let conf = SmtConf::default_yices_2();
         let mut solver = Solver::new(conf, Parser).expect("solver creation");
         solver.set_logic(rsmt2::Logic::QF_UF).expect("set-logic");
     }
 
     #[test]
     fn scenario_1() {
-        let conf = SmtConf::yices_2();
+        let conf = SmtConf::default_yices_2();
         let mut solver = Solver::new(conf, Parser).expect("solver creation");
 
         solver.set_logic(Logic::QF_LIA).expect("set-logic");
@@ -256,7 +256,7 @@ pub mod yices_2 {
         use rsmt2::parse::*;
         use rsmt2::*;
 
-        let mut conf = SmtConf::yices_2();
+        let mut conf = SmtConf::default_yices_2();
         conf.incremental();
 
         let mut solver = match Solver::new(conf, Parser) {
@@ -295,7 +295,7 @@ pub mod yices_2 {
 
 #[test]
 fn logic() {
-    let conf = SmtConf::z3();
+    let conf = SmtConf::default_z3();
 
     let mut solver = Solver::new(conf, ()).expect("solver");
 

@@ -3,7 +3,7 @@
 //! The underlying solver runs in a separate process, communication goes through system pipes.
 
 use std::fs::File;
-use std::io::{BufReader, BufWriter, Write};
+use std::io::{BufReader, BufWriter, Read, Write};
 use std::process::{Child, ChildStdin, ChildStdout, Command, Stdio};
 
 use crate::{
@@ -90,7 +90,7 @@ pub struct Solver<Parser> {
 }
 
 impl<Parser> Write for Solver<Parser> {
-    fn write(&mut self, buf: &[u8]) -> ::std::io::Result<usize> {
+    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
         if let Some(tee) = self.tee.as_mut() {
             let _ = tee.write(buf);
         }
@@ -101,6 +101,12 @@ impl<Parser> Write for Solver<Parser> {
             let _ = tee.flush();
         }
         self.stdin.flush()
+    }
+}
+
+impl<Parser> Read for Solver<Parser> {
+    fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+        self.smt_parser.read(buf)
     }
 }
 
@@ -190,29 +196,43 @@ impl<Parser> Solver<Parser> {
             actlit,
         })
     }
-    /// Creates a solver kid with the default configuration.
-    ///
-    /// Mostly used in tests, same as `Self::new( SmtConf::z3(), parser )`.
-    pub fn default(parser: Parser) -> SmtRes<Self> {
-        Self::new(SmtConf::z3(), parser)
-    }
+
     /// Creates a solver kid with the default z3 configuration.
     ///
     /// Mostly used in tests, same as `Self::new( SmtConf::z3(), parser )`.
-    pub fn default_z3(parser: Parser) -> SmtRes<Self> {
-        Self::new(SmtConf::z3(), parser)
+    pub fn z3(parser: Parser, cmd: impl Into<String>) -> SmtRes<Self> {
+        Self::new(SmtConf::z3(cmd), parser)
     }
     /// Creates a solver kid with the default cvc4 configuration.
     ///
     /// Mostly used in tests, same as `Self::new( SmtConf::z3(), parser )`.
-    pub fn default_cvc4(parser: Parser) -> SmtRes<Self> {
-        Self::new(SmtConf::cvc4(), parser)
+    pub fn cvc4(parser: Parser, cmd: impl Into<String>) -> SmtRes<Self> {
+        Self::new(SmtConf::cvc4(cmd), parser)
     }
     /// Creates a solver kid with the default yices 2 configuration.
     ///
     /// Mostly used in tests, same as `Self::new( SmtConf::yices_2(), parser )`.
+    pub fn yices_2(parser: Parser, cmd: impl Into<String>) -> SmtRes<Self> {
+        Self::new(SmtConf::yices_2(cmd), parser)
+    }
+
+    /// Creates a solver kid with the default z3 configuration and command.
+    ///
+    /// Mostly used in tests, same as `Self::new( SmtConf::default_z3(), parser )`.
+    pub fn default_z3(parser: Parser) -> SmtRes<Self> {
+        Self::new(SmtConf::default_z3(), parser)
+    }
+    /// Creates a solver kid with the default cvc4 configuration and command.
+    ///
+    /// Mostly used in tests, same as `Self::new( SmtConf::default_z3(), parser )`.
+    pub fn default_cvc4(parser: Parser) -> SmtRes<Self> {
+        Self::new(SmtConf::default_cvc4(), parser)
+    }
+    /// Creates a solver kid with the default yices 2 configuration and command.
+    ///
+    /// Mostly used in tests, same as `Self::new( SmtConf::default_yices_2(), parser )`.
     pub fn default_yices_2(parser: Parser) -> SmtRes<Self> {
-        Self::new(SmtConf::yices_2(), parser)
+        Self::new(SmtConf::default_yices_2(), parser)
     }
 
     /// Returns the configuration of the solver.
@@ -334,7 +354,7 @@ impl<Parser> Solver<Parser> {
     ///
     /// ```
     /// # use rsmt2::Solver;
-    /// let mut solver = Solver::default(()).unwrap();
+    /// let mut solver = Solver::default_z3(()).unwrap();
     /// solver.assert("(= 0 1)").unwrap();
     /// ```
     #[inline]
@@ -358,7 +378,7 @@ impl<Parser> Solver<Parser> {
     ///
     /// ```
     /// # use rsmt2::Solver;
-    /// # let mut solver = Solver::default(()).unwrap();
+    /// # let mut solver = Solver::default_z3(()).unwrap();
     /// solver.declare_const("x", "Int").unwrap();
     /// solver.declare_const("y", "Int").unwrap();
     ///
@@ -399,7 +419,7 @@ impl<Parser> Solver<Parser> {
     ///
     /// ```
     /// # use rsmt2::Solver;
-    /// # let mut solver = Solver::default(()).unwrap();
+    /// # let mut solver = Solver::default_z3(()).unwrap();
     /// solver.declare_const("x", "Int").unwrap();
     /// solver.declare_const("y", "Int").unwrap();
     ///
@@ -428,7 +448,7 @@ impl<Parser> Solver<Parser> {
     ///
     /// ```
     /// # use rsmt2::Solver;
-    /// let mut solver = Solver::default(()).unwrap();
+    /// let mut solver = Solver::default_z3(()).unwrap();
     /// solver.assert("(= 0 1)").unwrap();
     /// assert! { ! solver.check_sat().unwrap() }
     /// solver.reset().unwrap();
@@ -449,7 +469,7 @@ impl<Parser> Solver<Parser> {
     ///
     /// ```
     /// # use rsmt2::Solver;
-    /// let mut solver = Solver::default(()).unwrap();
+    /// let mut solver = Solver::default_z3(()).unwrap();
     /// solver.declare_const("x", "Int").unwrap()
     /// ```
     #[inline]
@@ -465,7 +485,7 @@ impl<Parser> Solver<Parser> {
     ///
     /// ```
     /// # use rsmt2::Solver;
-    /// let mut solver = Solver::default(()).unwrap();
+    /// let mut solver = Solver::default_z3(()).unwrap();
     /// solver.declare_fun(
     ///     "my_symbol", & [ "Int", "Real", "Bool" ], "Bool"
     /// ).unwrap()
@@ -492,7 +512,7 @@ impl<Parser> Solver<Parser> {
     ///
     /// ```
     /// # use rsmt2::Solver;
-    /// let mut solver = Solver::default(()).unwrap();
+    /// let mut solver = Solver::default_z3(()).unwrap();
     /// solver.define_const(
     ///     "seven", "Int", "7"
     /// ).unwrap()
@@ -518,7 +538,7 @@ impl<Parser> Solver<Parser> {
     ///
     /// ```
     /// # use rsmt2::Solver;
-    /// let mut solver = Solver::default(()).unwrap();
+    /// let mut solver = Solver::default_z3(()).unwrap();
     /// solver.define_fun(
     ///     "abs", & [ ("n", "Int") ], "Int", "(ite (< x 0) (- x) x)"
     /// ).unwrap()
@@ -548,7 +568,7 @@ impl<Parser> Solver<Parser> {
     ///
     /// ```
     /// # use rsmt2::Solver;
-    /// let mut solver = Solver::default(()).unwrap();
+    /// let mut solver = Solver::default_z3(()).unwrap();
     /// solver.declare_const("x", "Int").unwrap();
     /// solver.declare_const("y", "Int").unwrap();
     /// solver.assert("(= x y)").unwrap();
@@ -613,7 +633,7 @@ impl<Parser> Solver<Parser> {
     ///
     /// ```
     /// # use rsmt2::{SmtConf, Solver};
-    /// let mut solver = Solver::default(()).unwrap();
+    /// let mut solver = Solver::default_z3(()).unwrap();
     /// solver.set_logic( ::rsmt2::Logic::QF_UF ).unwrap();
     /// ```
     #[inline]
@@ -634,7 +654,7 @@ impl<Parser> Solver<Parser> {
     ///
     /// ```
     /// # use rsmt2::{SmtConf, Solver};
-    /// let mut solver = Solver::default(()).unwrap();
+    /// let mut solver = Solver::default_z3(()).unwrap();
     /// solver.set_custom_logic("QF_UFBV").unwrap();
     /// ```
     #[inline]
@@ -658,7 +678,7 @@ impl<Parser> Solver<Parser> {
     ///
     /// ```
     /// # use rsmt2::Solver;
-    /// let mut solver = Solver::default(()).unwrap();
+    /// let mut solver = Solver::default_z3(()).unwrap();
     /// solver.define_fun_rec(
     ///     "abs", & [ ("n", "Int") ], "Int", "(ite (< x 0) (abs (- x)) x)"
     /// ).unwrap()
@@ -688,7 +708,7 @@ impl<Parser> Solver<Parser> {
     ///
     /// ```
     /// # use rsmt2::Solver;
-    /// let mut solver = Solver::default(()).unwrap();
+    /// let mut solver = Solver::default_z3(()).unwrap();
     /// solver.define_funs_rec( & [
     ///     ("abs_1", & [ ("n", "Int") ], "Int", "(ite (< x 0) (abs_2 (- x)) x)"),
     ///     ("abs_2", & [ ("n", "Int") ], "Int", "(ite (< x 0) (abs_3 (- x)) x)"),
@@ -723,7 +743,7 @@ impl<Parser> Solver<Parser> {
     ///
     /// ```norun
     /// # use rsmt2::Solver;
-    /// let mut solver = Solver::default(()).unwrap();
+    /// let mut solver = Solver::default_z3(()).unwrap();
     /// solver.declare_datatypes( & [
     ///     ( "Tree", 1, ["T"],
     ///         [ "leaf", "(node (value T) (children (TreeList T)))" ] ),
@@ -986,7 +1006,7 @@ impl<Parser> Solver<Parser> {
     /// ```
     /// use rsmt2::Solver;
     ///
-    /// let mut solver = Solver::default(()).unwrap();
+    /// let mut solver = Solver::default_z3(()).unwrap();
     ///
     /// solver.declare_const("x", "Int").unwrap();
     /// solver.declare_const("y", "Int").unwrap();
@@ -1275,7 +1295,7 @@ impl<Parser> Solver<Parser> {
     ///
     /// ```
     /// # use rsmt2::Solver;
-    /// let mut solver = Solver::default(()).unwrap();
+    /// let mut solver = Solver::default_z3(()).unwrap();
     /// solver.declare_sort("A", 0).unwrap();
     /// solver.declare_const("x", "A").unwrap();
     /// solver.declare_const("y", "A").unwrap();
@@ -1309,7 +1329,7 @@ impl<Parser> Solver<Parser> {
     ///
     /// ```
     /// # use rsmt2::Solver;
-    /// let mut solver = Solver::default(()).unwrap();
+    /// let mut solver = Solver::default_z3(()).unwrap();
     /// solver.define_sort("MySet", & ["T"], "(Array T Bool)").unwrap();
     /// solver.define_null_sort("IList", "(List Int)").unwrap();
     /// solver.define_sort(
