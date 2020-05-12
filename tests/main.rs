@@ -112,9 +112,11 @@ pub mod z3 {
         assert!(is_sat);
 
         let model = solver.get_model().expect("get-model");
-        assert_eq!(
-            format!("{:?}", model),
-            r#"[("b", [], "Bool", "false"), ("a", [], "Bool", "true")]"#
+        let model = format!("{:?}", model);
+        println!("model: {}", model);
+        assert!(
+            model == r#"[("b", [], "Bool", "false"), ("a", [], "Bool", "true")]"#
+                || model == r#"[("a", [], "Bool", "true"), ("b", [], "Bool", "false")]"#
         );
 
         let values = solver

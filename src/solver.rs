@@ -219,18 +219,36 @@ impl<Parser> Solver<Parser> {
     /// Creates a solver kid with the default z3 configuration and command.
     ///
     /// Mostly used in tests, same as `Self::new( SmtConf::default_z3(), parser )`.
+    ///
+    /// # Warning
+    ///
+    /// The command used to run a particular solver is up to the end-user. As such, it **does not
+    /// make sense** to use default commands for anything else than local testing. You should
+    /// explicitely pass the command to use with [`Self::z3`](#method.z3) instead.
     pub fn default_z3(parser: Parser) -> SmtRes<Self> {
         Self::new(SmtConf::default_z3(), parser)
     }
     /// Creates a solver kid with the default cvc4 configuration and command.
     ///
     /// Mostly used in tests, same as `Self::new( SmtConf::default_z3(), parser )`.
+    ///
+    /// # Warning
+    ///
+    /// The command used to run a particular solver is up to the end-user. As such, it **does not
+    /// make sense** to use default commands for anything else than local testing. You should
+    /// explicitely pass the command to use with [`Self::z3`](#method.z3) instead.
     pub fn default_cvc4(parser: Parser) -> SmtRes<Self> {
         Self::new(SmtConf::default_cvc4(), parser)
     }
     /// Creates a solver kid with the default yices 2 configuration and command.
     ///
     /// Mostly used in tests, same as `Self::new( SmtConf::default_yices_2(), parser )`.
+    ///
+    /// # Warning
+    ///
+    /// The command used to run a particular solver is up to the end-user. As such, it **does not
+    /// make sense** to use default commands for anything else than local testing. You should
+    /// explicitely pass the command to use with [`Self::z3`](#method.z3) instead.
     pub fn default_yices_2(parser: Parser) -> SmtRes<Self> {
         Self::new(SmtConf::default_yices_2(), parser)
     }

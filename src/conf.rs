@@ -95,6 +95,12 @@ impl SmtStyle {
     }
 
     /// Default configuration for a solver style.
+    ///
+    /// # Warning
+    ///
+    /// The command used to run a particular solver is up to the end-user. As such, it **does not
+    /// make sense** to use default commands for anything else than local testing. You should
+    /// explicitely pass the command to use with [`Self::new`](#method.new) instead.
     pub fn default(self) -> SmtConf {
         self.new(self.cmd())
     }
@@ -224,7 +230,13 @@ impl SmtConf {
         Yices2.new(cmd)
     }
 
-    /// Creates a new z3-like solver configuration.
+    /// Creates a new z3-like solver configuration and command.
+    ///
+    /// # Warning
+    ///
+    /// The command used to run a particular solver is up to the end-user. As such, it **does not
+    /// make sense** to use default commands for anything else than local testing. You should
+    /// explicitely pass the command to use with [`Self::z3`](#method.z3) instead.
     ///
     /// # Examples
     ///
@@ -240,7 +252,13 @@ impl SmtConf {
         Z3.default()
     }
 
-    /// Creates a new cvc4-like solver configuration.
+    /// Creates a new cvc4-like solver configuration and command.
+    ///
+    /// # Warning
+    ///
+    /// The command used to run a particular solver is up to the end-user. As such, it **does not
+    /// make sense** to use default commands for anything else than local testing. You should
+    /// explicitely pass the command to use with [`Self::cvc4`](#method.cvc4) instead.
     ///
     /// # Examples
     ///
@@ -256,7 +274,13 @@ impl SmtConf {
         CVC4.default()
     }
 
-    /// Creates a new yices-2-like solver configuration.
+    /// Creates a new yices-2-like solver configuration and command.
+    ///
+    /// # Warning
+    ///
+    /// The command used to run a particular solver is up to the end-user. As such, it **does not
+    /// make sense** to use default commands for anything else than local testing. You should
+    /// explicitely pass the command to use with [`Self::yices_2`](#method.yices_2) instead.
     ///
     /// # Examples
     ///
