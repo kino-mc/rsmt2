@@ -205,7 +205,7 @@ impl<Parser> Solver<Parser> {
     }
     /// Creates a solver kid with the default cvc4 configuration.
     ///
-    /// Mostly used in tests, same as `Self::new( SmtConf::z3(), parser )`.
+    /// Mostly used in tests, same as `Self::new( SmtConf::cvc4(), parser )`.
     pub fn cvc4(parser: Parser, cmd: impl Into<String>) -> SmtRes<Self> {
         Self::new(SmtConf::cvc4(cmd), parser)
     }
@@ -214,6 +214,12 @@ impl<Parser> Solver<Parser> {
     /// Mostly used in tests, same as `Self::new( SmtConf::yices_2(), parser )`.
     pub fn yices_2(parser: Parser, cmd: impl Into<String>) -> SmtRes<Self> {
         Self::new(SmtConf::yices_2(cmd), parser)
+    }
+    /// Creates a solver kid with the default alt-ergo configuration.
+    ///
+    /// Mostly used in tests, same as `Self::new( SmtConf::z3(), parser )`.
+    pub fn alt_ergo(parser: Parser, cmd: impl Into<String>) -> SmtRes<Self> {
+        Self::new(SmtConf::alt_ergo(cmd), parser)
     }
 
     /// Creates a solver kid with the default z3 configuration and command.
@@ -236,9 +242,21 @@ impl<Parser> Solver<Parser> {
     ///
     /// The command used to run a particular solver is up to the end-user. As such, it **does not
     /// make sense** to use default commands for anything else than local testing. You should
-    /// explicitely pass the command to use with [`Self::z3`](#method.z3) instead.
+    /// explicitely pass the command to use with [`Self::cvc4`](#method.cvc4) instead.
     pub fn default_cvc4(parser: Parser) -> SmtRes<Self> {
         Self::new(SmtConf::default_cvc4(), parser)
+    }
+    /// Creates a solver kid with the default alt-ergo configuration and command.
+    ///
+    /// Mostly used in tests, same as `Self::new( SmtConf::default_z3(), parser )`.
+    ///
+    /// # Warning
+    ///
+    /// The command used to run a particular solver is up to the end-user. As such, it **does not
+    /// make sense** to use default commands for anything else than local testing. You should
+    /// explicitely pass the command to use with [`Self::alt_ergo`](#method.alt_ergo) instead.
+    pub fn default_alt_ergo(parser: Parser) -> SmtRes<Self> {
+        Self::new(SmtConf::default_alt_ergo(), parser)
     }
     /// Creates a solver kid with the default yices 2 configuration and command.
     ///
@@ -248,7 +266,7 @@ impl<Parser> Solver<Parser> {
     ///
     /// The command used to run a particular solver is up to the end-user. As such, it **does not
     /// make sense** to use default commands for anything else than local testing. You should
-    /// explicitely pass the command to use with [`Self::z3`](#method.z3) instead.
+    /// explicitely pass the command to use with [`Self::yices2`](#method.yices2) instead.
     pub fn default_yices_2(parser: Parser) -> SmtRes<Self> {
         Self::new(SmtConf::default_yices_2(), parser)
     }

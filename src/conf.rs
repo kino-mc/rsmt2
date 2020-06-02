@@ -28,13 +28,15 @@ fn supported(keyword: &'static str) -> ConfItem {
 /// - [z3][z3]: full support
 /// - [cvc4][cvc4]: full support in theory, but only partially tested. Note that `get-value` is
 ///   known to crash some versions of CVC4.
+/// - [Alt-Ergo][alt-ergo]: full support in theory, but only partially tested.
 /// - [yices 2][yices 2]: full support in theory, but only partially tested. Command `get-model`
 ///   will only work on Yices 2 > `2.6.1`, and needs to be activated in [SmtConf][SmtConf] with
 ///   [`conf.models()`](struct.SmtConf.html#method.models). To understand why, see
 ///   <https://github.com/SRI-CSL/yices2/issues/162>.
-///   
+///
 /// [z3]: https://github.com/Z3Prover/z3 (z3 github repository)
 /// [cvc4]: https://cvc4.github.io/ (cvc4 github pages)
+/// [alt-ergo]: https://github.com/OCamlPro/alt-ergo/ (Alt-Ergo github pages)
 /// [yices 2]: https://yices.csl.sri.com/ (yices 2 official page)
 #[derive(Debug, Clone, Copy)]
 #[allow(dead_code)]
@@ -45,9 +47,13 @@ pub enum SmtStyle {
     ///
     /// **NB**: CVC4 has only been partially tested at this point.
     CVC4,
+    /// Alt-Ergo-style smt solver.
+    ///
+    /// **NB**: Alt-Ergo has only been partially tested at this point.
+    AltErgo,
     /// Yices-2-style smt solver.
     ///
-    /// Yices 2 has only been partially tested at this point.
+    /// **NB**: Yices 2 has only been partially tested at this point.
     Yices2,
 }
 
@@ -75,6 +81,16 @@ impl SmtStyle {
                     "--lang".into(),
                     "smt2".into(),
                 ],
+                models: false,
+                incremental: false,
+                parse_success: false,
+                unsat_cores: false,
+                check_sat_assuming: unsupported(),
+            },
+            AltErgo => SmtConf {
+                style: self,
+                cmd,
+                options: vec![],
                 models: false,
                 incremental: false,
                 parse_success: false,
@@ -111,6 +127,7 @@ impl SmtStyle {
         match s {
             "z3" | "Z3" => Some(Z3),
             "cvc4" | "CVC4" => Some(CVC4),
+            "alt-ergo" | "ALT-ERGO" | "alt ergo" | "ALT ERGO" | "altergo" | "AltErgo" => Some(CVC4),
             "Yices2" | "yices2" | "YICES2" | "Yices 2" | "yices 2" | "YICES 2" => Some(CVC4),
             _ => None,
         }
@@ -119,8 +136,8 @@ impl SmtStyle {
     #[allow(dead_code)]
     pub fn str_keys() -> Vec<&'static str> {
         vec![
-            "z3", "Z3", "cvc4", "CVC4", "Yices2", "yices2", "YICES2", "Yices 2", "yices 2",
-            "YICES 2",
+            "z3", "Z3", "cvc4", "CVC4", "alt-ergo", "ALT-ERGO", "alt ergo", "ALT ERGO", "altergo",
+            "AltErgo", "Yices2", "yices2", "YICES2", "Yices 2", "yices 2", "YICES 2",
         ]
     }
 
@@ -130,6 +147,7 @@ impl SmtStyle {
         match self {
             Z3 => "z3".to_string(),
             CVC4 => "cvc4".to_string(),
+            AltErgo => "alt-ergo".to_string(),
             Yices2 => "yices".to_string(),
         }
     }
@@ -139,6 +157,7 @@ impl SmtStyle {
         match self {
             Z3 => "z3.exe".to_string(),
             CVC4 => "cvc4.exe".to_string(),
+            AltErgo => "alt-ergo.exe".to_string(),
             Yices2 => "yices.exe".to_string(),
         }
     }
@@ -149,6 +168,7 @@ impl fmt::Display for SmtStyle {
         match *self {
             Z3 => write!(fmt, "z3"),
             CVC4 => write!(fmt, "cvc4"),
+            AltErgo => write!(fmt, "Alt-Ergo"),
             Yices2 => write!(fmt, "yices2"),
         }
     }
@@ -159,13 +179,15 @@ impl fmt::Display for SmtStyle {
 /// - [z3][z3]: full support
 /// - [cvc4][cvc4]: full support in theory, but only partially tested. Note that `get-value` is
 ///   known to crash some versions of CVC4.
+/// - [Alt-Ergo][alt-ergo]: full support in theory, but only partially tested.
 /// - [yices 2][yices 2]: full support in theory, but only partially tested. Command `get-model`
 ///   will only work on Yices 2 > `2.6.1`, and needs to be activated in [SmtConf][SmtConf] with
 ///   [`conf.models()`](struct.SmtConf.html#method.models). To understand why, see
 ///   <https://github.com/SRI-CSL/yices2/issues/162>.
-///   
+///
 /// [z3]: https://github.com/Z3Prover/z3 (z3 github repository)
 /// [cvc4]: https://cvc4.github.io/ (cvc4 github pages)
+/// [alt-ergo]: https://github.com/OCamlPro/alt-ergo/ (Alt-Ergo github pages)
 /// [yices 2]: https://yices.csl.sri.com/ (yices 2 official page)
 #[derive(Debug, Clone)]
 pub struct SmtConf {
@@ -214,6 +236,20 @@ impl SmtConf {
     #[inline]
     pub fn cvc4(cmd: impl Into<String>) -> Self {
         CVC4.new(cmd)
+    }
+
+    /// Creates a new Alt-Ergo-like solver configuration.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// # use rsmt2::SmtConf;
+    /// let conf = SmtConf::alt_ergo("my_alt-ergo_command");
+    /// assert!(conf.get_cmd() == "my_alt-ergo_command")
+    /// ```
+    #[inline]
+    pub fn alt_ergo(cmd: impl Into<String>) -> Self {
+        AltErgo.new(cmd)
     }
 
     /// Creates a new yices-2-like solver configuration.
@@ -274,6 +310,28 @@ impl SmtConf {
         CVC4.default()
     }
 
+    /// Creates a new alt-ergo-like solver configuration and command.
+    ///
+    /// # Warning
+    ///
+    /// The command used to run a particular solver is up to the end-user. As such, it **does not
+    /// make sense** to use default commands for anything else than local testing. You should
+    /// explicitely pass the command to use with [`Self::alt_ergo`](#method.alt_ergo) instead.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// # use rsmt2::SmtConf;
+    /// let conf = SmtConf::default_alt_ergo();
+    /// assert! {
+    ///     conf.get_cmd() == "alt-ergo" || conf.get_cmd() == "alt-ergo.exe"
+    /// }
+    /// ```
+    #[inline]
+    pub fn default_alt_ergo() -> Self {
+        AltErgo.default()
+    }
+
     /// Creates a new yices-2-like solver configuration and command.
     ///
     /// # Warning
@@ -322,6 +380,7 @@ impl SmtConf {
         match self.style {
             Z3 => "z3",
             CVC4 => "cvc4",
+            AltErgo => "alt-ergo",
             Yices2 => "yices2",
         }
     }
@@ -339,6 +398,7 @@ impl SmtConf {
         }
         match self.style {
             CVC4 => self.options.push("--produce-models".into()),
+            AltErgo => self.options.push("-mcomplete".into()),
             Yices2 => self.options.push("--smt2-model-format".into()),
             Z3 => (),
         }
@@ -357,7 +417,7 @@ impl SmtConf {
         }
         match self.style {
             CVC4 | Yices2 => self.options.push("--incremental".into()),
-            Z3 => (),
+            AltErgo | Z3 => (),
         }
     }
 
@@ -524,7 +584,7 @@ impl SmtConf {
                 "some versions of CVC4 produce errors on `get-value` commands, \
                  consider using `get-model` instead"
             }),
-            SmtStyle::Z3 | SmtStyle::Yices2 => e,
+            SmtStyle::Z3 | SmtStyle::AltErgo | SmtStyle::Yices2 => e,
         }
     }
 }

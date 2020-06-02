@@ -36,3 +36,4 @@ MIT/Apache-2.0
 [hoice]: https://github.com/hopv/hoice (hoice on github)
 [z3]: https://github.com/Z3Prover/z3 (z3 on github)
 [cvc4]: https://github.com/CVC4/CVC4 (cvc4 on github)
+[alt-ergo]: https://github.com/OCamlPro/alt-ergo (Alt-Ergo github pages)
