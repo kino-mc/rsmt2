@@ -1285,7 +1285,8 @@ impl<R: BufRead> SmtParser<R> {
         self.spc_cmt();
         self.try_error()?;
         let mut model = Vec::new();
-        self.tags(&["(", "model"])?;
+        self.tag("(")?;
+        self.try_tag("model")?;
         while !self.try_tag(")")? {
             self.tag_info("(", "opening define-fun or `)` closing model")?;
             self.tag("define-fun")?;
@@ -1320,7 +1321,8 @@ impl<R: BufRead> SmtParser<R> {
         self.spc_cmt();
         self.try_error()?;
         let mut model = Vec::new();
-        self.tags(&["(", "model"])?;
+        self.tag("(")?;
+        self.try_tag("model")?;
         while !self.try_tag(")")? {
             self.tag_info("(", "opening define-fun or `)` closing model")?;
             self.tag("define-fun")?;
