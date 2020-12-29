@@ -759,7 +759,7 @@ impl<Parser> Solver<Parser> {
     ///
     /// # Examples
     ///
-    /// ```norun
+    /// ```no_run
     /// # use rsmt2::Solver;
     /// let mut solver = Solver::default_z3(()).unwrap();
     /// solver.declare_datatypes( & [
