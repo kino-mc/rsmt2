@@ -14,7 +14,7 @@
 //! In rsmt2, solvers run in a separate process and communication is achieved *via* system pipes.
 //! This means that to use a solver, it needs to be available as a binary in your path. For the
 //! moment, only [z3][z3] is officially supported, although there is experimental support for
-//! [cvc4][cvc4] and [yices 2][yices 2].
+//! [cvc4][cvc4], [Alt-Ergo][alt-ergo] and [yices 2][yices 2].
 //!
 //! **NB**: most of the tests and documentation examples in this crate will not work unless you have
 //! [z3][z3] in your path under the name `z3`.
@@ -32,6 +32,7 @@
 //! - [z3][z3]: full support
 //! - [cvc4][cvc4]: full support in theory, but only partially tested. Note that `get-value` is
 //!   known to crash some versions of CVC4.
+//! - [Alt-Ergo][alt-ergo]: full support in theory, but only partially tested.
 //! - [yices 2][yices 2]: full support in theory, but only partially tested. Command `get-model`
 //!   will only work on Yices 2 > `2.6.1`, and needs to be activated in [`SmtConf`][SmtConf] with
 //!   [`conf.models()`](struct.SmtConf.html#method.models). To understand why, see
@@ -324,6 +325,7 @@
 //! [rsmt2]: https://github.com/kino-mc/rsmt2 (rsmt2 github repository)
 //! [z3]: https://github.com/Z3Prover/z3 (z3 github repository)
 //! [cvc4]: https://cvc4.github.io/ (cvc4 github pages)
+//! [alt-ergo]: https://github.com/OCamlPro/alt-ergo/ (Alt-Ergo github pages)
 //! [yices 2]: https://yices.csl.sri.com/ (yices 2 official page)
 //! [SmtConf]: struct.SmtConf.html (SmtConf type)
 //! [changes]: https://github.com/kino-mc/rsmt2/blob/master/CHANGES.md (List of changes on github)
