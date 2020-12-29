@@ -23,7 +23,7 @@ jobs:
     # Retrieve the Z3 archive for the platform we're on.
     - name: Z3 windows
       if: startsWith(matrix.os, 'windows')
-      shell: cmd
+      shell: bash
       run: |
         wget https://github.com/Z3Prover/z3/releases/download/z3-4.8.7/z3-4.8.7-x64-win.zip
     - name: Z3 ubuntu
