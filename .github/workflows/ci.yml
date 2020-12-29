@@ -37,9 +37,9 @@ jobs:
     - name: Z3 setup
       run: |
         unzip z3*.zip
-        mv z3*/bin/z3* $HOME/.local/bin/.
-        rm -rf z3*
-        z3 -h
+        echo `pwd`/z3*/bin >> $GITHUB_PATH
+    - name: Z3 check help
+      run: z3 -h
 
     - name: Build
       run: cargo build --verbose
