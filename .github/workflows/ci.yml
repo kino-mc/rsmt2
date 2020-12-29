@@ -19,6 +19,31 @@ jobs:
 
     steps:
     - uses: actions/checkout@v2
+
+    # Retrieve the Z3 archive for the platform we're on.
+    - name: Z3 windows
+      if: startsWith(matrix.os, 'windows')
+      run: |
+        wget https://github.com/Z3Prover/z3/releases/download/z3-4.8.7/z3-4.8.7-x64-win.zip
+        mv z3*.zip z3.zip
+    - name: Z3 ubuntu
+      if: startsWith(matrix.os, 'ubuntu')
+      run: |
+        wget https://github.com/Z3Prover/z3/releases/download/z3-4.8.7/z3-4.8.7-x64-ubuntu-16.04.zip
+        mv z3*.zip z3.zip
+    - name: Z3 macos
+      if: startsWith(matrix.os, 'macos')
+      run: |
+        wget https://github.com/Z3Prover/z3/releases/download/z3-4.8.7/z3-4.8.7-x64-osx-10.14.6.zip
+        mv z3*.zip z3.zip
+
+    - name: Z3 setup
+      run: |
+        unzip z3.zip
+        mv z3/bin/z3* $HOME/.local/bin/.
+        rm -rf z3
+        z3 -h
+
     - name: Build
       run: cargo build --verbose
     - name: Run tests
