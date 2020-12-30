@@ -21,7 +21,7 @@
 //!
 //! This library does **not** have a structure for S-expressions. It must be provided by the user,
 //! as well as the relevant printing and parsing functions. Printing-related traits are discussed in
-//! the [`print`][print_mod] module, and parsing-related traits are in the [`parse`][parse_mod]
+//! the [`print`](self::print) module, and parsing-related traits are in the [`parse`](self::parse)
 //! module.
 //!
 //!
@@ -29,18 +29,16 @@
 //!
 //! This crate supports the following solvers:
 //!
-//! - [z3][z3]: full support
-//! - [cvc4][cvc4]: full support in theory, but only partially tested. Note that `get-value` is
+//! - [z3]: full support
+//! - [cvc4]: full support in theory, but only partially tested. Note that `get-value` is
 //!   known to crash some versions of CVC4.
-//! - [yices 2][yices 2]: full support in theory, but only partially tested. Command `get-model`
-//!   will only work on Yices 2 > `2.6.1`, and needs to be activated in [`SmtConf`][SmtConf] with
-//!   [`conf.models()`](struct.SmtConf.html#method.models). To understand why, see
-//!   <https://github.com/SRI-CSL/yices2/issues/162>.
+//! - [yices 2]: full support in theory, but only partially tested. Command `get-model` will only
+//!   work on Yices 2 > `2.6.1`, and needs to be activated with [`SmtConf::models`]. To understand
+//!   why, see <https://github.com/SRI-CSL/yices2/issues/162>.
 //!
 //! Since solver run as system processes on the end-user's system, it is hard to make any assumption
 //! regarding the command that will run a particular solver. For this reason you should make sure
-//! you allow your users to pass command that specifies how to run a given solver. You can take a
-//! look at the [`custom_cmd` example] for guidance.
+//! you allow your users to pass command that specifies how to run a given solver.
 //!
 //! # Very basic example
 //!
@@ -64,11 +62,13 @@
 //!
 //! Notice that all three functions spawning a solver take a parser used to parse identifiers,
 //! values and/or expressions. rsmt2 parses everything else (keywords and such), and lets users
-//! handle the important parts. See the [`parse`][parse_mod] module documentation for more details.
+//! handle the important parts. See the [`parse`](self::parse) module documentation for more
+//! details.
 //!
-//! Our current parser `()` is enough for this example. We can even perform `check-sat`s since,
-//! unlike `get-model` for instance, it does not require any user-data-structure-specific parsing.
-//! Let's declare a few symbols and perform a check-sat.
+//! Our current parser `()` is enough for this example. We can even perform
+//! [`check-sat`](Solver::check_sat)s since, unlike [`get-model`](Solver::get_model) for instance,
+//! it does not require any user-data-structure-specific parsing. Let's declare a few symbols and
+//! perform a check-sat.
 //!
 //! ```rust
 //! # fn do_smt_stuff() -> ::rsmt2::SmtRes<()> {
@@ -97,12 +97,13 @@
 //!
 //! If we want to be able to retrieve models, we need a parser that can parse two things:
 //! identifiers, types and values. That is, we need a parser that implements
-//! [`IdentParser`][ident_parser] (identifiers and types) and [`ModelParser`][model_parser]
-//! (values). The previous parser `()` doesn't, so `solver.get_model()` won't even compile.
+//! [`IdentParser`](parse::IdentParser) (identifiers and types) and
+//! [`ModelParser`](parse::ModelParser) (values). The previous parser `()` doesn't, so calls to
+//! [`Solver::get_model`] won't even compile.
 //!
-//! There's different ways to implement these traits, discussed in the [`parse`][parse_mod] module
+//! There's different ways to implement these traits, discussed in the [`parse`](self::parse) module
 //! documentation. Let us be lazy and just have rsmt2 do the work for us. Note the (unnecessary) use
-//! of `define_fun`.
+//! of [`Solver::define_fun`].
 //!
 //! ```rust
 //! use rsmt2::{ Solver, SmtRes };
@@ -169,12 +170,14 @@
 //! # Asynchronous check-sats.
 //!
 //! The check-sat command above is blocking, in that the caller cannot do anything until the backend
-//! solver answers. Using the `print_check_sat...` and `parse_check_sat...` functions, users can
-//! issue the check-sat command, work on something else, and get the result later on.
+//! solver answers. Using the `print_check_sat...` and `parse_check_sat...` functions on [`Solver`],
+//! users can issue the check-sat command, work on something else, and get the result later on.
 //!
-//! The `print_check_sat...` functions return a [`FutureCheckSat`][future] required by the
-//! `parse_check_sat...` functions to guarantee statically that the parse request makes sense.
-//! `FutureCheckSat` is equivalent to unit and exists only at compile time.
+//! The `print_check_sat...` [`Solver`] functions return a
+//! [`FutureCheckSat`](future::FutureCheckSat) required by the `parse_check_sat...` [`Solver`]
+//! functions to guarantee statically that the parse request makes sense.
+//! [`FutureCheckSat`](future::FutureCheckSat) is equivalent to unit and exists only at compile
+//! time.
 //!
 //! Rewriting the previous example in an asynchronous fashion yields (omitting most of the
 //! unmodified code):
@@ -221,7 +224,7 @@
 //!
 //! # Other SMT-LIB 2 commands
 //!
-//! Refer to [`Solver`][solver]'s documentation for the complete list of SMT-LIB 2 commands.
+//! Refer to [`Solver`]'s documentation for the complete list of SMT-LIB 2 commands.
 //!
 //!
 //!
@@ -230,8 +233,8 @@
 //!
 //! # Activation literals
 //!
-//! Module [`actlit`][actlit_mod] discusses rsmt2's API for *activation literals*, a alternative to
-//! [`push`][push]/[`pop`][pop] that's more limited but more efficient.
+//! Module [`actlit`](self::actlit) discusses rsmt2's API for *activation literals*, a alternative
+//! to [`Solver::push`] and [`Solver::pop`] that's more limited but more efficient.
 //!
 //!
 //!
@@ -244,9 +247,9 @@
 //!
 //! # Custom data structures
 //!
-//! Module [`example::simple`][simple_mod]'s documentation discusses in detail how to use rsmt2 with
-//! a custom data structure. This includes implementing the [print traits][print_mod] and writing a
-//! more evolved parser.
+//! Examples in the [`examples`](self::examples) module discusses in detail how to use rsmt2 with a
+//! custom data structure. This includes implementing the [print traits](self::print) and writing a
+//! more evolved parser. Examples are only visible if the `examples` features is active.
 //!
 //!
 //!
@@ -255,16 +258,16 @@
 //!
 //!
 //!
-//! # Print-time information
+//! # Print-Time Information Passing
 //!
-//! Module [`example::print_time`][print_time_mod]'s documentation showcases print-time information.
-//! Proper documentation is somewhat lacking as it is a rather advanced topic, and no one asked for
-//! more details about it.
+//! The `print_time` example in [`examples`](self::examples) showcases print-time
+//! information-passing. Proper documentation is somewhat lacking as it is a rather advanced topic,
+//! and no one asked for more details about it.
 //!
 //! Print-time information is the reason for
 //!
-//! - the `Info` type parameter in the [`...2Smt`][print_mod] traits,
-//! - all the `..._with` solver functions, such as `assert_with`.
+//! - the `Info` type parameter in the [`...2Smt` traits](self::print),
+//! - all the `..._with` solver functions, such as [`Solver::assert_with`].
 //!
 //! Users can call these functions to pass information down to their own printers as commands are
 //! written on the solver's input. The typical use-case is *print-time unrolling* when working with
@@ -313,8 +316,8 @@
 //! `x_0` to be printed as `x_3` and `x_1` as `x_4`. Without creating anything, just from the
 //! original term.
 //!
-//! This is the workflow showcased (but only partially explained) by
-//! [`example::print_time`][print_time_mod].
+//! This is the workflow showcased (but only partially explained) by `print_time` in
+//! [`examples`](self::examples).
 //!
 //!
 //!
@@ -325,22 +328,8 @@
 //! [z3]: https://github.com/Z3Prover/z3 (z3 github repository)
 //! [cvc4]: https://cvc4.github.io/ (cvc4 github pages)
 //! [yices 2]: https://yices.csl.sri.com/ (yices 2 official page)
-//! [SmtConf]: struct.SmtConf.html (SmtConf type)
 //! [changes]: https://github.com/kino-mc/rsmt2/blob/master/CHANGES.md (List of changes on github)
-//! [solver]: struct.Solver.html (Solver type)
-//! [push]: struct.Solver.html#method.push (Solver's push function)
-//! [pop]: struct.Solver.html#method.pop (Solver's pop function)
-//! [ident_parser]: parse/trait.IdentParser.html (IdentParser trait)
-//! [model_parser]: parse/trait.ModelParser.html (ValueParser trait)
-//! [parse_mod]: parse/index.html (parse module)
-//! [print_mod]: print/index.html (print module)
-//! [simple_mod]: example/simple/index.html (rsmt2 simple example)
-//! [print_time_mod]: example/print_time/index.html (rsmt2 complex example)
-//! [actlit_mod]: actlit/index.html (rsmt2 complex example)
 //! [hashconsing]: https://crates.io/crates/hashconsing (hashconsing crate on crates.io)
-//! [future]: future/struct.FutureCheckSat.html (FutureCheckSat struct)
-//! [`custom_cmd` example]: https://github.com/kino-mc/rsmt2/tree/master/examples/custom_cmd.rs
-//! (Example of passing a custom solver command to rsmt2)
 
 #[macro_use]
 extern crate error_chain;
@@ -458,9 +447,17 @@ pub mod future {
     pub use crate::solver::FutureCheckSat;
 }
 
-pub mod example;
+#[cfg(any(test, feature = "examples"))]
+pub mod examples;
+
+/// Examples, only available if the `examples` feature is active.
+#[cfg(not(any(test, feature = "examples")))]
+pub mod examples {}
 
 /// Traits your types must implement so that rsmt2 can use them.
 pub mod print {
     pub use crate::common::{Expr2Smt, Sort2Smt, Sym2Smt};
 }
+
+#[cfg(test)]
+mod tests;

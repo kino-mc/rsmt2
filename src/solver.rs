@@ -13,17 +13,14 @@ use crate::{
 };
 
 /// Prefix of an actlit identifier.
-#[allow(non_upper_case_globals)]
-pub static actlit_pref: &str = "|rsmt2 actlit ";
+pub static ACTLIT_PREF: &str = "|rsmt2 actlit ";
+
 /// Suffix of an actlit identifier.
-#[allow(non_upper_case_globals)]
-pub static actlit_suff: &str = "|";
+pub static ACTLIT_SUFF: &str = "|";
 
 /// An activation literal is an opaque wrapper around a `usize`.
 ///
-/// Obtained by a solver's [`get_actlit`][get actlit].
-///
-/// [get actlit]: ../trait.Solver.html#method.get_actlit (get_actlit documentation)
+/// Obtained by a call to [`Solver::get_actlit`].
 #[derive(Debug)]
 pub struct Actlit {
     /// ID of the actlit.
@@ -39,7 +36,7 @@ impl Actlit {
     where
         W: Write,
     {
-        write!(w, "{}{}{}", actlit_pref, self.id, actlit_suff)?;
+        write!(w, "{}{}{}", ACTLIT_PREF, self.id, ACTLIT_SUFF)?;
         Ok(())
     }
 }
@@ -68,10 +65,8 @@ fn future_check_sat() -> FutureCheckSat {
 
 /// Solver providing most of the SMT-LIB 2.5 commands.
 ///
-/// Note the [`tee` function][tee fun], which takes a file writer to which it will write everything
-/// sent to the solver.
-///
-/// [tee fun]: #method.tee (tee function)
+/// Note the [`tee` function](Self::tee), which takes a file writer to which it will write
+/// everything sent to the solver.
 pub struct Solver<Parser> {
     /// Solver configuration.
     conf: SmtConf,
@@ -224,11 +219,13 @@ impl<Parser> Solver<Parser> {
     ///
     /// The command used to run a particular solver is up to the end-user. As such, it **does not
     /// make sense** to use default commands for anything else than local testing. You should
-    /// explicitely pass the command to use with [`Self::z3`](#method.z3) instead.
+    /// explicitely pass the command to use with [`Self::z3`](Self::z3) instead.
     pub fn default_z3(parser: Parser) -> SmtRes<Self> {
         Self::new(SmtConf::default_z3(), parser)
     }
-    /// Creates a solver kid with the default cvc4 configuration and command.
+
+    /// Creates a solver kid with the default cvc4 configuration and
+    /// command.
     ///
     /// Mostly used in tests, same as `Self::new( SmtConf::default_z3(), parser )`.
     ///
@@ -236,11 +233,13 @@ impl<Parser> Solver<Parser> {
     ///
     /// The command used to run a particular solver is up to the end-user. As such, it **does not
     /// make sense** to use default commands for anything else than local testing. You should
-    /// explicitely pass the command to use with [`Self::z3`](#method.z3) instead.
+    /// explicitely pass the command to use with [`Self::cvc4`](Self::cvc4) instead.
     pub fn default_cvc4(parser: Parser) -> SmtRes<Self> {
         Self::new(SmtConf::default_cvc4(), parser)
     }
-    /// Creates a solver kid with the default yices 2 configuration and command.
+
+    /// Creates a solver kid with the default yices 2 configuration and
+    /// command.
     ///
     /// Mostly used in tests, same as `Self::new( SmtConf::default_yices_2(), parser )`.
     ///
@@ -248,7 +247,7 @@ impl<Parser> Solver<Parser> {
     ///
     /// The command used to run a particular solver is up to the end-user. As such, it **does not
     /// make sense** to use default commands for anything else than local testing. You should
-    /// explicitely pass the command to use with [`Self::z3`](#method.z3) instead.
+    /// explicitely pass the command to use with [`Self::yices_2`](Self::yices_2) instead.
     pub fn default_yices_2(parser: Parser) -> SmtRes<Self> {
         Self::new(SmtConf::default_yices_2(), parser)
     }
@@ -260,7 +259,8 @@ impl<Parser> Solver<Parser> {
 
     /// Forces the solver to write all communications to a file.
     ///
-    /// Errors if the solver was already tee-ed.
+    /// - fails if the solver is already tee-ed;
+    /// - see also [`path_tee`](Self::path_tee).
     pub fn tee(&mut self, file: File) -> SmtRes<()> {
         if self.tee.is_some() {
             bail!("Trying to tee a solver that's already tee-ed")
@@ -277,7 +277,9 @@ impl<Parser> Solver<Parser> {
 
     /// Forces the solver to write all communications to a file.
     ///
-    /// Opens `file` with `create` and `write`.
+    /// - opens `file` with `create` and `write`;
+    /// - fails if the solver is already tee-ed;
+    /// - see also [`tee`](Self::tee).
     pub fn path_tee<P>(&mut self, path: P) -> SmtRes<()>
     where
         P: AsRef<::std::path::Path>,
@@ -345,16 +347,16 @@ impl<Parser> Solver<Parser> {
         Ok(())
     }
 
-    /// Prints a comment in the tee-ed file if any.
+    /// Prints a comment in the tee-ed file, if any.
     #[inline]
-    pub fn comment_args(&mut self, args: ::std::fmt::Arguments) -> SmtRes<()> {
+    pub fn comment_args(&mut self, args: std::fmt::Arguments) -> SmtRes<()> {
         if let Some(ref mut file) = self.tee {
             Self::cmt(file, &format!("{}", args))?
         }
         Ok(())
     }
 
-    /// Prints a comment in the tee-ed file if any. String version.
+    /// Prints a comment in the tee-ed file, if any (string version).
     #[inline]
     pub fn comment(&mut self, blah: &str) -> SmtRes<()> {
         if let Some(ref mut file) = self.tee {
@@ -387,8 +389,8 @@ impl<Parser> Solver<Parser> {
     ///
     /// # See also
     ///
-    /// - [`print_check_sat`][print]
-    /// - [`parse_check_sat`][get]
+    /// - [`print_check_sat`](Self::print_check_sat)
+    /// - [`parse_check_sat`](Self::parse_check_sat)
     ///
     /// If you want a more natural way to handle unknown results, see `parse_check_sat_or_unk`.
     ///
@@ -417,11 +419,6 @@ impl<Parser> Solver<Parser> {
     ///     Ok(res) => panic!("expected error: {:?}", res),
     /// }
     /// ```
-    ///
-    /// [print]: #method.print_check_sat
-    /// (print_check_sat function)
-    /// [get]: #method.parse_check_sat
-    /// (parse_check_sat function)
     pub fn check_sat(&mut self) -> SmtRes<bool> {
         let future = self.print_check_sat()?;
         self.parse_check_sat(future)
@@ -431,7 +428,7 @@ impl<Parser> Solver<Parser> {
     ///
     /// # See also
     ///
-    /// - [`parse_check_sat_or_unk`][get]
+    /// - [`parse_check_sat_or_unk`][Self::parse_check_sat_or_unk]
     ///
     /// # Examples
     ///
@@ -452,9 +449,6 @@ impl<Parser> Solver<Parser> {
     /// // Unknown ~~~~~~~~~~~~~vvvv
     /// assert_eq! { maybe_sat, None }
     /// ```
-    ///
-    /// [get]: #method.parse_check_sat_or_unk
-    /// (parse_check_sat_or_unk function)
     pub fn check_sat_or_unk(&mut self) -> SmtRes<Option<bool>> {
         let future = self.print_check_sat()?;
         self.parse_check_sat_or_unk(future)
@@ -582,6 +576,8 @@ impl<Parser> Solver<Parser> {
 
     /// Pushes `n` layers on the assertion stack.
     ///
+    /// - see also [`pop`](Self::pop).
+    ///
     /// # Examples
     ///
     /// ```
@@ -612,10 +608,7 @@ impl<Parser> Solver<Parser> {
 
     /// Pops `n` layers off the assertion stack.
     ///
-    /// See [`push`][push] for examples.
-    ///
-    /// [push]: #method.push
-    /// (push function for solver)
+    /// - see also [`push`](Self::push).
     #[inline]
     pub fn pop(&mut self, n: u8) -> SmtRes<()> {
         tee_write! {
@@ -899,21 +892,13 @@ impl<Parser> Solver<Parser> {
     }
 }
 
-/// # Actlit-related functions.
+/// # Actlit-Related Functions.
 ///
-/// See the [`actlit`'s module doc][actlits] for more details.
-///
-/// [actlits]: actlit/index.html
-/// (actlit module documentation)
+/// See the [`actlit` module](super::actlit) for more details.
 impl<Parser> Solver<Parser> {
-    // |===| Actlit stuff.
-
     /// True if no actlits have been created since the last reset.
     ///
-    /// See the [`actlit`'s module doc][actlits] for more details.
-    ///
-    /// [actlits]: actlit/index.html
-    /// (actlit module documentation)
+    /// See the [`actlit` module](super::actlit) for more details.
     #[inline]
     fn has_actlits(&self) -> bool {
         self.actlit > 0
@@ -921,10 +906,7 @@ impl<Parser> Solver<Parser> {
 
     /// Introduces a new actlit.
     ///
-    /// See the [`actlit`'s module doc][actlits] for more details.
-    ///
-    /// [actlits]: actlit/index.html
-    /// (actlit module documentation)
+    /// See the [`actlit` module](super::actlit) for more details.
     #[inline]
     pub fn get_actlit(&mut self) -> SmtRes<Actlit> {
         let id = self.actlit;
@@ -933,7 +915,7 @@ impl<Parser> Solver<Parser> {
         tee_write! {
           self, |w| writeln!(
             w, "(declare-fun {}{}{} () Bool)",
-            actlit_pref, next_actlit.id, actlit_suff
+            ACTLIT_PREF, next_actlit.id, ACTLIT_SUFF
           ) ?
         }
         Ok(next_actlit)
@@ -941,10 +923,7 @@ impl<Parser> Solver<Parser> {
 
     /// Deactivates an activation literal, alias for `solver.set_actlit(actlit, false)`.
     ///
-    /// See the [`actlit`'s module doc][actlits] for more details.
-    ///
-    /// [actlits]: actlit/index.html
-    /// (actlit module documentation)
+    /// See the [`actlit` module](super::actlit) for more details.
     #[inline]
     pub fn de_actlit(&mut self, actlit: Actlit) -> SmtRes<()> {
         self.set_actlit(actlit, false)
@@ -952,10 +931,7 @@ impl<Parser> Solver<Parser> {
 
     /// Forces the value of an actlit and consumes it.
     ///
-    /// See the [`actlit`'s module doc][actlits] for more details.
-    ///
-    /// [actlits]: actlit/index.html
-    /// (actlit module documentation)
+    /// See the [`actlit` module](super::actlit) for more details.
     #[inline]
     pub fn set_actlit(&mut self, actlit: Actlit, b: bool) -> SmtRes<()> {
         tee_write! {
@@ -979,10 +955,7 @@ impl<Parser> Solver<Parser> {
 
     /// Asserts an expression without print information, guarded by an activation literal.
     ///
-    /// See the [`actlit`'s module doc][actlits] for more details.
-    ///
-    /// [actlits]: actlit/index.html
-    /// (actlit module documentation)
+    /// See the [`actlit` module](super::actlit) for more details.
     #[inline]
     pub fn assert_act<Expr>(&mut self, actlit: &Actlit, expr: &Expr) -> SmtRes<()>
     where
@@ -1017,7 +990,7 @@ impl<Parser> Solver<Parser> {
     /// Prints a check-sat command.
     ///
     /// Allows to print the `check-sat` and get the result later, *e.g.* with
-    /// [`parse_check_sat`][parse].
+    /// [`parse_check_sat`](Self::parse_check_sat).
     ///
     /// # Examples
     ///
@@ -1036,9 +1009,6 @@ impl<Parser> Solver<Parser> {
     /// let sat = solver.parse_check_sat(future).unwrap();
     /// assert! { sat }
     /// ```
-    ///
-    /// [parse]: #method.parse_check_sat
-    /// (parse_check_sat function for Solver)
     #[inline]
     pub fn print_check_sat(&mut self) -> SmtRes<FutureCheckSat> {
         tee_write! {
@@ -1049,10 +1019,7 @@ impl<Parser> Solver<Parser> {
 
     /// Check-sat command, with actlits.
     ///
-    /// See the [`actlit`'s module doc][actlits] for more details.
-    ///
-    /// [actlits]: actlit/index.html
-    /// (actlit module documentation)
+    /// See the [`actlit` module](super::actlit) for more details.
     #[inline]
     pub fn print_check_sat_act<'a, Actlits>(&mut self, actlits: Actlits) -> SmtRes<FutureCheckSat>
     where
@@ -1342,7 +1309,7 @@ impl<Parser> Solver<Parser> {
     ///
     /// # Examples
     ///
-    /// Note the use of [`define_null_sort`][def] to avoid problems with empty
+    /// Note the use of [`define_null_sort`](Self::define_null_sort) to avoid problems with empty
     /// arguments.
     ///
     /// ```
@@ -1364,9 +1331,6 @@ impl<Parser> Solver<Parser> {
     /// solver.assert("(= (select s2 l) false)").unwrap();
     /// let sat = solver.check_sat().unwrap();
     /// ```
-    ///
-    /// [def]: #method.define_null_sort
-    /// (define_null_sort function)
     #[inline]
     pub fn define_sort<'a, Sort, Arg, Args, Body>(
         &mut self,
@@ -1407,14 +1371,12 @@ impl<Parser> Solver<Parser> {
 
     /// Defines a new nullary sort.
     ///
-    /// When using [`define_sort`][def], rust complains because it does not know what the `Arg` type
-    /// parameter is, since the `args` parameter is empty. So this function can be useful.
+    /// When using [`define_sort`](Self::define_sort), rust complains because it does not know what
+    /// the `Arg` type parameter is, since the `args` parameter is empty. So this function can be
+    /// useful.
     ///
     /// This could be fixed with a default type for `Arg`, like `Body` for instance, but this is
     /// currently not possible in a function.
-    ///
-    /// [def]: #method.define_sort
-    /// (define_sort function)
     #[inline]
     pub fn define_null_sort<Sort, Body>(&mut self, sort: &Sort, body: &Body) -> SmtRes<()>
     where
@@ -1727,9 +1689,7 @@ impl<Parser> Solver<Parser> {
 
     /// Asserts an expression with some print information, guarded by an activation literal.
     ///
-    /// See the [`actlit`'s module doc][actlits] for more details.
-    ///
-    /// [actlits]: actlit/index.html (actlit module documentation)
+    /// See the [`actlit` module](super::actlit) for more details.
     #[inline]
     pub fn assert_act_with<Info, Expr>(
         &mut self,

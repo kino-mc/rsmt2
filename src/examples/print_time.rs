@@ -9,7 +9,7 @@ use std::io::Write;
 use crate::{common::*, parse::*};
 
 #[cfg(test)]
-use crate::example::get_solver;
+use crate::examples::get_solver;
 
 use self::Var::*;
 

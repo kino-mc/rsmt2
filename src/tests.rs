@@ -1,6 +1,4 @@
-#![allow(unused_imports)]
-use error_chain::bail;
-use rsmt2::{parse::*, *};
+use crate::{parse::*, *};
 
 type Typ = String;
 type Ident = String;
@@ -46,7 +44,7 @@ pub mod cvc4 {
     fn set_logic() {
         let conf = SmtConf::default_cvc4();
         let mut solver = Solver::new(conf, Parser).expect("solver creation");
-        solver.set_logic(rsmt2::Logic::QF_UF).expect("set-logic");
+        solver.set_logic(Logic::QF_UF).expect("set-logic");
     }
 
     #[test]
@@ -93,7 +91,7 @@ pub mod z3 {
     fn set_logic() {
         let conf = SmtConf::default_z3();
         let mut solver = Solver::new(conf, Parser).expect("solver creation");
-        solver.set_logic(rsmt2::Logic::QF_UF).expect("set-logic");
+        solver.set_logic(Logic::QF_UF).expect("set-logic");
     }
 
     #[test]
@@ -207,7 +205,7 @@ pub mod yices_2 {
     fn set_logic() {
         let conf = SmtConf::default_yices_2();
         let mut solver = Solver::new(conf, Parser).expect("solver creation");
-        solver.set_logic(rsmt2::Logic::QF_UF).expect("set-logic");
+        solver.set_logic(Logic::QF_UF).expect("set-logic");
     }
 
     #[test]
@@ -255,9 +253,6 @@ pub mod yices_2 {
 
     #[test]
     fn actlits_1() {
-        use rsmt2::parse::*;
-        use rsmt2::*;
-
         let mut conf = SmtConf::default_yices_2();
         conf.incremental();
 

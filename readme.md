@@ -1,6 +1,6 @@
 ![crates.io](https://img.shields.io/crates/v/rsmt2.svg)
 ![Documentation](https://docs.rs/rsmt2/badge.svg)
-![CI](https://github.com/AdrienChampion/rsmt2/workflows/CI/badge.svg)
+![CI](https://github.com/kino-mc/rsmt2/workflows/CI/badge.svg)
 
 # `rsmt2`
 

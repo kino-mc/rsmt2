@@ -26,3 +26,12 @@ error-chain = "^0"
 
 [dev-dependencies]
 clap = "^2"
+
+[features]
+default = []
+examples = []
+
+[package.metadata.docs.rs]
+
+# Features to pass to Cargo (default: [])
+features = ["examples"]

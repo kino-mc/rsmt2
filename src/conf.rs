@@ -29,9 +29,8 @@ fn supported(keyword: &'static str) -> ConfItem {
 /// - [cvc4][cvc4]: full support in theory, but only partially tested. Note that `get-value` is
 ///   known to crash some versions of CVC4.
 /// - [yices 2][yices 2]: full support in theory, but only partially tested. Command `get-model`
-///   will only work on Yices 2 > `2.6.1`, and needs to be activated in [SmtConf][SmtConf] with
-///   [`conf.models()`](struct.SmtConf.html#method.models). To understand why, see
-///   <https://github.com/SRI-CSL/yices2/issues/162>.
+///   will only work on Yices 2 > `2.6.1`, and needs to be activated in [`SmtConf`] with
+///   [`SmtConf::models`]. To understand why, see <https://github.com/SRI-CSL/yices2/issues/162>.
 ///   
 /// [z3]: https://github.com/Z3Prover/z3 (z3 github repository)
 /// [cvc4]: https://cvc4.github.io/ (cvc4 github pages)
@@ -47,7 +46,7 @@ pub enum SmtStyle {
     CVC4,
     /// Yices-2-style smt solver.
     ///
-    /// Yices 2 has only been partially tested at this point.
+    /// **NB**: Yices 2 has only been partially tested at this point.
     Yices2,
 }
 
@@ -100,7 +99,7 @@ impl SmtStyle {
     ///
     /// The command used to run a particular solver is up to the end-user. As such, it **does not
     /// make sense** to use default commands for anything else than local testing. You should
-    /// explicitely pass the command to use with [`Self::new`](#method.new) instead.
+    /// explicitely pass the command to use with [`Self::new`] instead.
     pub fn default(self) -> SmtConf {
         self.new(self.cmd())
     }
@@ -126,20 +125,20 @@ impl SmtStyle {
 
     /// Default command for a solver style.
     #[cfg(not(windows))]
-    pub fn cmd(self) -> String {
+    pub fn cmd(self) -> &'static str {
         match self {
-            Z3 => "z3".to_string(),
-            CVC4 => "cvc4".to_string(),
-            Yices2 => "yices".to_string(),
+            Z3 => "z3",
+            CVC4 => "cvc4",
+            Yices2 => "yices",
         }
     }
     /// Default command for a solver style.
     #[cfg(windows)]
-    pub fn cmd(self) -> String {
+    pub fn cmd(self) -> &'static str {
         match self {
-            Z3 => "z3.exe".to_string(),
-            CVC4 => "cvc4.exe".to_string(),
-            Yices2 => "yices.exe".to_string(),
+            Z3 => "z3.exe",
+            CVC4 => "cvc4.exe",
+            Yices2 => "yices.exe",
         }
     }
 }
@@ -160,9 +159,8 @@ impl fmt::Display for SmtStyle {
 /// - [cvc4][cvc4]: full support in theory, but only partially tested. Note that `get-value` is
 ///   known to crash some versions of CVC4.
 /// - [yices 2][yices 2]: full support in theory, but only partially tested. Command `get-model`
-///   will only work on Yices 2 > `2.6.1`, and needs to be activated in [SmtConf][SmtConf] with
-///   [`conf.models()`](struct.SmtConf.html#method.models). To understand why, see
-///   <https://github.com/SRI-CSL/yices2/issues/162>.
+///   will only work on Yices 2 > `2.6.1`, and needs to be activated with [`Self::models`]. To
+///   understand why, see <https://github.com/SRI-CSL/yices2/issues/162>.
 ///   
 /// [z3]: https://github.com/Z3Prover/z3 (z3 github repository)
 /// [cvc4]: https://cvc4.github.io/ (cvc4 github pages)
@@ -236,7 +234,7 @@ impl SmtConf {
     ///
     /// The command used to run a particular solver is up to the end-user. As such, it **does not
     /// make sense** to use default commands for anything else than local testing. You should
-    /// explicitely pass the command to use with [`Self::z3`](#method.z3) instead.
+    /// explicitely pass the command to use with [`Self::z3`] instead.
     ///
     /// # Examples
     ///
@@ -258,7 +256,7 @@ impl SmtConf {
     ///
     /// The command used to run a particular solver is up to the end-user. As such, it **does not
     /// make sense** to use default commands for anything else than local testing. You should
-    /// explicitely pass the command to use with [`Self::cvc4`](#method.cvc4) instead.
+    /// explicitely pass the command to use with [`Self::cvc4`] instead.
     ///
     /// # Examples
     ///
@@ -280,7 +278,7 @@ impl SmtConf {
     ///
     /// The command used to run a particular solver is up to the end-user. As such, it **does not
     /// make sense** to use default commands for anything else than local testing. You should
-    /// explicitely pass the command to use with [`Self::yices_2`](#method.yices_2) instead.
+    /// explicitely pass the command to use with [`Self::yices_2`] instead.
     ///
     /// # Examples
     ///

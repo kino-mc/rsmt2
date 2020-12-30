@@ -1,3 +1,7 @@
+# v0.11.0
+
+- a lot of documentation fixes/improvements
+
 # v0.11.0-beta.3
 
 - `SmtConf` and `Solver` creation now take a mandatory command argument to run the solver
