@@ -3,28 +3,26 @@
 //! For an explanation of what activation literal are, see [the discussion below][why actlits].
 //!
 //! **NB**: while `rmst2`'s actlit API declares some constant symbols in the underlying solver,
-//! these will not appear in the result of [`get_model`](get_model) queries.
+//! these will not appear in the result of [`get_model`](super::Solver::get_model) queries.
 //!
 //!
-//! # Relevant functions on solvers
+//! # Relevant functions on [`Solver`](super::Solver)s
 //!
-//! - [`get_actlit`](../trait.Solver.html#method.get_actlit)
-//! - [`get_sactlit`](../trait.Solver.html#method.get_sactlit)
-//! - [`de_actlit`](../trait.Solver.html#method.de_actlit)
-//! - [`set_actlit`](../trait.Solver.html#method.set_actlit)
-//! - [`assert_act`](../trait.Solver.html#method.assert_act)
-//! - [`assert_act_with`](../trait.Solver.html#method.assert_act_with)
-//! - [`print_check_sat_act`](../trait.Solver.html#method.print_check_sat_act)
-//! - [`check_sat_act`](../trait.Solver.html#method.check_sat_act)
-//! - [`check_sat_act_or_unk`]
-//!   (../trait.Solver.html#method.check_sat_act_or_unk)
+//! - [`Solver::get_actlit`](super::Solver::get_actlit)
+//! - [`Solver::de_actlit`](super::Solver::de_actlit)
+//! - [`Solver::set_actlit`](super::Solver::set_actlit)
+//! - [`Solver::assert_act`](super::Solver::assert_act)
+//! - [`Solver::assert_act_with`](super::Solver::assert_act_with)
+//! - [`Solver::print_check_sat_act`](super::Solver::print_check_sat_act)
+//! - [`Solver::check_sat_act`](super::Solver::check_sat_act)
+//! - [`Solver::check_sat_act_or_unk`](super::Solver::check_sat_act_or_unk)
 //!
 //!
 //!
 //! # Usage
 //!
 //! First, one can of course create activation literals by hand, and use them in `check-sat`s with
-//! [`check_sat_assuming`][check sat ass]:
+//! [`check_sat_assuming`](super::Solver::check_sat_assuming):
 //!
 //! ```
 //! use rsmt2::*;
@@ -235,11 +233,5 @@
 //! (mostly) just guard assertions and cannot accomplish this.
 //!
 //! [why actlits]: #discussion-on-activation-literals (Activation literals, why?)
-//! [SActlit]: struct.SActlit.html (SActlit documentation)
-//! [Actlit]: struct.Actlit.html (Actlit documentation)
-//! [phantom]: https://doc.rust-lang.org/std/marker/struct.PhantomData.html
-//! (PhantomData documentation)
-//! [check sat ass]: ../trait.Solver.html#method.check_sat_assuming (check_sat_assuming function)
-//! [get_model]: ../trait.Solver.html#method.get_model (get_model function)
 
 pub use crate::solver::Actlit;

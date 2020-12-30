@@ -37,12 +37,8 @@ fn run(file: Option<&str>, cmd: Option<&str>) -> SmtRes<()> {
 }
 
 fn solver(cmd: Option<&str>) -> SmtRes<Solver<()>> {
-    if let Some(cmd) = cmd {
-        SmtConf::z3(cmd)
-    } else {
-        SmtConf::default_z3()
-    }
-    .spawn(())
+    let cmd = cmd.unwrap_or_else(|| rsmt2::SmtStyle::Z3.cmd());
+    SmtConf::z3(cmd).spawn(())
 }
 
 fn run_file(file: &str, cmd: Option<&str>) -> SmtRes<String> {

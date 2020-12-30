@@ -124,11 +124,7 @@ impl Sort2Smt for String {
     }
 }
 
-/// SMT Lib 2 logics.
-///
-/// See [`Solver::set_logic`][logic].
-///
-/// [logic]: struct.Solver.html#method.set_logic
+/// SMT Lib 2 logics, used with [`Solver::set_logic`](super::Solver::set_logic).
 #[allow(non_camel_case_types)]
 #[derive(Clone, Copy)]
 pub enum Logic {
@@ -140,11 +136,9 @@ pub enum Logic {
     QF_NIA,
     /// Quantifier-free linear real arithmetic.
     QF_LRA,
-    /** Quantifier-free arrays, uninterpreted functions, linear integer
-    arithmetic. */
+    /// Quantifier-free arrays, uninterpreted functions, linear integer arithmetic.
     QF_AUFLIA,
-    /** Quantifier-free arrays, uninterpreted functions, linear integer
-    arithmetic. */
+    /// Arrays, uninterpreted functions, linear integer arithmetic.
     AUFLIA,
     /// Arrays, uninterpreted functions, linear integer/real arithmetic.
     AUFLIRA,

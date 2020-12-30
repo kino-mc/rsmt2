@@ -2,19 +2,19 @@
 //!
 //! Depending on the commands you plan to use, your parser will need to implement
 //!
-//! |                                         | for                |
-//! |:---------------------------------------:|:------------------:|
-//! | [`IdentParser`](trait.IdentParser.html) | `get-model`        |
-//! | [`ModelParser`](trait.ModelParser.html) | `get-model`        |
-//! | [`ValueParser`](trait.ValueParser.html) | `get-model`        |
-//! | [`ExprParser`](trait.ExprParser.html)   | `get-value`        |
-//! | [`ProofParser`](trait.ExprParser.html)  | *currently unused* |
+//! |                  | for                                              |
+//! |:----------------:|:------------------------------------------------:|
+//! | [`IdentParser`] | [`Solver::get_model`](super::Solver::get_model)   |
+//! | [`ModelParser`] | [`Solver::get_model`](super::Solver::get_model)   |
+//! | [`ValueParser`] | [`Solver::get_model`](super::Solver::get_model)   |
+//! | [`ExprParser`]  | [`Solver::get_values`](super::Solver::get_values) |
+//! | [`ProofParser`] | *currently unused*                                |
 //!
 //! You can choose the kind of input you want to parse, between
 //!
 //! - `& [u8]`, *e.g.* for [`nom`][nom],
 //! - `& str`, *e.g.* for [`regex`][regex],
-//! - [`& mut SmtParser`][parser], `rmst2`'s internal parser which provides simple helpers to parse
+//! - [`& mut SmtParser`](SmtParser), `rmst2`'s own parser which provides simple helpers to parse
 //!   s-expressions.
 //!
 //! The first two are safe in that your parsers will be called on the tokens they are supposed to
@@ -25,9 +25,8 @@
 //!
 //!
 //! Here is a first example where we defined a value parser that only recognizes booleans, to
-//! showcase [`ValueParser`](trait.ValueParser.html) and
-//! [`Solver::get_values`](../struct.Solver.html#method.get_values). `Expr`essions are represented
-//! as strings, and `Val`ues are booleans.
+//! showcase [`ValueParser`] and [`Solver::get_values`](super::Solver::get_values). `Expr`essions
+//! are represented as strings, and `Val`ues are booleans.
 //!
 //! ```rust
 //! # extern crate rsmt2;
@@ -75,8 +74,8 @@
 //! assert_eq!( values.next(), Some(("(and a (not b))".to_string(), true)) );
 //! ```
 //!
-//! Here is a second example where we implement `ModelParser`. This requires to parse identifiers,
-//! types and values.
+//! Here is a second example where we implement [`ModelParser`] and [`IdentParser`]. We must provide
+//! parsing functions for identifiers, types and values.
 //!
 //! ```rust
 //! # extern crate rsmt2;
@@ -115,11 +114,11 @@
 //! ```
 //!
 //!
-//! ## Parsing: `SmtParser`
+//! ## Parsing: [`SmtParser`]
 //!
-//! But a parser taking `SmtParser` as input is "unsafe" in the sense that it has access to the
-//! whole input. Note that `SmtParser` provides helper parsing functions such as
-//! [`try_int`][try_int] and [`try_sym`][try_sym].
+//! But a parser taking [`SmtParser`] as input is "unsafe" in the sense that it has access to the
+//! whole input. Note that [`SmtParser`] provides helper parsing functions such as
+//! [`SmtParser::try_int`] and [`SmtParser::try_sym`].
 //!
 //! ```
 //! # extern crate rsmt2;
@@ -170,9 +169,6 @@
 //!
 //! [nom]: https://crates.io/crates/nom (nom crate on crates.io)
 //! [regex]: https://crates.io/crates/regex (regex crate on crates.io)
-//! [parser]: struct.SmtParser.html (rsmt2's internal parser)
-//! [try_int]: struct.SmtParser.html#method.try_int (try_int function)
-//! [try_sym]: struct.SmtParser.html#method.try_sym (try_sym function)
 
 use crate::common::*;
 
@@ -460,6 +456,8 @@ impl<R: BufRead> SmtParser<R> {
     /// If this function returns `false`, then the cursor is at the first non-whitespace
     /// non-commented character after the original cursor position.
     ///
+    /// See also [`Self::tag`], [`Self::tag_info`] and [`Self::tags`].
+    ///
     /// ```
     /// # extern crate rsmt2;
     /// # use rsmt2::parse::SmtParser;
@@ -507,9 +505,7 @@ impl<R: BufRead> SmtParser<R> {
     }
     /// Parses a tag or fails.
     ///
-    /// Returns `()` exactly when [`try_tag`][try tag] returns `true`, and an error otherwise.
-    ///
-    /// [try tag]: struct.SmtParser.html#method.try_tag (try_tag function)
+    /// Returns `()` exactly when [`Self::try_tag`] returns `true`, and an error otherwise.
     pub fn tag(&mut self, tag: &str) -> SmtRes<()> {
         if self.try_tag(tag)? {
             Ok(())
@@ -519,9 +515,7 @@ impl<R: BufRead> SmtParser<R> {
     }
     /// Parses a tag or fails, appends `err_msg` at the end of the error message.
     ///
-    /// Returns `()` exactly when [`try_tag`][try tag] returns `true`, and an error otherwise.
-    ///
-    /// [try tag]: struct.SmtParser.html#method.try_tag (try_tag function)
+    /// Returns `()` exactly when [`Self::try_tag`] returns `true`, and an error otherwise.
     pub fn tag_info(&mut self, tag: &str, err_msg: &str) -> SmtRes<()> {
         if self.try_tag(tag)? {
             Ok(())
@@ -635,9 +629,7 @@ impl<R: BufRead> SmtParser<R> {
 
     /// Parses a sequence of things potentially separated by whitespaces and/or comments.
     ///
-    /// Returns `()` exactly when [`try_tags`][try tags] returns `true`, and an error otherwise.
-    ///
-    /// [try tags]: struct.SmtParser.html#method.try_tag (try_tag function)
+    /// Returns `()` exactly when [`Self::try_tags`] returns `true`, and an error otherwise.
     pub fn tags<'a, Tags, S>(&mut self, tags: &'a Tags) -> SmtRes<()>
     where
         &'a Tags: IntoIterator<Item = S>,
@@ -1262,10 +1254,10 @@ impl<R: BufRead> SmtParser<R> {
 
     /// Tries to parse a reserved actlit id.
     pub fn try_actlit_id(&mut self) -> SmtRes<bool> {
-        if self.try_tag(crate::solver::actlit_pref)? {
+        if self.try_tag(crate::solver::ACTLIT_PREF)? {
             self.uint(|_| ())
                 .chain_err(|| "while parsing internal actlit identifier")?;
-            self.tag(crate::solver::actlit_suff)?;
+            self.tag(crate::solver::ACTLIT_SUFF)?;
             Ok(true)
         } else {
             Ok(false)
@@ -1383,9 +1375,7 @@ impl<R: BufRead> SmtParser<R> {
 
 /// Can parse identifiers and types. Used for `get_model`.
 ///
-/// For more information refer to the [module-level documentation].
-///
-/// [module-level documentation]: index.html
+/// For more information refer to the [module-level documentation](self).
 pub trait IdentParser<Ident, Type, Input>: Copy {
     /// Parses an identifier.
     fn parse_ident(self, i: Input) -> SmtRes<Ident>;
@@ -1418,9 +1408,7 @@ where
 
 /// Can parse models. Used for `get-model`.
 ///
-/// For more information refer to the [module-level documentation].
-///
-/// [module-level documentation]: index.html
+/// For more information refer to the [module-level documentation](self).
 pub trait ModelParser<Ident, Type, Value, Input>: Copy {
     /// Parses a value in the context of a `get-model` command.
     ///
@@ -1474,9 +1462,7 @@ where
 
 /// Can parse values. Used for `get-value`.
 ///
-/// For more information refer to the [module-level documentation].
-///
-/// [module-level documentation]: index.html
+/// For more information refer to the [module-level documentation](self).
 pub trait ValueParser<Value, Input>: Copy {
     /// Parses a plain value.
     fn parse_value(self, i: Input) -> SmtRes<Value>;
@@ -1501,9 +1487,7 @@ where
 
 /// Can parse expressions. Used for `get_value`.
 ///
-/// For more information refer to the [module-level documentation].
-///
-/// [module-level documentation]: index.html
+/// For more information refer to the [module-level documentation](self).
 pub trait ExprParser<Expr, Info, Input>: Copy {
     fn parse_expr(self, i: Input, info: Info) -> SmtRes<Expr>;
 }
@@ -1527,9 +1511,7 @@ where
 
 /// Can parse proofs. Currenly unused.
 ///
-/// For more information refer to the [module-level documentation].
-///
-/// [module-level documentation]: index.html
+/// For more information refer to the [module-level documentation](self).
 pub trait ProofParser<Proof, Input>: Copy {
     fn parse_proof(self, i: Input) -> SmtRes<Proof>;
 }
