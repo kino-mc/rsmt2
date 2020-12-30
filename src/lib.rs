@@ -38,7 +38,16 @@
 //!
 //! Since solver run as system processes on the end-user's system, it is hard to make any assumption
 //! regarding the command that will run a particular solver. For this reason you should make sure
-//! you allow your users to pass command that specifies how to run a given solver.
+//! you allow your users to pass command that specifies how to run a given solver.You can take a
+//! look at the [`custom_cmd` example] for guidance.
+//!
+//! Note that the command for each solver can be passed through environment variables, see
+//! - the [`conf` module](self::conf) for general information,
+//! - [`conf::Z3_ENV_VAR`],
+//! - [`conf::CVC4_ENV_VAR`],
+//! - [`conf::YICES_2_ENV_VAR`], and
+//! - the [`conf::SmtConf::z3_or_env`], [`conf::SmtConf::cvc4_or_env`], and
+//!   [`conf::SmtConf::yices_2_or_env`] constructors.
 //!
 //! # Very basic example
 //!
@@ -332,6 +341,8 @@
 //! [yices 2]: https://yices.csl.sri.com/ (yices 2 official page)
 //! [changes]: https://github.com/kino-mc/rsmt2/blob/master/CHANGES.md (List of changes on github)
 //! [hashconsing]: https://crates.io/crates/hashconsing (hashconsing crate on crates.io)
+//! [`custom_cmd` example]: https://github.com/kino-mc/rsmt2/tree/master/examples/custom_cmd.rs
+//! (Example of passing a custom solver command to rsmt2)
 
 #[macro_use]
 extern crate error_chain;
@@ -437,7 +448,7 @@ mod common;
 
 pub mod actlit;
 pub mod asynch;
-mod conf;
+pub mod conf;
 pub mod parse;
 mod solver;
 
