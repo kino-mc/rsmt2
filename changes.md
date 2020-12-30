@@ -1,6 +1,7 @@
 # v0.11.0
 
 - a lot of documentation fixes/improvements
+- asynchronous check-sat-s, see `asynch` module and `Solver::async_check_sat_or_unk`
 
 # v0.11.0-beta.3
 

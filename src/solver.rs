@@ -1272,6 +1272,18 @@ impl<Parser> Solver<Parser> {
     }
 }
 
+/// # Non-blocking commands.
+impl<Parser: Send + 'static> Solver<Parser> {
+    /// Asynchronous check-sat, see the [`asynch` module](crate::asynch) for details.
+    ///
+    /// This function is not `unsafe` in the sense that it **cannot** create undefined behavior.
+    /// However, it is *unsafe* because the asynchronous check might end up running forever in the
+    /// background, burning 100% CPU.
+    pub unsafe fn async_check_sat_or_unk(&mut self) -> crate::asynch::CheckSatFuture<Parser> {
+        crate::asynch::CheckSatFuture::new(self)
+    }
+}
+
 /// # Sort-related SMT-LIB commands.
 impl<Parser> Solver<Parser> {
     /// Declares a new sort.
