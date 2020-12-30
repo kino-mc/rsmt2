@@ -321,7 +321,9 @@
 //!
 //!
 //!
+//! # Asynchronous check-sat-s
 //!
+//! See the [`asynch` module](self::asynch) and [`Solver::async_check_sat_or_unk`].
 //!
 //!
 //! [rsmt2]: https://github.com/kino-mc/rsmt2 (rsmt2 github repository)
@@ -432,7 +434,9 @@ pub mod errors {
 
 #[macro_use]
 mod common;
+
 pub mod actlit;
+pub mod asynch;
 mod conf;
 pub mod parse;
 mod solver;
