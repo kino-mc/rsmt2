@@ -2,6 +2,13 @@
 //!
 //! Do **NOT** use wildcards when matching over `SmtStyle`. We want the code to fail to compile
 //! whenever we add a solver. Likewise, do not use `if let` with `SmtStyle`.
+//!
+//! Note that the command for each solver can be passed through environment variables, see
+//! - [`Z3_ENV_VAR`],
+//! - [`CVC4_ENV_VAR`],
+//! - [`YICES_2_ENV_VAR`], and
+//! - the [`SmtConf::z3_or_env`], [`SmtConf::cvc4_or_env`], and [`SmtConf::yices_2_or_env`]
+//!   constructors.
 
 use std::fmt;
 
@@ -21,6 +28,26 @@ fn unsupported() -> ConfItem {
 #[inline]
 fn supported(keyword: &'static str) -> ConfItem {
     Some(keyword)
+}
+
+/// Environment variable providing the command for z3.
+pub const Z3_ENV_VAR: &str = "RSMT2_Z3_CMD";
+/// Environment variable providing the command for CVC4.
+pub const CVC4_ENV_VAR: &str = "RSMT2_CVC4_CMD";
+/// Environment variable providing the command for Yices 2.
+pub const YICES_2_ENV_VAR: &str = "RSMT2_YICES_2_CMD";
+
+/// Retrieves the value of an environment variable.
+fn get_env_var(env_var: &str) -> SmtRes<Option<String>> {
+    match std::env::var(env_var) {
+        Ok(res) => Ok(Some(res)),
+        Err(std::env::VarError::NotPresent) => Ok(None),
+        Err(std::env::VarError::NotUnicode(cmd)) => bail!(
+            "value of environment variable `{}` is not legal unicode: `{}`",
+            env_var,
+            cmd.to_string_lossy(),
+        ),
+    }
 }
 
 /// Solver styles.
@@ -121,6 +148,18 @@ impl SmtStyle {
             "z3", "Z3", "cvc4", "CVC4", "Yices2", "yices2", "YICES2", "Yices 2", "yices 2",
             "YICES 2",
         ]
+    }
+
+    /// Solver style command from the corresponding environment variable.
+    ///
+    /// The environement variables scanned are [`Z3_ENV_VAR`], [`CVC4_ENV_VAR`] and
+    /// [`YICES_2_ENV_VAR`].
+    pub fn env_cmd(self) -> SmtRes<Option<String>> {
+        match self {
+            Z3 => get_env_var(Z3_ENV_VAR),
+            CVC4 => get_env_var(CVC4_ENV_VAR),
+            Yices2 => get_env_var(YICES_2_ENV_VAR),
+        }
     }
 
     /// Default command for a solver style.
@@ -226,6 +265,162 @@ impl SmtConf {
     #[inline]
     pub fn yices_2(cmd: impl Into<String>) -> Self {
         Yices2.new(cmd)
+    }
+
+    /// Creates a z3-like solver configuration from an optional, or the value of the [`Z3_ENV_VAR`]
+    /// environment variable.
+    ///
+    /// Fails if `cmd.is_none()` and [`Z3_ENV_VAR`] is not set.
+    ///
+    /// ```rust
+    /// use rsmt2::conf::{SmtConf, Z3_ENV_VAR};
+    /// use std::env::{set_var, var_os};
+    ///
+    /// // Passes the command directly.
+    /// let cmd = "z3_explicit";
+    /// let explicit_cmd = SmtConf::z3_or_env(Some(cmd.into())).expect("explicit");
+    /// assert_eq!(explicit_cmd.get_cmd(), cmd);
+    ///
+    /// // Error if no command + environment variable not set.
+    /// assert_eq!(var_os(Z3_ENV_VAR), None);
+    /// let error = SmtConf::z3_or_env(None);
+    /// match error {
+    ///     Ok(_) => panic!("expected error, got an SMT style"),
+    ///     Err(e) => assert_eq!(
+    ///         &e.to_string(),
+    ///         "no command for z3 provided, \
+    ///         and `RSMT2_Z3_CMD` environment variable not set; \
+    ///         cannot spawn z3 solver"
+    ///     ),
+    /// }
+    ///
+    /// // Retrieves the command from the environment.
+    /// let cmd = "z3_implicit";
+    /// assert_eq!(Z3_ENV_VAR, "RSMT2_Z3_CMD");
+    /// set_var(Z3_ENV_VAR, cmd);
+    /// let implicit_cmd = SmtConf::z3_or_env(None).expect("implicit");
+    /// assert_eq!(implicit_cmd.get_cmd(), cmd);
+    /// ```
+    #[inline]
+    pub fn z3_or_env(cmd: Option<String>) -> SmtRes<Self> {
+        if let Some(cmd) = cmd {
+            Ok(Self::z3(cmd))
+        } else {
+            let cmd = SmtStyle::Z3.env_cmd()?;
+            if let Some(cmd) = cmd {
+                Ok(Self::z3(cmd))
+            } else {
+                bail!(
+                    "no command for z3 provided, \
+                    and `{}` environment variable not set; cannot spawn z3 solver",
+                    Z3_ENV_VAR,
+                )
+            }
+        }
+    }
+
+    /// Creates a CVC4-like solver configuration from an optional, or the value of the
+    /// [`CVC4_ENV_VAR`] environment variable.
+    ///
+    /// Fails if `cmd.is_none()` and [`CVC4_ENV_VAR`] is not set.
+    ///
+    /// ```rust
+    /// use rsmt2::conf::{SmtConf, CVC4_ENV_VAR};
+    /// use std::env::{set_var, var_os};
+    ///
+    /// // Passes the command directly.
+    /// let cmd = "cvc4_explicit";
+    /// let explicit_cmd = SmtConf::cvc4_or_env(Some(cmd.into())).expect("explicit");
+    /// assert_eq!(explicit_cmd.get_cmd(), cmd);
+    ///
+    /// // Error if no command + environment variable not set.
+    /// assert_eq!(var_os(CVC4_ENV_VAR), None);
+    /// let error = SmtConf::cvc4_or_env(None);
+    /// match error {
+    ///     Ok(_) => panic!("expected error, got an SMT style"),
+    ///     Err(e) => assert_eq!(
+    ///         &e.to_string(),
+    ///         "no command for CVC4 provided, \
+    ///         and `RSMT2_CVC4_CMD` environment variable not set; \
+    ///         cannot spawn CVC4 solver"
+    ///     ),
+    /// }
+    ///
+    /// // Retrieves the command from the environment.
+    /// let cmd = "cvc4_implicit";
+    /// assert_eq!(CVC4_ENV_VAR, "RSMT2_CVC4_CMD");
+    /// set_var(CVC4_ENV_VAR, cmd);
+    /// let implicit_cmd = SmtConf::cvc4_or_env(None).expect("implicit");
+    /// assert_eq!(implicit_cmd.get_cmd(), cmd);
+    /// ```
+    #[inline]
+    pub fn cvc4_or_env(cmd: Option<String>) -> SmtRes<Self> {
+        if let Some(cmd) = cmd {
+            Ok(Self::cvc4(cmd))
+        } else {
+            let cmd = SmtStyle::CVC4.env_cmd()?;
+            if let Some(cmd) = cmd {
+                Ok(Self::cvc4(cmd))
+            } else {
+                bail!(
+                    "no command for CVC4 provided, \
+                    and `{}` environment variable not set; cannot spawn CVC4 solver",
+                    CVC4_ENV_VAR,
+                )
+            }
+        }
+    }
+
+    /// Creates a Yices-2-like solver configuration from an optional, or the value of the
+    /// [`YICES_2_ENV_VAR`] environment variable.
+    ///
+    /// Fails if `cmd.is_none()` and [`YICES_2_ENV_VAR`] is not set.
+    ///
+    /// ```rust
+    /// use rsmt2::conf::{SmtConf, YICES_2_ENV_VAR};
+    /// use std::env::{set_var, var_os};
+    ///
+    /// // Passes the command directly.
+    /// let cmd = "yices_2_explicit";
+    /// let explicit_cmd = SmtConf::yices_2_or_env(Some(cmd.into())).expect("explicit");
+    /// assert_eq!(explicit_cmd.get_cmd(), cmd);
+    ///
+    /// // Error if no command + environment variable not set.
+    /// assert_eq!(var_os(YICES_2_ENV_VAR), None);
+    /// let error = SmtConf::yices_2_or_env(None);
+    /// match error {
+    ///     Ok(_) => panic!("expected error, got an SMT style"),
+    ///     Err(e) => assert_eq!(
+    ///         &e.to_string(),
+    ///         "no command for Yices 2 provided, \
+    ///         and `RSMT2_YICES_2_CMD` environment variable not set; \
+    ///         cannot spawn Yices 2 solver"
+    ///     ),
+    /// }
+    ///
+    /// // Retrieves the command from the environment.
+    /// let cmd = "yices_2_implicit";
+    /// assert_eq!(YICES_2_ENV_VAR, "RSMT2_YICES_2_CMD");
+    /// set_var(YICES_2_ENV_VAR, cmd);
+    /// let implicit_cmd = SmtConf::yices_2_or_env(None).expect("implicit");
+    /// assert_eq!(implicit_cmd.get_cmd(), cmd);
+    /// ```
+    #[inline]
+    pub fn yices_2_or_env(cmd: Option<String>) -> SmtRes<Self> {
+        if let Some(cmd) = cmd {
+            Ok(Self::yices_2(cmd))
+        } else {
+            let cmd = SmtStyle::Yices2.env_cmd()?;
+            if let Some(cmd) = cmd {
+                Ok(Self::yices_2(cmd))
+            } else {
+                bail!(
+                    "no command for Yices 2 provided, \
+                    and `{}` environment variable not set; cannot spawn Yices 2 solver",
+                    YICES_2_ENV_VAR,
+                )
+            }
+        }
     }
 
     /// Creates a new z3-like solver configuration and command.

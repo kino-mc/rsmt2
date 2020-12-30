@@ -14,11 +14,13 @@ so that we can add your project to the readme.
 See [`changes.md`](https://github.com/kino-mc/rsmt2/blob/master/README.md) for the list of changes.
 
 
-# Future features
+# Features
 
 - [x] support main solvers ([z3][z3], [CVC4][cvc4], [Yices 2][yices2])
 - [x] all basic declaration/definition/assertion/model/values commands
 - [x] `check-sat-assuming`, with dedicated [actlit API]
+- [x] the commands to run each solver can be passed through environment variables, see the `conf`
+  module
 - [ ] [alt-ergo][AE]
 - [ ] `get-proof` command
 

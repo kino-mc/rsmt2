@@ -2,6 +2,9 @@
 
 - a lot of documentation fixes/improvements
 - asynchronous check-sat-s, see `asynch` module and `Solver::async_check_sat_or_unk`
+- the commands to run each solver can now be passed through environment variables, see
+    - the `conf` module, and
+    - the `<solver>_or_env` functions on `SmtConf`.
 
 # v0.11.0-beta.3
 
