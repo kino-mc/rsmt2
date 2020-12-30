@@ -1,4 +1,4 @@
-name: ci
+name: CI
 
 on:
   push:
@@ -12,8 +12,10 @@ env:
 jobs:
   build:
     strategy:
+      fail-fast: false
+
       matrix:
-        os: [ubuntu-latest, macos-latest]
+        os: [windows-latest, ubuntu-latest, macos-latest]
 
     runs-on: ${{ matrix.os }}
 
@@ -21,19 +23,26 @@ jobs:
     - uses: actions/checkout@v2
 
     # Retrieve the Z3 archive for the platform we're on.
+    - name: Z3 windows
+      if: startsWith(matrix.os, 'windows')
+      shell: powershell
+      run: |
+        Invoke-WebRequest -Uri https://github.com/Z3Prover/z3/releases/download/z3-4.8.7/z3-4.8.7-x64-windows.zip -OutFile z3-windows.zip
+        Expand-Archive -Path z3-windows.zip -DestinationPath .
+        echo "z3-windows/bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
     - name: Z3 ubuntu
       if: startsWith(matrix.os, 'ubuntu')
       run: |
         wget https://github.com/Z3Prover/z3/releases/download/z3-4.8.7/z3-4.8.7-x64-ubuntu-16.04.zip
+        unzip z3-4.8.7-x64-ubuntu-16.04.zip
+        echo `pwd`/z3-4.8.7-x64-ubuntu-16.04/bin >> $GITHUB_PATH
     - name: Z3 macos
       if: startsWith(matrix.os, 'macos')
       run: |
         wget https://github.com/Z3Prover/z3/releases/download/z3-4.8.7/z3-4.8.7-x64-osx-10.14.6.zip
+        unzip z3-4.8.7-x64-osx-10.14.6.zip
+        echo `pwd`/z3-4.8.7-x64-osx-10.14.6/bin >> $GITHUB_PATH
 
-    - name: Z3 setup
-      run: |
-        unzip z3*.zip
-        echo `pwd`/z3*/bin >> $GITHUB_PATH
     - name: Z3 check help
       run: z3 -h
 

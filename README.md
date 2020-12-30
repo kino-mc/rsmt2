@@ -1,6 +1,6 @@
 ![crates.io](https://img.shields.io/crates/v/hashconsing.svg)
 ![Documentation](https://docs.rs/hashconsing/badge.svg)
-![ci](https://github.com/AdrienChampion/hashconsing/workflows/ci/badge.svg)
+![CI](https://github.com/AdrienChampion/hashconsing/workflows/CI/badge.svg)
 
 # `rsmt2`
 
