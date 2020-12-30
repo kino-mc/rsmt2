@@ -111,7 +111,7 @@ impl SmtStyle {
         match s {
             "z3" | "Z3" => Some(Z3),
             "cvc4" | "CVC4" => Some(CVC4),
-            "Yices2" | "yices2" | "YICES2" | "Yices 2" | "yices 2" | "YICES 2" => Some(CVC4),
+            "Yices2" | "yices2" | "YICES2" | "Yices 2" | "yices 2" | "YICES 2" => Some(Yices2),
             _ => None,
         }
     }
