@@ -1,3 +1,7 @@
+# v0.12.0
+
+- adapted parser for Z3's new `get-model` output, which does not use the `model` keyword
+
 # v0.11.0
 
 - a lot of documentation fixes/improvements
