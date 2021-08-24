@@ -252,6 +252,11 @@ pub struct Actlit {
     /// ID of the actlit.
     pub(crate) id: usize,
 }
+impl AsRef<Actlit> for Actlit {
+    fn as_ref(&self) -> &Self {
+        self
+    }
+}
 impl Actlit {
     /// Constructor.
     pub(crate) fn new(id: usize) -> Self {

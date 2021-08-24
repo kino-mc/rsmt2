@@ -345,9 +345,9 @@ impl<Parser> Solver<Parser> {
     /// solver.assert("(= 0 1)").unwrap();
     /// ```
     #[inline]
-    pub fn assert<Expr>(&mut self, expr: &Expr) -> SmtRes<()>
+    pub fn assert<Expr>(&mut self, expr: Expr) -> SmtRes<()>
     where
-        Expr: ?Sized + Expr2Smt<()>,
+        Expr: Expr2Smt<()>,
     {
         self.assert_with(expr, ())
     }
@@ -948,9 +948,9 @@ impl<Parser> Solver<Parser> {
     ///
     /// See the [`actlit` module][crate::actlit] for more details.
     #[inline]
-    pub fn assert_act<Expr>(&mut self, actlit: &Actlit, expr: &Expr) -> SmtRes<()>
+    pub fn assert_act<Expr>(&mut self, actlit: impl AsRef<Actlit>, expr: Expr) -> SmtRes<()>
     where
-        Expr: ?Sized + Expr2Smt<()>,
+        Expr: Expr2Smt<()>,
     {
         self.assert_act_with(actlit, expr, ())
     }
@@ -1720,18 +1720,18 @@ impl<Parser> Solver<Parser> {
     #[inline]
     pub fn assert_act_with<Info, Expr>(
         &mut self,
-        actlit: &Actlit,
-        expr: &Expr,
+        actlit: impl AsRef<Actlit>,
+        expr: Expr,
         info: Info,
     ) -> SmtRes<()>
     where
         Info: Copy,
-        Expr: ?Sized + Expr2Smt<Info>,
+        Expr: Expr2Smt<Info>,
     {
         tee_write! {
           self, |w| {
             write_str(w, "(assert\n  (=>\n    ")?;
-            actlit.write(w)?;
+            actlit.as_ref().write(w)?;
             write_str(w, "\n    ")?;
             expr.expr_to_smt2(w, info)?;
             write_str(w, "\n  )\n)\n") ?
@@ -1742,10 +1742,10 @@ impl<Parser> Solver<Parser> {
 
     /// Asserts an expression with some print information.
     #[inline]
-    pub fn assert_with<Info, Expr>(&mut self, expr: &Expr, info: Info) -> SmtRes<()>
+    pub fn assert_with<Info, Expr>(&mut self, expr: Expr, info: Info) -> SmtRes<()>
     where
         Info: Copy,
-        Expr: ?Sized + Expr2Smt<Info>,
+        Expr: Expr2Smt<Info>,
     {
         tee_write! {
           self, |w| {
