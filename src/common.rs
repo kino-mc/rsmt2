@@ -8,7 +8,7 @@ pub use crate::errors::*;
 pub type Model<Ident, Type, Value> = Vec<(Ident, Vec<(Ident, Type)>, Type, Value)>;
 
 /// A symbol printable in the SMT Lib 2 standard given some info.
-pub trait Sym2Smt<Info> {
+pub trait Sym2Smt<Info = ()> {
     /// Prints a symbol to a writer given some info.
     fn sym_to_smt2<Writer>(&self, w: &mut Writer, i: Info) -> SmtRes<()>
     where
@@ -16,7 +16,7 @@ pub trait Sym2Smt<Info> {
 }
 
 /// An expression printable in the SMT Lib 2 standard given some info.
-pub trait Expr2Smt<Info> {
+pub trait Expr2Smt<Info = ()> {
     /// Prints an expression to a writer given some info.
     fn expr_to_smt2<Writer>(&self, w: &mut Writer, i: Info) -> SmtRes<()>
     where
@@ -121,6 +121,62 @@ impl Sort2Smt for String {
         Writer: io::Write,
     {
         write_str(writer, self)
+    }
+}
+
+/// Wraps an expression and a symbol. Symbol is understood as the name of the expression.
+///
+/// ```rust
+/// use rsmt2::prelude::*;
+/// let mut conf = SmtConf::default_z3();
+/// conf.unsat_cores();
+/// println!("unsat_cores: {}", conf.get_unsat_cores());
+/// let mut solver = Solver::new(conf, ()).unwrap();
+/// solver.declare_const("n", "Int").unwrap();
+/// solver.declare_const("m", "Int").unwrap();
+///
+/// solver.assert("true").unwrap();
+///
+/// let e_1 = "(> n 7)";
+/// let label_e_1 = "e_1";
+/// let named = NamedExpr::new(label_e_1, e_1);
+/// solver.assert(&named).unwrap();
+///
+/// let e_2 = "(and (> m n) (< m 7))";
+/// let label_e_2 = "e_2";
+/// let named = NamedExpr::new(label_e_2, e_2);
+/// solver.assert(&named).unwrap();
+///
+/// assert!(!solver.check_sat().unwrap());
+/// let core: Vec<String> = solver.get_unsat_core().unwrap();
+/// ```
+pub struct NamedExpr<Sym, Expr> {
+    /// Symbol.
+    sym: Sym,
+    /// Expression.
+    expr: Expr,
+}
+impl<Sym, Expr> NamedExpr<Sym, Expr> {
+    /// Constructor.
+    pub fn new(sym: Sym, expr: Expr) -> Self {
+        Self { sym, expr }
+    }
+}
+impl<Sym, Expr, Info> Expr2Smt<Info> for NamedExpr<Sym, Expr>
+where
+    Sym: Sym2Smt<()>,
+    Expr: Expr2Smt<Info>,
+{
+    fn expr_to_smt2<Writer>(&self, w: &mut Writer, i: Info) -> SmtRes<()>
+    where
+        Writer: io::Write,
+    {
+        write!(w, "(! ")?;
+        self.expr.expr_to_smt2(w, i)?;
+        write!(w, " :named ")?;
+        self.sym.sym_to_smt2(w, ())?;
+        write!(w, ")")?;
+        Ok(())
     }
 }
 

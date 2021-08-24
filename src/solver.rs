@@ -7,53 +7,11 @@ use std::io::{BufReader, BufWriter, Read, Write};
 use std::process::{Child, ChildStdin, ChildStdout, Command, Stdio};
 
 use crate::{
+    actlit::Actlit,
     common::*,
     conf::SmtConf,
-    parse::{ExprParser, IdentParser, ModelParser, RSmtParser, ValueParser},
+    parse::{ExprParser, IdentParser, ModelParser, RSmtParser, SymParser, ValueParser},
 };
-
-/// Prefix of an actlit identifier.
-pub static ACTLIT_PREF: &str = "|rsmt2 actlit ";
-
-/// Suffix of an actlit identifier.
-pub static ACTLIT_SUFF: &str = "|";
-
-/// An activation literal is an opaque wrapper around a `usize`.
-///
-/// Obtained by a call to [`Solver::get_actlit`].
-#[derive(Debug)]
-pub struct Actlit {
-    /// ID of the actlit.
-    id: usize,
-}
-impl Actlit {
-    /// Unique number of this actlit.
-    pub fn uid(&self) -> usize {
-        self.id
-    }
-    /// Writes the actlit as an SMT-LIB 2 symbol.
-    pub fn write<W>(&self, w: &mut W) -> SmtRes<()>
-    where
-        W: Write,
-    {
-        write!(w, "{}{}{}", ACTLIT_PREF, self.id, ACTLIT_SUFF)?;
-        Ok(())
-    }
-}
-impl Expr2Smt<()> for Actlit {
-    fn expr_to_smt2<Writer>(&self, w: &mut Writer, _: ()) -> SmtRes<()>
-    where
-        Writer: ::std::io::Write,
-    {
-        self.write(w)
-    }
-}
-impl ::std::ops::Deref for Actlit {
-    type Target = usize;
-    fn deref(&self) -> &usize {
-        &self.id
-    }
-}
 
 /// Promise for an asynchronous check-sat.
 pub struct FutureCheckSat {
@@ -181,7 +139,7 @@ impl<Parser> Solver<Parser> {
         let tee = None;
         let actlit = 0;
 
-        Ok(Solver {
+        let mut slf = Solver {
             kid,
             stdin,
             tee,
@@ -189,7 +147,16 @@ impl<Parser> Solver<Parser> {
             smt_parser,
             parser,
             actlit,
-        })
+        };
+
+        if slf.conf.get_models() {
+            slf.produce_models()?;
+        }
+        if slf.conf.get_unsat_cores() {
+            slf.produce_unsat_cores()?;
+        }
+
+        Ok(slf)
     }
 
     /// Creates a solver kid with the default z3 configuration.
@@ -372,7 +339,7 @@ impl<Parser> Solver<Parser> {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```rust
     /// # use rsmt2::Solver;
     /// let mut solver = Solver::default_z3(()).unwrap();
     /// solver.assert("(= 0 1)").unwrap();
@@ -396,9 +363,11 @@ impl<Parser> Solver<Parser> {
     ///
     /// # Examples
     ///
-    /// ```
-    /// # use rsmt2::Solver;
-    /// # let mut solver = Solver::default_z3(()).unwrap();
+    /// ```rust
+    /// # use rsmt2::prelude::*;
+    /// let mut conf = SmtConf::default_z3();
+    /// conf.option("-t:10");
+    /// let mut solver = Solver::new(conf, ()).unwrap();
     /// solver.declare_const("x", "Int").unwrap();
     /// solver.declare_const("y", "Int").unwrap();
     ///
@@ -432,9 +401,12 @@ impl<Parser> Solver<Parser> {
     ///
     /// # Examples
     ///
-    /// ```
-    /// # use rsmt2::Solver;
-    /// # let mut solver = Solver::default_z3(()).unwrap();
+    /// ```rust
+    /// # use rsmt2::prelude::*;
+    /// let mut conf = SmtConf::default_z3();
+    /// conf.option("-t:10");
+    /// # let mut solver = Solver::new(conf, ()).unwrap();
+    /// solver.path_tee("./log.smt2").unwrap();
     /// solver.declare_const("x", "Int").unwrap();
     /// solver.declare_const("y", "Int").unwrap();
     ///
@@ -458,7 +430,7 @@ impl<Parser> Solver<Parser> {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```rust
     /// # use rsmt2::Solver;
     /// let mut solver = Solver::default_z3(()).unwrap();
     /// solver.assert("(= 0 1)").unwrap();
@@ -479,7 +451,7 @@ impl<Parser> Solver<Parser> {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```rust
     /// # use rsmt2::Solver;
     /// let mut solver = Solver::default_z3(()).unwrap();
     /// solver.declare_const("x", "Int").unwrap()
@@ -495,7 +467,7 @@ impl<Parser> Solver<Parser> {
 
     /// Declares a new function symbol.
     ///
-    /// ```
+    /// ```rust
     /// # use rsmt2::Solver;
     /// let mut solver = Solver::default_z3(()).unwrap();
     /// solver.declare_fun(
@@ -522,7 +494,7 @@ impl<Parser> Solver<Parser> {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```rust
     /// # use rsmt2::Solver;
     /// let mut solver = Solver::default_z3(()).unwrap();
     /// solver.define_const(
@@ -548,7 +520,7 @@ impl<Parser> Solver<Parser> {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```rust
     /// # use rsmt2::Solver;
     /// let mut solver = Solver::default_z3(()).unwrap();
     /// solver.define_fun(
@@ -583,7 +555,7 @@ impl<Parser> Solver<Parser> {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```rust
     /// # use rsmt2::Solver;
     /// let mut solver = Solver::default_z3(()).unwrap();
     /// solver.declare_const("x", "Int").unwrap();
@@ -652,7 +624,7 @@ impl<Parser> Solver<Parser> {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```rust
     /// # use rsmt2::{SmtConf, Solver};
     /// let mut solver = Solver::default_z3(()).unwrap();
     /// solver.set_logic( ::rsmt2::Logic::QF_UF ).unwrap();
@@ -673,7 +645,7 @@ impl<Parser> Solver<Parser> {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```rust
     /// # use rsmt2::{SmtConf, Solver};
     /// let mut solver = Solver::default_z3(()).unwrap();
     /// solver.set_custom_logic("QF_UFBV").unwrap();
@@ -697,7 +669,7 @@ impl<Parser> Solver<Parser> {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```rust
     /// # use rsmt2::Solver;
     /// let mut solver = Solver::default_z3(()).unwrap();
     /// solver.define_fun_rec(
@@ -727,7 +699,7 @@ impl<Parser> Solver<Parser> {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```rust
     /// # use rsmt2::Solver;
     /// let mut solver = Solver::default_z3(()).unwrap();
     /// solver.define_funs_rec( & [
@@ -762,7 +734,7 @@ impl<Parser> Solver<Parser> {
     ///
     /// # Examples
     ///
-    /// ```no_run
+    /// ```rust,no_run
     /// # use rsmt2::Solver;
     /// let mut solver = Solver::default_z3(()).unwrap();
     /// solver.declare_datatypes( & [
@@ -900,6 +872,15 @@ impl<Parser> Solver<Parser> {
         self.get_values_with(exprs, ())
             .map_err(|e| self.conf.enrich_get_values_error(e))
     }
+
+    /// Get-unsat-core command.
+    pub fn get_unsat_core<Sym>(&mut self) -> SmtRes<Vec<Sym>>
+    where
+        Parser: for<'a> SymParser<Sym, &'a mut RSmtParser>,
+    {
+        self.print_get_unsat_core()?;
+        self.parse_get_unsat_core()
+    }
 }
 
 /// # Actlit-Related Functions.
@@ -918,15 +899,15 @@ impl<Parser> Solver<Parser> {
     ///
     /// See the [`actlit` module][crate::actlit] for more details.
     #[inline]
-    pub fn get_actlit(&mut self) -> SmtRes<Actlit> {
+    pub fn get_actlit(&mut self) -> SmtRes<crate::actlit::Actlit> {
         let id = self.actlit;
         self.actlit += 1;
-        let next_actlit = Actlit { id };
+        let next_actlit = crate::actlit::Actlit::new(id);
         tee_write! {
-          self, |w| writeln!(
-            w, "(declare-fun {}{}{} () Bool)",
-            ACTLIT_PREF, next_actlit.id, ACTLIT_SUFF
-          ) ?
+          self, |w|
+            write!(w, "(declare-fun ")?;
+            next_actlit.write(w)?;
+            writeln!(w, " () Bool)")?
         }
         Ok(next_actlit)
     }
@@ -1004,7 +985,7 @@ impl<Parser> Solver<Parser> {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```rust
     /// use rsmt2::Solver;
     ///
     /// let mut solver = Solver::default_z3(()).unwrap();
@@ -1074,6 +1055,26 @@ impl<Parser> Solver<Parser> {
     #[inline]
     pub fn parse_check_sat_or_unk(&mut self, _: FutureCheckSat) -> SmtRes<Option<bool>> {
         self.smt_parser.check_sat()
+    }
+
+    /// Get-interpolant command.
+    ///
+    /// At the time of writing, only Z3 supports this command.
+    #[inline]
+    pub fn print_get_interpolant(
+        &mut self,
+        sym_1: impl Sym2Smt<()>,
+        sym_2: impl Sym2Smt<()>,
+    ) -> SmtRes<()> {
+        tee_write! {
+            self, |w|
+                write_str(w, "(get-interpolant ")?;
+                sym_1.sym_to_smt2(w, ())?;
+                write_str(w, " ")?;
+                sym_2.sym_to_smt2(w, ())?;
+                write_str(w, ")\n")?
+        }
+        Ok(())
     }
 
     /// Get-model command.
@@ -1202,7 +1203,7 @@ impl<Parser> Solver<Parser> {
         }
     }
 
-    /// Parse the result of a get-model.
+    /// Parse the result of a `get-model`.
     fn parse_get_model<Ident, Type, Value>(&mut self) -> SmtRes<Model<Ident, Type, Value>>
     where
         Parser: for<'a> IdentParser<Ident, Type, &'a mut RSmtParser>
@@ -1222,7 +1223,15 @@ impl<Parser> Solver<Parser> {
         }
     }
 
-    /// Parse the result of a get-model where all the symbols are nullary.
+    /// Parses the result of a `get-unsat-core`.
+    fn parse_get_unsat_core<Sym>(&mut self) -> SmtRes<Vec<Sym>>
+    where
+        Parser: for<'a> SymParser<Sym, &'a mut RSmtParser>,
+    {
+        self.smt_parser.get_unsat_core(self.parser)
+    }
+
+    /// Parse the result of a `get-model` where all the symbols are nullary.
     fn parse_get_model_const<Ident, Type, Value>(&mut self) -> SmtRes<Vec<(Ident, Type, Value)>>
     where
         Parser: for<'a> IdentParser<Ident, Type, &'a mut RSmtParser>
@@ -1300,7 +1309,7 @@ impl<Parser> Solver<Parser> {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```rust
     /// # use rsmt2::Solver;
     /// let mut solver = Solver::default_z3(()).unwrap();
     /// solver.declare_sort("A", 0).unwrap();
@@ -1333,7 +1342,7 @@ impl<Parser> Solver<Parser> {
     ///
     /// Note the use of [`Self::define_null_sort`] to avoid problems with empty arguments.
     ///
-    /// ```
+    /// ```rust
     /// # use rsmt2::Solver;
     /// let mut solver = Solver::default_z3(()).unwrap();
     /// solver.define_sort("MySet", & ["T"], "(Array T Bool)").unwrap();
@@ -1807,8 +1816,13 @@ impl<Parser> Solver<Parser> {
 
     /// Activates unsat core production.
     #[inline]
-    pub fn produce_unsat_core(&mut self) -> SmtRes<()> {
+    pub fn produce_unsat_cores(&mut self) -> SmtRes<()> {
         self.set_option(":produce-unsat-cores", "true")
+    }
+    /// Activates model production.
+    #[inline]
+    pub fn produce_models(&mut self) -> SmtRes<()> {
+        self.set_option(":produce-models", "true")
     }
 
     /// Resets the assertions in the solver.

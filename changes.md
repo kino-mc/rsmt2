@@ -1,3 +1,16 @@
+# v0.13.0
+
+- `Actlit` now implies `Sym2Smt`
+- added `actlit::CondExpr`, which wraps an `Actlit` and a user expression; allows to use `Actlit`s
+  in normal `check-sat` commands
+- named expression
+    - added `NamedExpr<Sym, Expr>` which wraps an expression and a symbol and encodes a named expression
+    - added `into_named` and `as_named` methods on `Expr2Smt` trait for easy expression naming
+    - added `into_name_for` and `as_name_for` methods on `Sym2Smt`
+- unsat cores now working (best used with `NamedExpr` to name expressions)
+    - relies on the `ParseSym` trait to parse symbols from the core
+
+
 # v0.12.0
 
 - adapted parser for Z3's new `get-model` output, which does not use the `model` keyword

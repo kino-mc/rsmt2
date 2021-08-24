@@ -236,6 +236,120 @@
 
 #[allow(unused_imports)]
 // Only used by doc links.
-use crate::Solver;
+use crate::prelude::*;
 
-pub use crate::solver::Actlit;
+/// Prefix of an actlit identifier.
+pub(crate) static ACTLIT_PREF: &str = "|rsmt2 actlit ";
+
+/// Suffix of an actlit identifier.
+pub(crate) static ACTLIT_SUFF: &str = "|";
+
+/// An activation literal is an opaque wrapper around a `usize`.
+///
+/// Obtained by a call to [`Solver::get_actlit`].
+#[derive(Debug)]
+pub struct Actlit {
+    /// ID of the actlit.
+    pub(crate) id: usize,
+}
+impl Actlit {
+    /// Constructor.
+    pub(crate) fn new(id: usize) -> Self {
+        Self { id }
+    }
+    /// Unique number of this actlit.
+    pub fn uid(&self) -> usize {
+        self.id
+    }
+    /// Writes the actlit as an SMT-LIB 2 symbol.
+    pub fn write<W>(&self, w: &mut W) -> SmtRes<()>
+    where
+        W: std::io::Write,
+    {
+        write!(w, "{}{}{}", ACTLIT_PREF, self.id, ACTLIT_SUFF)?;
+        Ok(())
+    }
+    /// Builds an implication between an actlit and an expression.
+    ///
+    /// Allows to use normal `assert` function over [`Solver`].
+    ///
+    /// ```rust
+    /// # use rsmt2::Solver;
+    /// let mut solver = Solver::default_z3(()).expect("failed to spawn solver");
+    /// let actlit = solver.get_actlit().expect("failed to declare actlit");
+    /// let conditional = actlit.implies("(> 0 1)");
+    /// solver.assert(&conditional).expect("failed to assert conditional expr");
+    /// let is_sat = solver.check_sat_assuming(Some(&actlit)).expect("failed to perform check-sat");
+    /// assert!(!is_sat);
+    /// ```
+    pub fn implies<Expr>(&self, expr: Expr) -> CondExpr<Expr> {
+        CondExpr {
+            actlit: Self { id: self.id },
+            expr,
+        }
+    }
+}
+impl Expr2Smt<()> for Actlit {
+    fn expr_to_smt2<Writer>(&self, w: &mut Writer, _: ()) -> SmtRes<()>
+    where
+        Writer: ::std::io::Write,
+    {
+        self.write(w)
+    }
+}
+impl Sym2Smt<()> for Actlit {
+    fn sym_to_smt2<Writer>(&self, w: &mut Writer, _: ()) -> SmtRes<()>
+    where
+        Writer: std::io::Write,
+    {
+        self.write(w)
+    }
+}
+impl ::std::ops::Deref for Actlit {
+    type Target = usize;
+    fn deref(&self) -> &usize {
+        &self.id
+    }
+}
+
+/// An implication between an [Actlit] and some expression.
+pub struct CondExpr<Expr> {
+    /// The actlit.
+    actlit: Actlit,
+    /// The expression.
+    expr: Expr,
+}
+impl<Expr> CondExpr<Expr> {
+    /// Constructor.
+    pub fn new(actlit: Actlit, expr: Expr) -> Self {
+        Self { actlit, expr }
+    }
+    /// Destructor.
+    pub fn destroy(self) -> (Actlit, Expr) {
+        (self.actlit, self.expr)
+    }
+    /// Actlit accessor.
+    pub fn actlit(&self) -> &Actlit {
+        &self.actlit
+    }
+    /// Expression accessor.
+    pub fn expr(&self) -> &Expr {
+        &self.expr
+    }
+}
+impl<Expr, Info> crate::print::Expr2Smt<Info> for CondExpr<Expr>
+where
+    Expr: crate::print::Expr2Smt<Info>,
+{
+    fn expr_to_smt2<Writer>(&self, w: &mut Writer, i: Info) -> SmtRes<()>
+    where
+        Writer: std::io::Write,
+    {
+        write!(w, "(=> ")?;
+        self.actlit.write(w)?;
+        write!(w, " ")?;
+        self.expr.expr_to_smt2(w, i)?;
+        write!(w, ")")?;
+        Ok(())
+    }
+}

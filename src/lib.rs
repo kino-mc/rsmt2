@@ -348,7 +348,9 @@ extern crate error_chain;
 
 /// Common rsmt2 type and helpers.
 pub mod prelude {
-    pub use super::{errors::SmtRes, parse::*, print::*, SmtConf, Solver};
+    pub use crate::{
+        actlit, common::NamedExpr, errors::SmtRes, parse::*, print::*, SmtConf, Solver,
+    };
 }
 
 /// Errors.
@@ -451,7 +453,7 @@ pub mod conf;
 pub mod parse;
 mod solver;
 
-pub use crate::common::Logic;
+pub use crate::common::{Logic, NamedExpr};
 pub use crate::conf::{SmtConf, SmtStyle};
 pub use crate::errors::SmtRes;
 pub use crate::solver::Solver;

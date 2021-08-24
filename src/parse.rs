@@ -2,13 +2,14 @@
 //!
 //! Depending on the commands you plan to use, your parser will need to implement
 //!
-//! |                  | for                                              |
-//! |:----------------:|:------------------------------------------------:|
-//! | [`IdentParser`] | [`Solver::get_model`](super::Solver::get_model)   |
-//! | [`ModelParser`] | [`Solver::get_model`](super::Solver::get_model)   |
-//! | [`ValueParser`] | [`Solver::get_model`](super::Solver::get_model)   |
-//! | [`ExprParser`]  | [`Solver::get_values`](super::Solver::get_values) |
-//! | [`ProofParser`] | *currently unused*                                |
+//! |                  | for                       |
+//! |:----------------:|:-------------------------:|
+//! | [`IdentParser`] | [`Solver::get_model`]      |
+//! | [`ModelParser`] | [`Solver::get_model`]      |
+//! | [`ValueParser`] | [`Solver::get_model`]      |
+//! | [`ExprParser`]  | [`Solver::get_values`]     |
+//! | [`SymParser`]   | [`Solver::get_unsat_core`] |
+//! | [`ProofParser`] | *currently unused*         |
 //!
 //! You can choose the kind of input you want to parse, between
 //!
@@ -25,8 +26,8 @@
 //!
 //!
 //! Here is a first example where we defined a value parser that only recognizes booleans, to
-//! showcase [`ValueParser`] and [`Solver::get_values`][crate::Solver::get_values]. `Expr`essions
-//! are represented as strings, and `Val`ues are booleans.
+//! showcase [`ValueParser`] and [`Solver::get_values`]. `Expr`essions are represented as strings,
+//! and `Val`ues are booleans.
 //!
 //! ```rust
 //! # extern crate rsmt2;
@@ -174,6 +175,9 @@ use crate::common::*;
 
 use std::io::{BufRead, BufReader, Read};
 use std::process::ChildStdout;
+
+#[allow(unused_imports)]
+use crate::Solver;
 
 /// Alias for the underlying parser.
 pub type RSmtParser = SmtParser<BufReader<ChildStdout>>;
@@ -430,6 +434,9 @@ impl<R: BufRead> SmtParser<R> {
     /// # }
     /// ```
     pub fn spc_cmt(&mut self) {
+        if self.cursor >= self.buff.len() {
+            return ();
+        }
         let mut chars = self.buff[self.cursor..].chars();
         'spc_cmt: while let Some(c) = chars.next() {
             if !c.is_whitespace() {
@@ -1140,9 +1147,9 @@ impl<R: BufRead> SmtParser<R> {
     /// );
     /// # }
     /// ```
-    pub fn try_sym<F, T, Err>(&mut self, f: F) -> SmtRes<Option<T>>
+    pub fn try_sym<'me, F, T, Err>(&'me mut self, f: F) -> SmtRes<Option<T>>
     where
-        F: FnOnce(&str) -> Result<T, Err>,
+        F: FnOnce(&'me str) -> Result<T, Err>,
         Err: ::std::fmt::Display,
     {
         self.spc_cmt();
@@ -1254,14 +1261,31 @@ impl<R: BufRead> SmtParser<R> {
 
     /// Tries to parse a reserved actlit id.
     pub fn try_actlit_id(&mut self) -> SmtRes<bool> {
-        if self.try_tag(crate::solver::ACTLIT_PREF)? {
+        if self.try_tag(crate::actlit::ACTLIT_PREF)? {
             self.uint(|_| ())
                 .chain_err(|| "while parsing internal actlit identifier")?;
-            self.tag(crate::solver::ACTLIT_SUFF)?;
+            self.tag(crate::actlit::ACTLIT_SUFF)?;
             Ok(true)
         } else {
             Ok(false)
         }
+    }
+
+    /// Parses the result of a `get-unsat-core`.
+    pub fn get_unsat_core<Sym, Parser>(&mut self, parser: Parser) -> SmtRes<Vec<Sym>>
+    where
+        Parser: for<'a> SymParser<Sym, &'a mut Self>,
+    {
+        self.spc_cmt();
+        self.try_error()?;
+        let mut core = Vec::new();
+        self.tag("(")?;
+        self.spc_cmt();
+        while !self.try_tag(")")? {
+            core.push(parser.parse_sym(self)?);
+            self.spc_cmt();
+        }
+        Ok(core)
     }
 
     /// Parses the result of a get-model where all symbols are nullary.
@@ -1372,6 +1396,49 @@ impl<R: BufRead> SmtParser<R> {
         }
         self.clear();
         Ok(values)
+    }
+}
+
+/// Can parse symbols.
+pub trait SymParser<Sym, Input>: Copy {
+    /// Parses a symbol.
+    fn parse_sym(self, i: Input) -> SmtRes<Sym>;
+}
+impl<'a, Sym, T> SymParser<Sym, &'a str> for T
+where
+    T: SymParser<Sym, &'a [u8]>,
+{
+    fn parse_sym(self, input: &'a str) -> SmtRes<Sym> {
+        self.parse_sym(input.as_bytes())
+    }
+}
+impl<'a, Sym, T, Br> SymParser<Sym, &'a mut SmtParser<Br>> for T
+where
+    T: SymParser<Sym, &'a str>,
+    Br: BufRead,
+{
+    fn parse_sym(self, input: &'a mut SmtParser<Br>) -> SmtRes<Sym> {
+        self.parse_sym(input.get_sexpr()?)
+    }
+}
+impl<'a, Br> SymParser<&'a str, &'a mut SmtParser<Br>> for ()
+where
+    Br: BufRead,
+{
+    fn parse_sym(self, input: &'a mut SmtParser<Br>) -> SmtRes<&'a str> {
+        input
+            .try_sym(|s| SmtRes::Ok(s))
+            .and_then(|sym_opt| sym_opt.ok_or_else(|| "expected symbol".into()))
+    }
+}
+impl<'a, Br> SymParser<String, &'a mut SmtParser<Br>> for ()
+where
+    Br: BufRead,
+{
+    fn parse_sym(self, input: &'a mut SmtParser<Br>) -> SmtRes<String> {
+        input
+            .try_sym(|s| SmtRes::Ok(s.into()))
+            .and_then(|sym_opt| sym_opt.ok_or_else(|| "expected symbol".into()))
     }
 }
 
