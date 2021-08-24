@@ -13,16 +13,15 @@
 //!
 //! In rsmt2, solvers run in a separate process and communication is achieved *via* system pipes.
 //! This means that to use a solver, it needs to be available as a binary in your path. For the
-//! moment, only [z3][z3] is officially supported, although there is experimental support for
-//! [cvc4][cvc4] and [yices 2][yices 2].
+//! moment, only [z3] is officially supported, although there is experimental support for [cvc4] and
+//! [yices 2].
 //!
 //! **NB**: most of the tests and documentation examples in this crate will not work unless you have
-//! [z3][z3] in your path under the name `z3`.
+//! [z3] in your path under the name `z3`.
 //!
 //! This library does **not** have a structure for S-expressions. It must be provided by the user,
 //! as well as the relevant printing and parsing functions. Printing-related traits are discussed in
-//! the [`print`](self::print) module, and parsing-related traits are in the [`parse`](self::parse)
-//! module.
+//! the [`mod@print`] module, and parsing-related traits are in the [`mod@parse`] module.
 //!
 //!
 //! # Note on Backend Solvers
@@ -30,8 +29,8 @@
 //! This crate supports the following solvers:
 //!
 //! - [z3]: full support
-//! - [cvc4]: full support in theory, but only partially tested. Note that `get-value` is
-//!   known to crash some versions of CVC4.
+//! - [cvc4]: full support in theory, but only partially tested. Note that `get-value` is known to
+//!   crash some versions of CVC4.
 //! - [yices 2]: full support in theory, but only partially tested. Command `get-model` will only
 //!   work on Yices 2 > `2.6.1`, and needs to be activated with [`SmtConf::models`]. To understand
 //!   why, see <https://github.com/SRI-CSL/yices2/issues/162>.

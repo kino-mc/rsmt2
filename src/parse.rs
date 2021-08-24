@@ -25,7 +25,7 @@
 //!
 //!
 //! Here is a first example where we defined a value parser that only recognizes booleans, to
-//! showcase [`ValueParser`] and [`Solver::get_values`](super::Solver::get_values). `Expr`essions
+//! showcase [`ValueParser`] and [`Solver::get_values`][crate::Solver::get_values]. `Expr`essions
 //! are represented as strings, and `Val`ues are booleans.
 //!
 //! ```rust
@@ -1375,7 +1375,7 @@ impl<R: BufRead> SmtParser<R> {
     }
 }
 
-/// Can parse identifiers and types. Used for `get_model`.
+/// Can parse identifiers and types. Used for [`Solver::get_model`][crate::Solver::get_model].
 ///
 /// For more information refer to the [module-level documentation](self).
 pub trait IdentParser<Ident, Type, Input>: Copy {
@@ -1408,7 +1408,7 @@ where
     }
 }
 
-/// Can parse models. Used for `get-model`.
+/// Can parse models. Used for [`Solver::get_model`][crate::Solver::get_model].
 ///
 /// For more information refer to the [module-level documentation](self).
 pub trait ModelParser<Ident, Type, Value, Input>: Copy {
@@ -1462,7 +1462,7 @@ where
     }
 }
 
-/// Can parse values. Used for `get-value`.
+/// Can parse values. Used for [`Solver::get_values`][crate::Solver::get_values].
 ///
 /// For more information refer to the [module-level documentation](self).
 pub trait ValueParser<Value, Input>: Copy {
@@ -1487,7 +1487,7 @@ where
     }
 }
 
-/// Can parse expressions. Used for `get_value`.
+/// Can parse expressions. Used for [`Solver::get_values`][crate::Solver::get_values].
 ///
 /// For more information refer to the [module-level documentation](self).
 pub trait ExprParser<Expr, Info, Input>: Copy {

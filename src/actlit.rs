@@ -3,26 +3,26 @@
 //! For an explanation of what activation literal are, see [the discussion below][why actlits].
 //!
 //! **NB**: while `rmst2`'s actlit API declares some constant symbols in the underlying solver,
-//! these will not appear in the result of [`get_model`](super::Solver::get_model) queries.
+//! these will not appear in the result of [`Solver::get_model`] queries.
 //!
 //!
-//! # Relevant functions on [`Solver`](super::Solver)s
+//! # Relevant functions on [`Solver`]s
 //!
-//! - [`Solver::get_actlit`](super::Solver::get_actlit)
-//! - [`Solver::de_actlit`](super::Solver::de_actlit)
-//! - [`Solver::set_actlit`](super::Solver::set_actlit)
-//! - [`Solver::assert_act`](super::Solver::assert_act)
-//! - [`Solver::assert_act_with`](super::Solver::assert_act_with)
-//! - [`Solver::print_check_sat_act`](super::Solver::print_check_sat_act)
-//! - [`Solver::check_sat_act`](super::Solver::check_sat_act)
-//! - [`Solver::check_sat_act_or_unk`](super::Solver::check_sat_act_or_unk)
+//! - [`Solver::get_actlit`]
+//! - [`Solver::de_actlit`]
+//! - [`Solver::set_actlit`]
+//! - [`Solver::assert_act`]
+//! - [`Solver::assert_act_with`]
+//! - [`Solver::print_check_sat_act`]
+//! - [`Solver::check_sat_act`]
+//! - [`Solver::check_sat_act_or_unk`]
 //!
 //!
 //!
 //! # Usage
 //!
 //! First, one can of course create activation literals by hand, and use them in `check-sat`s with
-//! [`check_sat_assuming`](super::Solver::check_sat_assuming):
+//! [`Solver::check_sat_assuming`]:
 //!
 //! ```
 //! use rsmt2::*;
@@ -222,16 +222,20 @@
 //! (get-value (x))
 //! ```
 //!
-//! This is much more efficient than `push`/`pop`: the conditional `check-sat`s basically force the
-//! activation literals directly in the SAT part of the SMT solver. Long story short, this means
-//! everything the solver learns during the checks is still valid afterwards. Conversely, after a
-//! `pop` solvers are usually unable to decide what to keep from the checks before the `pop`, and
-//! thus drop everything.
+//! This is much more efficient than [`push`][Solver::push]/[`pop`][Solver::pop]: the conditional
+//! `check-sat`s basically force the activation literals directly in the SAT part of the SMT solver.
+//! Long story short, this means everything the solver learns during the checks is still valid
+//! afterwards. Conversely, after a `pop` solvers are usually unable to decide what to keep from the
+//! checks before the `pop`, and thus drop everything.
 //!
-//! Actlits are **not** equivalent to `push`/`pop` however. Pushing a scope allows to declare/define
-//! function symbols and then discard them, while keeping whatever's outside of the scope. Actlits
-//! (mostly) just guard assertions and cannot accomplish this.
+//! Actlits are **not** equivalent to [`push`][Solver::push]/[`pop`][Solver::pop] however. Pushing a
+//! scope allows to declare/define function symbols and then discard them, while keeping whatever's
+//! outside of the scope. Actlits (mostly) just guard assertions and cannot accomplish this.
 //!
 //! [why actlits]: #discussion-on-activation-literals (Activation literals, why?)
+
+#[allow(unused_imports)]
+// Only used by doc links.
+use crate::Solver;
 
 pub use crate::solver::Actlit;

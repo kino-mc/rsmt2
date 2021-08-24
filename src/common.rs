@@ -124,7 +124,7 @@ impl Sort2Smt for String {
     }
 }
 
-/// SMT Lib 2 logics, used with [`Solver::set_logic`](super::Solver::set_logic).
+/// SMT Lib 2 logics, used with [`Solver::set_logic`][crate::Solver::set_logic].
 #[allow(non_camel_case_types)]
 #[derive(Clone, Copy)]
 pub enum Logic {

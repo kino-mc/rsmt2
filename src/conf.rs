@@ -194,10 +194,10 @@ impl fmt::Display for SmtStyle {
 
 /// Configuration and solver specific info.
 ///
-/// - [z3][z3]: full support
-/// - [cvc4][cvc4]: full support in theory, but only partially tested. Note that `get-value` is
+/// - [z3]: full support
+/// - [cvc4]: full support in theory, but only partially tested. Note that `get-value` is
 ///   known to crash some versions of CVC4.
-/// - [yices 2][yices 2]: full support in theory, but only partially tested. Command `get-model`
+/// - [yices 2]: full support in theory, but only partially tested. Command `get-model`
 ///   will only work on Yices 2 > `2.6.1`, and needs to be activated with [`Self::models`]. To
 ///   understand why, see <https://github.com/SRI-CSL/yices2/issues/162>.
 ///   
