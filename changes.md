@@ -1,5 +1,7 @@
 # v0.13.0
 
+- `assert`-like functions on `Solver` no longer require the expression to be a reference
+    - goes with `Expr2Smt<Info>` being auto-impl-ed for all `T: Expr2Smt<Info>`
 - `Actlit` now implies `Sym2Smt`
 - added `actlit::CondExpr`, which wraps an `Actlit` and a user expression; allows to use `Actlit`s
   in normal `check-sat` commands
