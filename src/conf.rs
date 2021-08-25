@@ -62,7 +62,7 @@ fn get_env_var(env_var: &str) -> SmtRes<Option<String>> {
 /// [z3]: https://github.com/Z3Prover/z3 (z3 github repository)
 /// [cvc4]: https://cvc4.github.io/ (cvc4 github pages)
 /// [yices 2]: https://yices.csl.sri.com/ (yices 2 official page)
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[allow(dead_code)]
 pub enum SmtStyle {
     /// Z3-style smt solver.
@@ -90,6 +90,7 @@ impl SmtStyle {
                 incremental: true,
                 parse_success: false,
                 unsat_cores: false,
+                interpolants: true,
                 check_sat_assuming: supported("check-sat-assuming"),
             },
             CVC4 => SmtConf {
@@ -105,6 +106,7 @@ impl SmtStyle {
                 incremental: false,
                 parse_success: false,
                 unsat_cores: false,
+                interpolants: false,
                 check_sat_assuming: unsupported(),
             },
             Yices2 => SmtConf {
@@ -115,6 +117,7 @@ impl SmtStyle {
                 incremental: false,
                 parse_success: false,
                 unsat_cores: false,
+                interpolants: false,
                 check_sat_assuming: supported("check-sat-assuming"),
             },
         }
@@ -180,6 +183,11 @@ impl SmtStyle {
             Yices2 => "yices.exe",
         }
     }
+
+    /// True if `self` is [`Self::Z3`].
+    pub fn is_z3(self) -> bool {
+        self == Self::Z3
+    }
 }
 
 impl fmt::Display for SmtStyle {
@@ -220,11 +228,18 @@ pub struct SmtConf {
     parse_success: bool,
     /// Triggers unsat-core production.
     unsat_cores: bool,
+    /// Triggers interpolant production.
+    interpolants: bool,
     /// Keyword for check-sat with assumptions.
     check_sat_assuming: ConfItem,
 }
 
 impl SmtConf {
+    /// Solver style accessor.
+    pub fn style(&self) -> SmtStyle {
+        self.style
+    }
+
     /// Creates a new z3-like solver configuration.
     ///
     /// # Examples
@@ -519,41 +534,6 @@ impl SmtConf {
         }
     }
 
-    /// Model production flag.
-    pub fn get_models(&self) -> bool {
-        self.models
-    }
-    /// Activates model production.
-    pub fn models(&mut self) {
-        if self.models {
-            return ();
-        } else {
-            self.models = true
-        }
-        match self.style {
-            CVC4 => self.options.push("--produce-models".into()),
-            Yices2 => self.options.push("--smt2-model-format".into()),
-            Z3 => (),
-        }
-    }
-
-    /// Incrementality.
-    pub fn get_incremental(&self) -> bool {
-        self.incremental
-    }
-    /// Activates incrementality (push/pop, check-sat-assuming).
-    pub fn incremental(&mut self) {
-        if self.incremental {
-            return ();
-        } else {
-            self.incremental = true
-        }
-        match self.style {
-            CVC4 | Yices2 => self.options.push("--incremental".into()),
-            Z3 => (),
-        }
-    }
-
     /// Solver command.
     ///
     /// # Examples
@@ -583,47 +563,6 @@ impl SmtConf {
     #[inline]
     pub fn get_options(&self) -> &[String] {
         &self.options
-    }
-
-    /// Indicates if print success is active.
-    ///
-    /// # Examples
-    ///
-    /// ```rust
-    /// # use rsmt2::SmtConf;
-    /// assert! { ! SmtConf::default_z3().get_print_success() }
-    /// ```
-    #[inline]
-    pub fn get_print_success(&self) -> bool {
-        self.parse_success
-    }
-
-    /// Indicates if unsat cores is active.
-    ///
-    /// # Examples
-    ///
-    /// ```rust
-    /// # use rsmt2::SmtConf;
-    /// assert! { ! SmtConf::default_z3().get_unsat_cores() }
-    /// ```
-    #[inline]
-    pub fn get_unsat_cores(&self) -> bool {
-        self.unsat_cores
-    }
-
-    /// Keyword for check-sat with assumptions.
-    ///
-    /// # Examples
-    ///
-    /// ```rust
-    /// # use rsmt2::SmtConf;
-    /// assert_eq! {
-    ///     SmtConf::default_z3().get_check_sat_assuming(), Some("check-sat-assuming")
-    /// }
-    /// ```
-    #[inline]
-    pub fn get_check_sat_assuming(&self) -> ConfItem {
-        self.check_sat_assuming.as_ref().map(|s| *s)
     }
 
     /// Adds an option to the configuration.
@@ -676,6 +615,165 @@ impl SmtConf {
         self
     }
 
+    /// Model production flag.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// # use rsmt2::SmtConf;
+    /// assert!(SmtConf::default_z3().get_models());
+    /// ```
+    pub fn get_models(&self) -> bool {
+        self.models
+    }
+    /// Activates model production.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// # use rsmt2::SmtConf;
+    /// let mut conf = SmtConf::default_z3();
+    /// conf.models();
+    /// assert! { conf.get_models() }
+    /// ```
+    pub fn models(&mut self) {
+        self.set_models(true)
+    }
+    /// (De)activates model production.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// # use rsmt2::SmtConf;
+    /// let mut conf = SmtConf::default_z3();
+    /// conf.set_models(false);
+    /// assert! { !conf.get_models() }
+    /// ```
+    pub fn set_models(&mut self, val: bool) {
+        self.models = val;
+        if val {
+            match self.style {
+                CVC4 => self.options.push("--produce-models".into()),
+                Yices2 => self.options.push("--smt2-model-format".into()),
+                Z3 => (),
+            }
+        }
+    }
+
+    /// Incrementality.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// # use rsmt2::SmtConf;
+    /// let mut conf = SmtConf::default_z3();
+    /// assert! { conf.get_incremental() }
+    /// ```
+    pub fn get_incremental(&self) -> bool {
+        self.incremental
+    }
+    /// Activates incrementality (push/pop, check-sat-assuming).
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// # use rsmt2::SmtConf;
+    /// let mut conf = SmtConf::default_z3();
+    /// conf.incremental();
+    /// assert! { conf.get_incremental() }
+    /// ```
+    pub fn incremental(&mut self) {
+        self.set_incremental(true)
+    }
+    /// Activates incrementality (push/pop, check-sat-assuming).
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// # use rsmt2::SmtConf;
+    /// let mut conf = SmtConf::default_z3();
+    /// conf.incremental();
+    /// assert! { conf.get_incremental() }
+    /// ```
+    pub fn set_incremental(&mut self, val: bool) {
+        self.incremental = val;
+        if val {
+            match self.style {
+                CVC4 | Yices2 => self.options.push("--incremental".into()),
+                Z3 => (),
+            }
+        }
+    }
+
+    /// Indicates if unsat core production is active.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// # use rsmt2::SmtConf;
+    /// assert! { ! SmtConf::default_z3().get_unsat_cores() }
+    /// ```
+    #[inline]
+    pub fn get_unsat_cores(&self) -> bool {
+        self.unsat_cores
+    }
+    /// Activates unsat core production.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// # use rsmt2::SmtConf;
+    /// let mut conf = SmtConf::default_z3();
+    /// conf.unsat_cores();
+    /// assert! { conf.get_unsat_cores() }
+    /// ```
+    #[inline]
+    pub fn unsat_cores(&mut self) {
+        self.set_unsat_cores(true)
+    }
+    /// (De)activates unsat core production.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// # use rsmt2::SmtConf;
+    /// let mut conf = SmtConf::default_z3();
+    /// conf.set_unsat_cores(false);
+    /// assert! { !conf.get_unsat_cores() }
+    /// ```
+    #[inline]
+    pub fn set_unsat_cores(&mut self, val: bool) {
+        self.unsat_cores = val
+    }
+
+    /// Keyword for check-sat with assumptions.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// # use rsmt2::SmtConf;
+    /// assert_eq! {
+    ///     SmtConf::default_z3().get_check_sat_assuming(), Some("check-sat-assuming")
+    /// }
+    /// ```
+    #[inline]
+    pub fn get_check_sat_assuming(&self) -> ConfItem {
+        self.check_sat_assuming.as_ref().map(|s| *s)
+    }
+
+    /// Indicates if print success is active.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// # use rsmt2::SmtConf;
+    /// assert! { ! SmtConf::default_z3().get_print_success() }
+    /// ```
+    #[inline]
+    #[cfg(not(no_parse_success))]
+    pub fn get_print_success(&self) -> bool {
+        self.parse_success
+    }
     /// Activates parse sucess.
     ///
     /// # Examples
@@ -689,22 +787,72 @@ impl SmtConf {
     #[inline]
     #[cfg(not(no_parse_success))]
     pub fn print_success(&mut self) {
-        self.parse_success = true
+        self.set_print_success(true)
     }
-
-    /// Activates unsat-core production.
+    /// (De)activates parse sucess.
     ///
     /// # Examples
     ///
     /// ```rust
     /// # use rsmt2::SmtConf;
     /// let mut conf = SmtConf::default_z3();
-    /// conf.unsat_cores();
-    /// assert! { conf.get_unsat_cores() }
+    /// conf.set_print_success(true);
+    /// assert! { conf.get_print_success() }
     /// ```
     #[inline]
-    pub fn unsat_cores(&mut self) {
-        self.unsat_cores = true
+    #[cfg(not(no_parse_success))]
+    pub fn set_print_success(&mut self, val: bool) {
+        self.parse_success = val
+    }
+
+    /// Indicates if interpolant production is active.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// # use rsmt2::SmtConf;
+    /// assert! { SmtConf::default_z3().get_interpolants() }
+    /// ```
+    #[inline]
+    pub fn get_interpolants(&self) -> bool {
+        self.interpolants
+    }
+    /// Activates interpolant production.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// # use rsmt2::SmtConf;
+    /// let mut conf = SmtConf::default_z3();
+    /// conf.interpolants();
+    /// assert! { conf.get_interpolants() }
+    /// ```
+    #[inline]
+    pub fn interpolants(&mut self) -> SmtRes<()> {
+        self.set_interpolants(true)
+    }
+    /// (De)activates interpolant production.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// # use rsmt2::SmtConf;
+    /// let mut conf = SmtConf::default_z3();
+    /// conf.set_interpolants(false);
+    /// assert! { !conf.get_interpolants() }
+    /// ```
+    #[inline]
+    pub fn set_interpolants(&mut self, val: bool) -> SmtRes<()> {
+        if self.style.is_z3() {
+            self.interpolants = val;
+            Ok(())
+        } else {
+            bail!(
+                "interpolant production is only supported by Z3, \
+                cannot activate interpolants for `{}`",
+                self.style,
+            )
+        }
     }
 }
 

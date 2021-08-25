@@ -1285,6 +1285,7 @@ impl<R: BufRead> SmtParser<R> {
             core.push(parser.parse_sym(self)?);
             self.spc_cmt();
         }
+        self.clear();
         Ok(core)
     }
 
@@ -1324,7 +1325,7 @@ impl<R: BufRead> SmtParser<R> {
         Ok(model)
     }
 
-    /// Parses the result of a get-model.
+    /// Parses the result of a `get-model`.
     pub fn get_model<Ident, Value, Type, Parser>(
         &mut self,
         prune_actlits: bool,
@@ -1373,7 +1374,7 @@ impl<R: BufRead> SmtParser<R> {
         Ok(model)
     }
 
-    /// Parses the result of a get-value.
+    /// Parses the result of a `get-value`.
     pub fn get_values<Val, Info: Clone, Expr, Parser>(
         &mut self,
         parser: Parser,
@@ -1396,6 +1397,22 @@ impl<R: BufRead> SmtParser<R> {
         }
         self.clear();
         Ok(values)
+    }
+
+    /// Parses the result of a `get-interpolant`.
+    pub fn get_interpolant<Expr, Info, Parser>(
+        &mut self,
+        parser: Parser,
+        info: Info,
+    ) -> SmtRes<Expr>
+    where
+        Parser: for<'a> ExprParser<Expr, Info, &'a mut Self>,
+    {
+        self.spc_cmt();
+        self.try_error()?;
+        let expr = parser.parse_expr(self, info)?;
+        self.clear();
+        Ok(expr)
     }
 }
 

@@ -873,6 +873,25 @@ impl<Parser> Solver<Parser> {
             .map_err(|e| self.conf.enrich_get_values_error(e))
     }
 
+    /// Get-values command.
+    ///
+    /// Notice that the input expression type and the output one have no reason to be the same.
+    fn get_values_with<'a, Info, Expr, Exprs, PExpr, PValue>(
+        &mut self,
+        exprs: Exprs,
+        info: Info,
+    ) -> SmtRes<Vec<(PExpr, PValue)>>
+    where
+        Info: Copy,
+        Parser: for<'b> ExprParser<PExpr, Info, &'b mut RSmtParser>
+            + for<'b> ValueParser<PValue, &'b mut RSmtParser>,
+        Expr: ?Sized + Expr2Smt<Info> + 'a,
+        Exprs: IntoIterator<Item = &'a Expr>,
+    {
+        self.print_get_values_with(exprs, info)?;
+        self.parse_get_values_with(info)
+    }
+
     /// Get-unsat-core command.
     pub fn get_unsat_core<Sym>(&mut self) -> SmtRes<Vec<Sym>>
     where
@@ -880,6 +899,32 @@ impl<Parser> Solver<Parser> {
     {
         self.print_get_unsat_core()?;
         self.parse_get_unsat_core()
+    }
+
+    /// Get-interpolant command.
+    pub fn get_interpolant<Expr>(
+        &mut self,
+        sym_1: impl Sym2Smt,
+        sym_2: impl Sym2Smt,
+    ) -> SmtRes<Expr>
+    where
+        Parser: for<'b> ExprParser<Expr, (), &'b mut RSmtParser>,
+    {
+        self.get_interpolant_with(sym_1, sym_2, ())
+    }
+
+    /// Get-interpolant command.
+    pub fn get_interpolant_with<Info, Expr>(
+        &mut self,
+        sym_1: impl Sym2Smt,
+        sym_2: impl Sym2Smt,
+        info: Info,
+    ) -> SmtRes<Expr>
+    where
+        Parser: for<'b> ExprParser<Expr, Info, &'b mut RSmtParser>,
+    {
+        self.print_get_interpolant(sym_1, sym_2)?;
+        self.parse_get_interpolant(info)
     }
 }
 
@@ -1261,33 +1306,33 @@ impl<Parser> Solver<Parser> {
         let res = self.smt_parser.get_values(self.parser, info);
         if res.is_err() && !self.conf.get_models() {
             res.chain_err(|| {
-                "\
-                 Note: model production is not active \
-                 for this SmtConf (`conf.models()`)\
-                 "
+                "Note: model production is not active \
+                for this SmtConf (`conf.models()`)"
             })
         } else {
             res
         }
     }
 
-    /// Get-values command.
-    ///
-    /// Notice that the input expression type and the output one have no reason to be the same.
-    fn get_values_with<'a, Info, Expr, Exprs, PExpr, PValue>(
-        &mut self,
-        exprs: Exprs,
-        info: Info,
-    ) -> SmtRes<Vec<(PExpr, PValue)>>
+    /// Parses the result of a `get-interpolant`.
+    fn parse_get_interpolant<Expr, Info>(&mut self, info: Info) -> SmtRes<Expr>
     where
-        Info: Copy,
-        Parser: for<'b> ExprParser<PExpr, Info, &'b mut RSmtParser>
-            + for<'b> ValueParser<PValue, &'b mut RSmtParser>,
-        Expr: ?Sized + Expr2Smt<Info> + 'a,
-        Exprs: IntoIterator<Item = &'a Expr>,
+        Parser: for<'a> ExprParser<Expr, Info, &'a mut RSmtParser>,
     {
-        self.print_get_values_with(exprs, info)?;
-        self.parse_get_values_with(info)
+        let mut res = self.smt_parser.get_interpolant(self.parser, info);
+        if res.is_err() {
+            if !self.conf.style().is_z3() {
+                res = res.chain_err(|| {
+                    format!(
+                        "`{}` does not support interpolant production, only Z3 does",
+                        self.conf.style()
+                    )
+                })
+            } else if !self.conf.get_interpolants() {
+                res = res.chain_err(|| format!("interpolant production is not active"))
+            }
+        }
+        res
     }
 }
 

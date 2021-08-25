@@ -1,17 +1,22 @@
 # v0.13.0
 
-- `assert`-like functions on `Solver` no longer require the expression to be a reference
-    - goes with `Expr2Smt<Info>` being auto-impl-ed for all `T: Expr2Smt<Info>`
-- `Actlit` now implies `Sym2Smt`
-- added `actlit::CondExpr`, which wraps an `Actlit` and a user expression; allows to use `Actlit`s
-  in normal `check-sat` commands
 - named expression
     - added `NamedExpr<Sym, Expr>` which wraps an expression and a symbol and encodes a named expression
     - added `into_named` and `as_named` methods on `Expr2Smt` trait for easy expression naming
     - added `into_name_for` and `as_name_for` methods on `Sym2Smt`
 - unsat cores now working (best used with `NamedExpr` to name expressions)
     - relies on the `ParseSym` trait to parse symbols from the core
-
+- interpolants (`get-interpolant`) now supported
+    - only Z3 supports this
+    - `SmtConf` produces an error if interpolant production is activated on a non-Z3 solver
+    - uses `Sym2Smt`
+    - best used with `NamedExpr` to name expressions
+- `assert`-like functions on `Solver` no longer require the expression to be a reference
+    - goes with `Expr2Smt<Info>` being auto-impl-ed for all `T: Expr2Smt<Info>`
+- `Actlit` now implies `Sym2Smt`
+- added `actlit::CondExpr`, which wraps an `Actlit` and a user expression; allows to use `Actlit`s
+  in normal `check-sat` commands
+- `SmtConf` now has `set_...` functions for model/unsat core/... production
 
 # v0.12.0
 
