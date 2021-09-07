@@ -130,7 +130,8 @@ impl Sort2Smt for String {
 /// use rsmt2::prelude::*;
 /// let mut conf = SmtConf::default_z3();
 /// conf.unsat_cores();
-/// println!("unsat_cores: {}", conf.get_unsat_cores());
+/// # println!("unsat_cores: {}", conf.get_unsat_cores());
+///
 /// let mut solver = Solver::new(conf, ()).unwrap();
 /// solver.declare_const("n", "Int").unwrap();
 /// solver.declare_const("m", "Int").unwrap();
@@ -149,6 +150,7 @@ impl Sort2Smt for String {
 ///
 /// assert!(!solver.check_sat().unwrap());
 /// let core: Vec<String> = solver.get_unsat_core().unwrap();
+/// assert_eq!(core, vec![label_e_1, label_e_2]);
 /// ```
 pub struct NamedExpr<Sym, Expr> {
     /// Symbol.

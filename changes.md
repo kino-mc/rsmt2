@@ -1,3 +1,15 @@
+# v0.13.1
+
+- added *named assert* function on `Solver`s
+    - `Solver::named_assert_act_with`: named + actlit + print info
+    - `Solver::named_assert_with`: named + print info
+    - `Solver::named_assert`: named
+- simplified most `Solver` function signatures
+    - take ownership over expressions, symbols and sorts (previously took references)
+
+        still accepts refs since `T: Sym2Smt<Info>` ⇒ `&T: Sym2Smt<Info>`, same for `Expr2Smt` and
+        `Sort2Smt`
+
 # v0.13.0
 
 - named expression
