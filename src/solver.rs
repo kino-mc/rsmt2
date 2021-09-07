@@ -483,9 +483,9 @@ impl<Parser> Solver<Parser> {
     ) -> SmtRes<()>
     where
         FunSym: Sym2Smt<()>,
-        ArgSort: Sort2Smt + 'a,
+        ArgSort: Sort2Smt,
         OutSort: Sort2Smt,
-        Args: IntoIterator<Item = &'a ArgSort>,
+        Args: IntoIterator<Item = ArgSort>,
     {
         self.declare_fun_with(symbol, args, out, ())
     }
@@ -1258,8 +1258,8 @@ impl<Parser> Solver<Parser> {
     ) -> SmtRes<FutureCheckSat>
     where
         Info: Copy,
-        Ident: ?Sized + Sym2Smt<Info> + 'a,
-        Idents: IntoIterator<Item = &'a Ident>,
+        Ident: Sym2Smt<Info>,
+        Idents: IntoIterator<Item = Ident>,
     {
         match self.conf.get_check_sat_assuming() {
             Some(ref cmd) => {
@@ -1536,9 +1536,9 @@ impl<Parser> Solver<Parser> {
     where
         Info: Copy,
         FunSym: Sym2Smt<Info>,
-        ArgSort: Sort2Smt + 'a,
+        ArgSort: Sort2Smt,
         OutSort: Sort2Smt,
-        Args: IntoIterator<Item = &'a ArgSort>,
+        Args: IntoIterator<Item = ArgSort>,
     {
         tee_write! {
           self, |w| {
@@ -1915,15 +1915,15 @@ impl<Parser> Solver<Parser> {
     }
 
     /// Check-sat assuming command, turns `unknown` results into errors.
-    pub fn check_sat_assuming_with<'a, Info, Ident, Idents>(
+    pub fn check_sat_assuming_with<'a, Info, Sym, Syms>(
         &mut self,
-        idents: Idents,
+        idents: Syms,
         info: Info,
     ) -> SmtRes<bool>
     where
         Info: Copy,
-        Ident: ?Sized + Sym2Smt<Info> + 'a,
-        Idents: IntoIterator<Item = &'a Ident>,
+        Sym: Sym2Smt<Info>,
+        Syms: IntoIterator<Item = Sym>,
     {
         let future = self.print_check_sat_assuming_with(idents, info)?;
         self.parse_check_sat(future)
@@ -1937,8 +1937,8 @@ impl<Parser> Solver<Parser> {
     ) -> SmtRes<Option<bool>>
     where
         Info: Copy,
-        Ident: ?Sized + Sym2Smt<Info> + 'a,
-        Idents: IntoIterator<Item = &'a Ident>,
+        Ident: Sym2Smt<Info>,
+        Idents: IntoIterator<Item = Ident>,
     {
         let future = self.print_check_sat_assuming_with(idents, info)?;
         self.parse_check_sat_or_unk(future)
