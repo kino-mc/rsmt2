@@ -472,7 +472,7 @@ pub mod examples {}
 
 /// Traits your types must implement so that rsmt2 can use them.
 pub mod print {
-    pub use crate::common::{Expr2Smt, Sort2Smt, Sym2Smt};
+    pub use crate::common::{Expr2Smt, Sort2Smt, Sym2Smt, SymAndSort};
 }
 
 #[cfg(test)]

@@ -31,6 +31,51 @@ pub trait Sort2Smt {
         Writer: io::Write;
 }
 
+/// A symbol and a sort, implemented by by symbol/sort pairs.
+///
+/// Implement this trait if you want to use your own data structures in solver functions working on
+/// lists of sorted symbols. For example,
+///
+/// - [Solver::define_fun][crate::Solver::define_fun]
+/// - [Solver::define_funs_rec_with][crate::Solver::define_funs_rec_with]
+pub trait SymAndSort<Info> {
+    /// Type of the symbol.
+    type Sym: Sym2Smt<Info>;
+    /// Type of the sort.
+    type Sort: Sym2Smt<Info>;
+    /// Symbol accessor.
+    fn sym(&self) -> &Self::Sym;
+    /// Sort accessor.
+    fn sort(&self) -> &Self::Sort;
+}
+impl<'a, T, Info> SymAndSort<Info> for &'a T
+where
+    T: SymAndSort<Info>,
+{
+    type Sym = <T as SymAndSort<Info>>::Sym;
+    type Sort = <T as SymAndSort<Info>>::Sort;
+    fn sym(&self) -> &Self::Sym {
+        (*self).sym()
+    }
+    fn sort(&self) -> &Self::Sort {
+        (*self).sort()
+    }
+}
+impl<Info, Sym, Sort> SymAndSort<Info> for (Sym, Sort)
+where
+    Sym: Sym2Smt<Info>,
+    Sort: Sym2Smt<Info>,
+{
+    type Sym = Sym;
+    type Sort = Sort;
+    fn sym(&self) -> &Sym {
+        &self.0
+    }
+    fn sort(&self) -> &Sort {
+        &self.1
+    }
+}
+
 /// Writes a string.
 #[inline(always)]
 pub fn write_str<W: io::Write>(w: &mut W, s: &str) -> SmtRes<()> {
