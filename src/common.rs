@@ -36,13 +36,13 @@ pub trait Sort2Smt {
 /// Implement this trait if you want to use your own data structures in solver functions working on
 /// lists of sorted symbols. For example,
 ///
-/// - [Solver::define_fun][crate::Solver::define_fun]
-/// - [Solver::define_funs_rec_with][crate::Solver::define_funs_rec_with]
-pub trait SymAndSort<Info> {
+/// - [Solver::define_fun][crate::Solver::define_fun],
+/// - [Solver::define_funs_rec_with][crate::Solver::define_funs_rec_with].
+pub trait SymAndSort<Info = ()> {
     /// Type of the symbol.
     type Sym: Sym2Smt<Info>;
     /// Type of the sort.
-    type Sort: Sym2Smt<Info>;
+    type Sort: Sort2Smt;
     /// Symbol accessor.
     fn sym(&self) -> &Self::Sym;
     /// Sort accessor.
@@ -64,7 +64,7 @@ where
 impl<Info, Sym, Sort> SymAndSort<Info> for (Sym, Sort)
 where
     Sym: Sym2Smt<Info>,
-    Sort: Sym2Smt<Info>,
+    Sort: Sort2Smt,
 {
     type Sym = Sym;
     type Sort = Sort;
@@ -73,6 +73,77 @@ where
     }
     fn sort(&self) -> &Sort {
         &self.1
+    }
+}
+
+pub trait FunDef<Info = ()> {
+    type FunSym: Sym2Smt<Info>;
+    type SortedSym: SymAndSort<Info>;
+    type ArgsIter: Iterator<Item = Self::SortedSym>;
+    type OutSort: Sort2Smt;
+    type Body: Expr2Smt<Info>;
+
+    fn fun_sym(&self) -> &Self::FunSym;
+
+    fn args(&self) -> Self::ArgsIter;
+
+    fn out_sort(&self) -> &Self::OutSort;
+
+    fn body(&self) -> &Self::Body;
+}
+impl<'a, T, Info> FunDef<Info> for &'a T
+where
+    T: FunDef<Info>,
+{
+    type FunSym = T::FunSym;
+    type SortedSym = T::SortedSym;
+    type ArgsIter = T::ArgsIter;
+    type OutSort = T::OutSort;
+    type Body = T::Body;
+
+    fn fun_sym(&self) -> &Self::FunSym {
+        (*self).fun_sym()
+    }
+
+    fn args(&self) -> Self::ArgsIter {
+        (*self).args()
+    }
+
+    fn out_sort(&self) -> &Self::OutSort {
+        (*self).out_sort()
+    }
+
+    fn body(&self) -> &Self::Body {
+        (*self).body()
+    }
+}
+impl<'a, FunSym, SortedSym, ArgsIter, Args, OutSort, Body, Info> FunDef<Info>
+    for (FunSym, Args, OutSort, Body)
+where
+    FunSym: Sym2Smt<Info>,
+    SortedSym: SymAndSort<Info> + 'a,
+    ArgsIter: Iterator<Item = SortedSym> + 'a,
+    Args: IntoIterator<IntoIter = ArgsIter> + Clone,
+    OutSort: Sort2Smt,
+    Body: Expr2Smt<Info>,
+{
+    type FunSym = FunSym;
+    type SortedSym = SortedSym;
+    type ArgsIter = ArgsIter;
+    type OutSort = OutSort;
+    type Body = Body;
+
+    fn fun_sym(&self) -> &FunSym {
+        &self.0
+    }
+    fn args(&self) -> ArgsIter {
+        self.1.clone().into_iter()
+    }
+    fn out_sort(&self) -> &OutSort {
+        &self.2
+    }
+    fn body(&self) -> &Body {
+        &self.3
     }
 }
 
