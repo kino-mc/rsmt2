@@ -634,7 +634,7 @@ impl SmtConf {
     /// # use rsmt2::SmtConf;
     /// let mut conf = SmtConf::default_z3();
     /// conf.models();
-    /// assert! { conf.get_models() }
+    /// assert!(conf.get_models());
     /// ```
     pub fn models(&mut self) {
         self.set_models(true)
@@ -647,7 +647,7 @@ impl SmtConf {
     /// # use rsmt2::SmtConf;
     /// let mut conf = SmtConf::default_z3();
     /// conf.set_models(false);
-    /// assert! { !conf.get_models() }
+    /// assert!(!conf.get_models());
     /// ```
     pub fn set_models(&mut self, val: bool) {
         self.models = val;
@@ -667,7 +667,7 @@ impl SmtConf {
     /// ```rust
     /// # use rsmt2::SmtConf;
     /// let mut conf = SmtConf::default_z3();
-    /// assert! { conf.get_incremental() }
+    /// assert!(conf.get_incremental());
     /// ```
     pub fn get_incremental(&self) -> bool {
         self.incremental
@@ -680,7 +680,7 @@ impl SmtConf {
     /// # use rsmt2::SmtConf;
     /// let mut conf = SmtConf::default_z3();
     /// conf.incremental();
-    /// assert! { conf.get_incremental() }
+    /// assert!(conf.get_incremental());
     /// ```
     pub fn incremental(&mut self) {
         self.set_incremental(true)
@@ -693,7 +693,7 @@ impl SmtConf {
     /// # use rsmt2::SmtConf;
     /// let mut conf = SmtConf::default_z3();
     /// conf.incremental();
-    /// assert! { conf.get_incremental() }
+    /// assert!(conf.get_incremental());
     /// ```
     pub fn set_incremental(&mut self, val: bool) {
         self.incremental = val;
@@ -711,7 +711,7 @@ impl SmtConf {
     ///
     /// ```rust
     /// # use rsmt2::SmtConf;
-    /// assert! { ! SmtConf::default_z3().get_unsat_cores() }
+    /// assert!(! SmtConf::default_z3().get_unsat_cores());
     /// ```
     #[inline]
     pub fn get_unsat_cores(&self) -> bool {
@@ -725,7 +725,7 @@ impl SmtConf {
     /// # use rsmt2::SmtConf;
     /// let mut conf = SmtConf::default_z3();
     /// conf.unsat_cores();
-    /// assert! { conf.get_unsat_cores() }
+    /// assert!(conf.get_unsat_cores());
     /// ```
     #[inline]
     pub fn unsat_cores(&mut self) {
@@ -739,7 +739,7 @@ impl SmtConf {
     /// # use rsmt2::SmtConf;
     /// let mut conf = SmtConf::default_z3();
     /// conf.set_unsat_cores(false);
-    /// assert! { !conf.get_unsat_cores() }
+    /// assert!(!conf.get_unsat_cores());
     /// ```
     #[inline]
     pub fn set_unsat_cores(&mut self, val: bool) {
@@ -767,7 +767,7 @@ impl SmtConf {
     ///
     /// ```rust
     /// # use rsmt2::SmtConf;
-    /// assert! { ! SmtConf::default_z3().get_print_success() }
+    /// assert!(! SmtConf::default_z3().get_print_success());
     /// ```
     #[inline]
     #[cfg(not(no_parse_success))]
@@ -782,7 +782,7 @@ impl SmtConf {
     /// # use rsmt2::SmtConf;
     /// let mut conf = SmtConf::default_z3();
     /// conf.print_success();
-    /// assert! { conf.get_print_success() }
+    /// assert!(conf.get_print_success());
     /// ```
     #[inline]
     #[cfg(not(no_parse_success))]
@@ -797,7 +797,7 @@ impl SmtConf {
     /// # use rsmt2::SmtConf;
     /// let mut conf = SmtConf::default_z3();
     /// conf.set_print_success(true);
-    /// assert! { conf.get_print_success() }
+    /// assert!(conf.get_print_success());
     /// ```
     #[inline]
     #[cfg(not(no_parse_success))]
@@ -811,7 +811,7 @@ impl SmtConf {
     ///
     /// ```rust
     /// # use rsmt2::SmtConf;
-    /// assert! { SmtConf::default_z3().get_interpolants() }
+    /// assert!(SmtConf::default_z3().get_interpolants());
     /// ```
     #[inline]
     pub fn get_interpolants(&self) -> bool {
@@ -825,7 +825,7 @@ impl SmtConf {
     /// # use rsmt2::SmtConf;
     /// let mut conf = SmtConf::default_z3();
     /// conf.interpolants();
-    /// assert! { conf.get_interpolants() }
+    /// assert!(conf.get_interpolants());
     /// ```
     #[inline]
     pub fn interpolants(&mut self) -> SmtRes<()> {
@@ -839,7 +839,7 @@ impl SmtConf {
     /// # use rsmt2::SmtConf;
     /// let mut conf = SmtConf::default_z3();
     /// conf.set_interpolants(false);
-    /// assert! { !conf.get_interpolants() }
+    /// assert!(!conf.get_interpolants());
     /// ```
     #[inline]
     pub fn set_interpolants(&mut self, val: bool) -> SmtRes<()> {

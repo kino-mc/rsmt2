@@ -53,20 +53,20 @@
 //!
 //!         // Non-blocking.
 //!         let maybe_result = future.try_get();
-//!         assert! { maybe_result.is_none() }
+//!         assert!(maybe_result.is_none());
 //!
 //!         // Blocking with timeout.
 //!         let maybe_result = future.timeout_get(std::time::Duration::new(0, 50));
-//!         assert! { maybe_result.is_none() }
+//!         assert!(maybe_result.is_none());
 //!
 //!         // Blocking.
 //!         let result = future.get();
-//!         assert! { result.expect("reached timeout").is_none() }
+//!         assert!(result.expect("reached timeout").is_none());
 //!     }
 //!
 //!     // We can re-use the solver now.
 //!     let result = solver.check_sat_or_unk();
-//!     assert! { result.expect("reached timeout").is_none() }
+//!     assert!(result.expect("reached timeout").is_none());
 //!
 //!     Ok(())
 //! }

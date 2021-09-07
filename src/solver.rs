@@ -434,9 +434,9 @@ impl<Parser> Solver<Parser> {
     /// # use rsmt2::Solver;
     /// let mut solver = Solver::default_z3(()).unwrap();
     /// solver.assert("(= 0 1)").unwrap();
-    /// assert! { ! solver.check_sat().unwrap() }
+    /// assert!(! solver.check_sat().unwrap());
     /// solver.reset().unwrap();
-    /// assert! { solver.check_sat().unwrap() }
+    /// assert!(solver.check_sat().unwrap());
     /// ```
     #[inline]
     pub fn reset(&mut self) -> SmtRes<()> {
@@ -734,7 +734,7 @@ impl<Parser> Solver<Parser> {
     ///
     /// # Examples
     ///
-    /// ```rust,no_run
+    /// ```rust
     /// # use rsmt2::Solver;
     /// let mut solver = Solver::default_z3(()).unwrap();
     /// solver.declare_datatypes( & [
@@ -752,7 +752,7 @@ impl<Parser> Solver<Parser> {
     /// solver.assert("(not (value t2))").unwrap();
     ///
     /// let sat = solver.check_sat().unwrap();
-    /// assert! { sat } panic! { "aaa" }
+    /// assert!(sat);
     /// ```
     pub fn declare_datatypes<'a, Sort, Param, ParamList, Def, DefList, All>(
         &mut self,
@@ -893,6 +893,24 @@ impl<Parser> Solver<Parser> {
     }
 
     /// Get-unsat-core command.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use rsmt2::Solver;
+    ///
+    /// let mut solver = Solver::default_z3(()).unwrap();
+    ///
+    /// solver.declare_const("x", "Int").unwrap();
+    /// solver.declare_const("y", "Int").unwrap();
+    ///
+    /// solver.assert("(= (+ x y) 0)").unwrap();
+    ///
+    /// let future = solver.print_check_sat().unwrap();
+    /// // Do stuff while the solver works.
+    /// let sat = solver.parse_check_sat(future).unwrap();
+    /// assert!(sat);
+    /// ```
     pub fn get_unsat_core<Sym>(&mut self) -> SmtRes<Vec<Sym>>
     where
         Parser: for<'a> SymParser<Sym, &'a mut RSmtParser>,
@@ -1043,7 +1061,7 @@ impl<Parser> Solver<Parser> {
     /// let future = solver.print_check_sat().unwrap();
     /// // Do stuff while the solver works.
     /// let sat = solver.parse_check_sat(future).unwrap();
-    /// assert! { sat }
+    /// assert!(sat);
     /// ```
     #[inline]
     pub fn print_check_sat(&mut self) -> SmtRes<FutureCheckSat> {

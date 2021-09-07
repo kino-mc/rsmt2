@@ -89,7 +89,7 @@
 //! solver.assert("(= (+ (* n n) (* m m)) 7)")?;
 //!
 //! let is_sat = solver.check_sat()?;
-//! assert! { ! is_sat }
+//! assert!(! is_sat);
 //! # Ok(())
 //! # }
 //! # do_smt_stuff().unwrap()
@@ -156,16 +156,16 @@
 //! solver.assert("(and (< n 5) (> n 0) (> m 0))")?;
 //!
 //! let is_sat = solver.check_sat()?;
-//! assert! { is_sat }
+//! assert!(is_sat);
 //! let mut model = solver.get_model()?;
 //! model.sort(); // Order might vary, sorting for assert below.
-//! assert_eq! {
+//! assert_eq!(
 //!     model,
 //!     vec![
 //!         ("m".into(), vec![], "Int".into(), "5".into()),
 //!         ("n".into(), vec![], "Int".into(), "2".into()),
 //!     ]
-//! }
+//! );
 //! # Ok(())
 //! # }
 //! # do_smt_stuff().unwrap()
@@ -222,7 +222,7 @@
 //! let my_check_sat = solver.print_check_sat()?;
 //! // Solver is working, we can do other things.
 //! let is_sat = solver.parse_check_sat(my_check_sat)?;
-//! assert! { is_sat }
+//! assert!(is_sat);
 //! # Ok(())
 //! # }
 //! # do_smt_stuff().unwrap()
