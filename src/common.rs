@@ -145,15 +145,15 @@ where
     }
 }
 
-pub trait SortField {
+pub trait AdtVariantField {
     type FieldSym: Sym2Smt;
     type FieldSort: Sort2Smt;
     fn sym(&self) -> &Self::FieldSym;
     fn sort(&self) -> &Self::FieldSort;
 }
-impl<'a, T> SortField for &'a T
+impl<'a, T> AdtVariantField for &'a T
 where
-    T: SortField,
+    T: AdtVariantField,
 {
     type FieldSym = T::FieldSym;
     type FieldSort = T::FieldSort;
@@ -164,7 +164,7 @@ where
         (*self).sort()
     }
 }
-impl<FieldSym, FieldSort> SortField for (FieldSym, FieldSort)
+impl<FieldSym, FieldSort> AdtVariantField for (FieldSym, FieldSort)
 where
     FieldSym: Sym2Smt,
     FieldSort: Sort2Smt,
@@ -180,17 +180,17 @@ where
     }
 }
 
-pub trait SortVariant {
+pub trait AdtVariant {
     type VariantSym: Sym2Smt;
-    type Field: SortField;
+    type Field: AdtVariantField;
     type FieldIter: Iterator<Item = Self::Field>;
 
     fn sym(&self) -> &Self::VariantSym;
     fn fields(&self) -> Self::FieldIter;
 }
-impl<'a, T> SortVariant for &'a T
+impl<'a, T> AdtVariant for &'a T
 where
-    T: SortVariant,
+    T: AdtVariant,
 {
     type VariantSym = T::VariantSym;
     type Field = T::Field;
@@ -203,10 +203,10 @@ where
         (*self).fields()
     }
 }
-impl<VariantSym, Field, FieldIntoIter> SortVariant for (VariantSym, FieldIntoIter)
+impl<VariantSym, Field, FieldIntoIter> AdtVariant for (VariantSym, FieldIntoIter)
 where
     VariantSym: Sym2Smt,
-    Field: SortField,
+    Field: AdtVariantField,
     FieldIntoIter: IntoIterator<Item = Field> + Clone,
 {
     type VariantSym = VariantSym;
@@ -221,14 +221,14 @@ where
     }
 }
 
-pub trait SortDecl {
+pub trait AdtDecl {
     type SortSym: Sym2Smt;
     type VariantSym: Sym2Smt;
 
     type SortArg: Sym2Smt;
     type ArgsIter: Iterator<Item = Self::SortArg> + ExactSizeIterator;
 
-    type Variant: SortVariant;
+    type Variant: AdtVariant;
     type VariantIter: Iterator<Item = Self::Variant>;
 
     fn sort_sym(&self) -> &Self::SortSym;
@@ -238,14 +238,14 @@ pub trait SortDecl {
     }
     fn variants(&self) -> Self::VariantIter;
 }
-impl<SortSym, ArgsIntoIter, VariantIntoIter> SortDecl for (SortSym, ArgsIntoIter, VariantIntoIter)
+impl<SortSym, ArgsIntoIter, VariantIntoIter> AdtDecl for (SortSym, ArgsIntoIter, VariantIntoIter)
 where
     SortSym: Sym2Smt,
     ArgsIntoIter: IntoIterator + Clone,
     ArgsIntoIter::IntoIter: ExactSizeIterator,
     ArgsIntoIter::Item: Sym2Smt,
     VariantIntoIter: IntoIterator + Clone,
-    VariantIntoIter::Item: SortVariant,
+    VariantIntoIter::Item: AdtVariant,
 {
     type SortSym = SortSym;
     type VariantSym = ArgsIntoIter::Item;
@@ -266,9 +266,9 @@ where
         self.2.clone().into_iter()
     }
 }
-impl<'a, T> SortDecl for &'a T
+impl<'a, T> AdtDecl for &'a T
 where
-    T: SortDecl,
+    T: AdtDecl,
 {
     type SortSym = T::SortSym;
     type VariantSym = T::VariantSym;

@@ -1,6 +1,6 @@
 fn run() {
     use rsmt2::{
-        print::{SortDecl, SortField, SortVariant},
+        print::{AdtDecl, AdtVariant, AdtVariantField},
         Solver,
     };
     let mut solver = Solver::default_z3(()).unwrap();
@@ -9,15 +9,15 @@ fn run() {
     // sort-declaration data in custom types. If you want to declare a sort, you most likely
     // already have a representation for it, so working on custom types is reasonable.
 
-    // Notice that the `SortDecl`, `SortField` and `SortVariant` traits from `rsmt2::print::_` are in
-    // scope. This is what our custom types will need to generate to declare the sort.
+    // Notice that the `AdtDecl`, `AdtVariantField` and `AdtVariant` traits from `rsmt2::print::_`
+    // are in scope. This is what our custom types will need to generate to declare the sort.
 
     // We'll use static string slices for simplicity as `&str` implements all printing traits.
     type Sym = &'static str;
     type Sort = &'static str;
 
     // Let's start with the top-level sort type.
-    struct MySort {
+    struct MyAdt {
         // Name of the sort, for instance `List`.
         sym: Sym,
         // Symbol(s) for the type parameter(s), for instance `T` for `List<T>`. Must be a collection
@@ -26,18 +26,18 @@ fn run() {
         // Body of the sort: its variants. For instance the `nil` and `cons` variants for `List<T>`.
         variants: Vec<Variant>,
     }
-    impl MySort {
+    impl MyAdt {
         // This thing build the actual declaration expected by rsmt2. Its output is something that
-        // implements `SortDecl` and can only live as long as the input ref to `self`.
-        fn as_decl<'me>(&'me self) -> impl SortDecl + 'me {
-            // Check out rsmt2's documentation and you'll see that `SortDecl` is already implemented for
+        // implements `AdtDecl` and can only live as long as the input ref to `self`.
+        fn as_decl<'me>(&'me self) -> impl AdtDecl + 'me {
+            // Check out rsmt2's documentation and you'll see that `AdtDecl` is already implemented for
             // certain triplets.
             (
                 // Symbol.
                 &self.sym,
                 // Sized collection of type-parameter symbols.
                 &self.args,
-                // Variant, collection of iterator over `impl SortVariant` (see below).
+                // Variant, collection of iterator over `impl AdtVariant` (see below).
                 self.variants.iter().map(Variant::as_decl),
             )
         }
@@ -58,8 +58,8 @@ fn run() {
         fields: Vec<Field>,
     }
     impl Variant {
-        // Variant declaration; again, `SortVariant` is implemented for certain types of pairs.
-        fn as_decl<'me>(&'me self) -> impl SortVariant + 'me {
+        // Variant declaration; again, `AdtVariant` is implemented for certain types of pairs.
+        fn as_decl<'me>(&'me self) -> impl AdtVariant + 'me {
             (
                 // Symbol.
                 self.sym,
@@ -89,8 +89,8 @@ fn run() {
         sort: Sort,
     }
     impl Field {
-        // As usual, `SortField` is implemented for certain pairs.
-        fn as_decl(&self) -> impl SortField {
+        // As usual, `AdtVariantField` is implemented for certain pairs.
+        fn as_decl(&self) -> impl AdtVariantField {
             (self.sym, self.sort)
         }
 
@@ -108,7 +108,7 @@ fn run() {
         }
     }
 
-    let tree = MySort::tree();
+    let tree = MyAdt::tree();
 
     // Now this `tree` uses an non-existing `(TreeList T)` sort to store its children, let's declare
     // it now.
@@ -130,12 +130,13 @@ fn run() {
             },
         ],
     };
-    let tree_list = MySort {
+    let tree_list = MyAdt {
         sym: "TreeList",
         args: vec!["T"],
         variants: vec![nil, cons],
     };
 
+    println!("declaring ADTs `Tree<T>` and `TreeList<T>`");
     solver
         // These sort are mutually recursive, `Solver::declare_datatypes` needs to declare them at the
         // same time.
@@ -144,15 +145,19 @@ fn run() {
 
     // That's it! Solver now knows these sorts and we can use them.
 
+    println!("declaring two `Tree<_>` values");
     solver.declare_const("t1", "(Tree Int)").unwrap();
     solver.declare_const("t2", "(Tree Bool)").unwrap();
 
+    println!("asserting some stuff");
     solver.assert("(> (value t1) 20)").unwrap();
     solver.assert("(not (is-leaf t2))").unwrap();
     solver.assert("(not (value t2))").unwrap();
 
+    println!("check-sat, should be sat");
     let sat = solver.check_sat().unwrap();
     assert!(sat);
+    println!("it is!");
 }
 
 fn main() {

@@ -702,14 +702,14 @@ impl<Parser> Solver<Parser> {
     /// # Examples
     ///
     /// ```rust
-    /// use rsmt2::print::{SortDecl, SortField, SortVariant};
+    /// use rsmt2::print::{AdtDecl, AdtVariantField, AdtVariant};
     ///
     /// // Alright, so we're going to declare two mutually recursive sorts. It is easier to pack the
     /// // sort-declaration data in custom types. If you want to declare a sort, you most likely
     /// // already have a representation for it, so working on custom types is reasonable.
     ///
-    /// // Notice that the `SortDecl`, `SortField` and `SortVariant` traits from `rsmt2::print::_` are in
-    /// // scope. This is what our custom types will need to generate to declare the sort.
+    /// // Notice that the `AdtDecl`, `AdtVariantField` and `AdtVariant` traits from `rsmt2::print::_`
+    /// // are in scope. This is what our custom types will need to generate to declare the sort.
     ///
     /// // We'll use static string slices for simplicity as `&str` implements all printing traits.
     /// type Sym = &'static str;
@@ -727,16 +727,16 @@ impl<Parser> Solver<Parser> {
     /// }
     /// impl MySort {
     ///     // This thing build the actual definition expected by rsmt2. Its output is something that
-    ///     // implements `SortDecl` and can only live as long as the input ref to `self`.
-    ///     fn as_decl<'me>(&'me self) -> impl SortDecl + 'me {
-    ///         // Check out rsmt2's documentation and you'll see that `SortDecl` is already implemented for
+    ///     // implements `AdtDecl` and can only live as long as the input ref to `self`.
+    ///     fn as_decl<'me>(&'me self) -> impl AdtDecl + 'me {
+    ///         // Check out rsmt2's documentation and you'll see that `AdtDecl` is already implemented for
     ///         // certain triplets.
     ///         (
     ///             // Symbol.
     ///             &self.sym,
     ///             // Sized collection of type-parameter symbols.
     ///             &self.args,
-    ///             // Variant, collection of iterator over `impl SortVariant` (see below).
+    ///             // Variant, collection of iterator over `impl AdtVariant` (see below).
     ///             self.variants.iter().map(Variant::as_decl),
     ///         )
     ///     }
@@ -757,8 +757,8 @@ impl<Parser> Solver<Parser> {
     ///     fields: Vec<Field>,
     /// }
     /// impl Variant {
-    ///     // Variant declaration; again, `SortVariant` is implemented for certain types of pairs.
-    ///     fn as_decl<'me>(&'me self) -> impl SortVariant + 'me {
+    ///     // Variant declaration; again, `AdtVariant` is implemented for certain types of pairs.
+    ///     fn as_decl<'me>(&'me self) -> impl AdtVariant + 'me {
     ///         (
     ///             // Symbol.
     ///             self.sym,
@@ -788,8 +788,8 @@ impl<Parser> Solver<Parser> {
     ///     sort: Sort,
     /// }
     /// impl Field {
-    ///     // As usual, `SortField` is implemented for certain pairs.
-    ///     fn as_decl(&self) -> impl SortField {
+    ///     // As usual, `AdtVariantField` is implemented for certain pairs.
+    ///     fn as_decl(&self) -> impl AdtVariantField {
     ///         (self.sym, self.sort)
     ///     }
     ///
@@ -858,7 +858,7 @@ impl<Parser> Solver<Parser> {
     pub fn declare_datatypes<Defs>(&mut self, defs: Defs) -> SmtRes<()>
     where
         Defs: IntoIterator + Clone,
-        Defs::Item: SortDecl,
+        Defs::Item: AdtDecl,
     {
         tee_write! {
           self, |w| write!(w, "(declare-datatypes (") ?

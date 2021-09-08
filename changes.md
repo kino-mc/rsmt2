@@ -16,6 +16,8 @@
         workflow should not break existing code.
     - **[breaking]** revamp of `declare_datatypes`, see documentation.
 
+        Relevant traits are `AdtDecl`, `AdtVariant` and `AdtVariantField`.
+
 ## Breaking Changes
 
 - Use of `declare_datatypes` has changed significantly, will most likely break everything. Refer to
