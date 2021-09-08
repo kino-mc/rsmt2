@@ -696,22 +696,157 @@ impl<Parser> Solver<Parser> {
 
     /// Declares mutually recursive datatypes.
     ///
-    /// A relatively recent version of z3 is recommended.
+    /// A relatively recent version of z3 is recommended. Sort definition is a relatively expert
+    /// action, this function is a bit complex. The example below goes over how it works.
     ///
     /// # Examples
     ///
     /// ```rust
-    /// # use rsmt2::Solver;
-    /// let mut solver = Solver::default_z3(()).unwrap();
-    /// solver.declare_datatypes( & [
-    ///     ( "Tree", 1, ["T"],
-    ///         [ "leaf", "(node (value T) (children (TreeList T)))" ] ),
-    ///     ( "TreeList", 1, ["T"],
-    ///         [ "nil", "(cons (car (Tree T)) (cdr (TreeList T)))" ]),
-    /// ] ).unwrap();
+    /// use rsmt2::print::{SortDecl, SortField, SortVariant};
     ///
-    /// solver.declare_const( "t1", "(Tree Int)" ).unwrap();
-    /// solver.declare_const( "t2", "(Tree Bool)" ).unwrap();
+    /// // Alright, so we're going to declare two mutually recursive sorts. It is easier to pack the
+    /// // sort-declaration data in custom types. If you want to declare a sort, you most likely
+    /// // already have a representation for it, so working on custom types is reasonable.
+    ///
+    /// // Notice that the `SortDecl`, `SortField` and `SortVariant` traits from `rsmt2::print::_` are in
+    /// // scope. This is what our custom types will need to generate to declare the sort.
+    ///
+    /// // We'll use static string slices for simplicity as `&str` implements all printing traits.
+    /// type Sym = &'static str;
+    /// type Sort = &'static str;
+    ///
+    /// // Let's start with the top-level sort type.
+    /// struct MySort {
+    ///     // Name of the sort, for instance `List`.
+    ///     sym: Sym,
+    ///     // Symbol(s) for the type parameter(s), for instance `T` for `List<T>`. Must be a collection
+    ///     // of known length, because rsmt2 needs to access the arity (number of type parameters).
+    ///     args: Vec<Sym>,
+    ///     // Body of the sort: its variants. For instance the `nil` and `cons` variants for `List<T>`.
+    ///     variants: Vec<Variant>,
+    /// }
+    /// impl MySort {
+    ///     // This thing build the actual definition expected by rsmt2. Its output is something that
+    ///     // implements `SortDecl` and can only live as long as the input ref to `self`.
+    ///     fn as_decl<'me>(&'me self) -> impl SortDecl + 'me {
+    ///         // Check out rsmt2's documentation and you'll see that `SortDecl` is already implemented for
+    ///         // certain triplets.
+    ///         (
+    ///             // Symbol.
+    ///             &self.sym,
+    ///             // Sized collection of type-parameter symbols.
+    ///             &self.args,
+    ///             // Variant, collection of iterator over `impl SortVariant` (see below).
+    ///             self.variants.iter().map(Variant::as_decl),
+    ///         )
+    ///     }
+    ///
+    ///     fn tree() -> Self {
+    ///         Self {
+    ///             sym: "Tree",
+    ///             args: vec!["T"],
+    ///             variants: vec![Variant::tree_leaf(), Variant::tree_node()],
+    ///         }
+    ///     }
+    /// }
+    ///
+    /// // Next up, variants. A variant is a symbol (*e.g.* `nil` or `cons` for `List<T>`) and some
+    /// // fields which describe the data stored in the variant.
+    /// struct Variant {
+    ///     sym: Sym,
+    ///     fields: Vec<Field>,
+    /// }
+    /// impl Variant {
+    ///     // Variant declaration; again, `SortVariant` is implemented for certain types of pairs.
+    ///     fn as_decl<'me>(&'me self) -> impl SortVariant + 'me {
+    ///         (
+    ///             // Symbol.
+    ///             self.sym,
+    ///             // Iterator over field declarations.
+    ///             self.fields.iter().map(Field::as_decl),
+    ///         )
+    ///     }
+    ///
+    ///     fn tree_leaf() -> Self {
+    ///         Self {
+    ///             sym: "leaf",
+    ///             fields: vec![],
+    ///         }
+    ///     }
+    ///     fn tree_node() -> Self {
+    ///         Self {
+    ///             sym: "node",
+    ///             fields: vec![Field::tree_node_value(), Field::tree_node_children()],
+    ///         }
+    ///     }
+    /// }
+    ///
+    /// // A symbol and a sort: describes a piece of data in a variant with a symbol to retrieve it,
+    /// // *i.e.* the name of the field.
+    /// struct Field {
+    ///     sym: Sym,
+    ///     sort: Sort,
+    /// }
+    /// impl Field {
+    ///     // As usual, `SortField` is implemented for certain pairs.
+    ///     fn as_decl(&self) -> impl SortField {
+    ///         (self.sym, self.sort)
+    ///     }
+    ///
+    ///     fn tree_node_value() -> Self {
+    ///         Self {
+    ///             sym: "value",
+    ///             sort: "T",
+    ///         }
+    ///     }
+    ///     fn tree_node_children() -> Self {
+    ///         Self {
+    ///             sym: "children",
+    ///             sort: "(TreeList T)",
+    ///         }
+    ///     }
+    /// }
+    ///
+    /// let tree = MySort::tree();
+    ///
+    /// // Now this `tree` uses an non-existing `(TreeList T)` sort to store its children, let's declare
+    /// // it now.
+    ///
+    /// let nil = Variant {
+    ///     sym: "nil",
+    ///     fields: vec![],
+    /// };
+    /// let cons = Variant {
+    ///     sym: "cons",
+    ///     fields: vec![
+    ///         Field {
+    ///             sym: "car",
+    ///             sort: "(Tree T)",
+    ///         },
+    ///         Field {
+    ///             sym: "cdr",
+    ///             sort: "(TreeList T)",
+    ///         },
+    ///     ],
+    /// };
+    /// let tree_list = MySort {
+    ///     sym: "TreeList",
+    ///     args: vec!["T"],
+    ///     variants: vec![nil, cons],
+    /// };
+    ///
+    /// let mut solver = rsmt2::Solver::default_z3(()).unwrap();
+    ///
+    /// solver
+    ///     // These sort are mutually recursive, `Solver::declare_datatypes` needs to declare them at the
+    ///     // same time.
+    ///     .declare_datatypes(&[tree.as_decl(), tree_list.as_decl()])
+    ///     .unwrap();
+    ///
+    /// // That's it! Solver now knows these sorts and we can use them.
+    ///
+    /// solver.declare_const("t1", "(Tree Int)").unwrap();
+    /// solver.declare_const("t2", "(Tree Bool)").unwrap();
     ///
     /// solver.assert("(> (value t1) 20)").unwrap();
     /// solver.assert("(not (is-leaf t2))").unwrap();
@@ -720,32 +855,22 @@ impl<Parser> Solver<Parser> {
     /// let sat = solver.check_sat().unwrap();
     /// assert!(sat);
     /// ```
-    pub fn declare_datatypes<'a, Sort, ArgSort, Args, Def, DefList, All>(
-        &mut self,
-        defs: All,
-    ) -> SmtRes<()>
+    pub fn declare_datatypes<Defs>(&mut self, defs: Defs) -> SmtRes<()>
     where
-        Sort: Sort2Smt + 'a,
-
-        ArgSort: Sort2Smt + 'a,
-        &'a Args: IntoIterator<Item = &'a ArgSort> + 'a,
-
-        Def: Sort2Smt + 'a,
-        &'a DefList: IntoIterator<Item = &'a Def> + 'a,
-        All: IntoIterator<Item = &'a (Sort, usize, Args, DefList)> + 'a,
-        All::IntoIter: Clone,
+        Defs: IntoIterator + Clone,
+        Defs::Item: SortDecl,
     {
         tee_write! {
           self, |w| write!(w, "(declare-datatypes (") ?
         }
 
-        let def_iter = defs.into_iter();
-
-        for &(ref sort, arity, _, _) in def_iter.clone() {
+        for def in defs.clone() {
+            let sort_sym = def.sort_sym();
+            let arity = def.arity();
             tee_write! {
               self, |w| {
                 write!(w, " (")?;
-                sort.sort_to_smt2(w)?;
+                sort_sym.sym_to_smt2(w, ())?;
                 write!(w, " {})", arity) ?
               }
             }
@@ -755,28 +880,51 @@ impl<Parser> Solver<Parser> {
           self, |w| write!(w, " ) (") ?
         }
 
-        for &(_, arity, ref params, ref defs) in def_iter {
-            tee_write! {
-              self, |w| {
-                write!(w, " (")?;
-
-                if arity > 0 {
-                  write!(w, "par (")?;
-                  for param in params {
-                    write!(w, " ")?;
-                    param.sort_to_smt2(w)?;
-                  }
-                  write!(w, " ) (") ?
+        for def in defs {
+            let arity = def.arity();
+            let args = def.args();
+            let variants = def.variants();
+            tee_write! { self, |w| write!(w, " (")? };
+            if arity > 0 {
+                tee_write! { self, |w| write!(w, "par (")? };
+                for param in args {
+                    tee_write! { self, |w| {
+                        write!(w, " ")?;
+                        param.sym_to_smt2(w, ())?;
+                    }}
                 }
-              }
+                tee_write! { self, |w| write!(w, " ) (")? };
             }
 
-            for def in defs {
-                tee_write! {
-                  self, |w| {
-                    write!(w, " ")?;
-                    def.sort_to_smt2(w) ?
-                  }
+            for variant in variants {
+                let sym = variant.sym();
+                let mut fields = variant.fields();
+                let first_field = fields.next();
+
+                tee_write! { self, |w| write!(w, " ")? };
+
+                if first_field.is_some() {
+                    tee_write! { self, |w| write!(w, "(")? };
+                }
+
+                tee_write! { self, |w| sym.sym_to_smt2(w, ())? };
+
+                if let Some(first) = first_field {
+                    for field in Some(first).into_iter().chain(fields) {
+                        let sym = field.sym();
+                        let sort = field.sort();
+                        tee_write! {
+                            self, |w| {
+                                write!(w, " (")?;
+                                sym.sym_to_smt2(w, ())?;
+                                write!(w, " ")?;
+                                sort.sort_to_smt2(w)?;
+                                write!(w, ")")?;
+                            }
+                        }
+                    }
+
+                    tee_write! { self, |w| write!(w, ")")? };
                 }
             }
 
