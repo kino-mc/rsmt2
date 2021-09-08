@@ -8,7 +8,18 @@
     - take ownership over expressions, symbols and sorts (previously took references)
 
         still accepts refs since `T: Sym2Smt<Info>` ⇒ `&T: Sym2Smt<Info>`, same for `Expr2Smt` and
-        `Sort2Smt`
+        `Sort2Smt`.
+    - `Solver` functions taking collections (iterators) now abstract over what they expect the items
+        to be. Previously, they had to be (constrained) pairs or triplets. They now expect some type
+        implementing the relevant trait for the information they expect (`SymAndSort` for instance).
+        These traits are implemented for the pairs/triplets from previous versions: this new
+        workflow should not break existing code.
+    - **[breaking]** revamp of `declare_datatypes`, see documentation.
+
+## Breaking Changes
+
+- Use of `declare_datatypes` has changed significantly, will most likely break everything. Refer to
+    the documentation for details, sorry.
 
 # v0.13.0
 
