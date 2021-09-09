@@ -1,7 +1,6 @@
 //! This modules handles asynchronous interactions with the solver.
 //!
-//! The related function is
-//! [`Solver::async_check_sat_or_unk`](crate::Solver::async_check_sat_or_unk).
+//! The related function is [`Solver::async_check_sat_or_unk`].
 //!
 //! Presently, only asynchronous check-sat-s are supported. The idea is to wrap the whole solver in
 //! a new thread, and yield a future of the check-sat result. The new thread starts parsing the
@@ -20,8 +19,8 @@
 //! > solver with the right options to add a timeout. For Z3, `-t:500` for a (soft, per query)
 //! > timeout, which makes it report `unknown`. This is what the examples below do.
 //! >
-//! > This is why [`Solver::async_check_sat_or_unk`](crate::Solver::async_check_sat_or_unk) is
-//! > marked `unsafe`: if not careful, one can end up with a background process burning 100% CPU.
+//! > This is why [`Solver::async_check_sat_or_unk`] is marked `unsafe`: if not careful, one can end
+//! > up with a background process burning 100% CPU.
 //!
 //! # Examples
 //!
@@ -54,20 +53,20 @@
 //!
 //!         // Non-blocking.
 //!         let maybe_result = future.try_get();
-//!         assert! { maybe_result.is_none() }
+//!         assert!(maybe_result.is_none());
 //!
 //!         // Blocking with timeout.
 //!         let maybe_result = future.timeout_get(std::time::Duration::new(0, 50));
-//!         assert! { maybe_result.is_none() }
+//!         assert!(maybe_result.is_none());
 //!
 //!         // Blocking.
 //!         let result = future.get();
-//!         assert! { result.expect("reached timeout").is_none() }
+//!         assert!(result.expect("reached timeout").is_none());
 //!     }
 //!
 //!     // We can re-use the solver now.
 //!     let result = solver.check_sat_or_unk();
-//!     assert! { result.expect("reached timeout").is_none() }
+//!     assert!(result.expect("reached timeout").is_none());
 //!
 //!     Ok(())
 //! }

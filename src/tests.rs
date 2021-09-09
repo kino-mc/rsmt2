@@ -142,9 +142,7 @@ pub mod z3 {
                  ",
             )
             .unwrap();
-        assert! {
-            ! solver.check_sat_assuming( Some("actlit") ).unwrap()
-        }
+        assert!(!solver.check_sat_assuming(Some("actlit")).unwrap());
         solver.assert("(not actlit)").unwrap();
 
         solver.declare_const("other_actlit", "Bool").unwrap();
@@ -157,9 +155,7 @@ pub mod z3 {
                  ",
             )
             .unwrap();
-        assert! {
-            solver.check_sat_assuming( Some("other_actlit") ).unwrap()
-        }
+        assert!(solver.check_sat_assuming(Some("other_actlit")).unwrap());
         solver.assert("(not other_actlit)").unwrap();
 
         solver.kill().unwrap()
@@ -179,9 +175,7 @@ pub mod z3 {
         solver.assert_act(&actlit, "(< x 3)").unwrap();
         solver.assert_act(&actlit, "(= (mod x 3) 0)").unwrap();
 
-        assert! {
-            ! solver.check_sat_act( Some(& actlit) ).unwrap()
-        }
+        assert!(!solver.check_sat_act(Some(&actlit)).unwrap());
         solver.de_actlit(actlit).unwrap();
         // At this point `actlit` has been consumed. So it's a bit safer than the
         // version above, since use-after-deactivate is not possible.
@@ -189,9 +183,7 @@ pub mod z3 {
         let actlit = solver.get_actlit().unwrap();
         solver.assert_act(&actlit, "(> x 7)").unwrap();
         solver.assert_act(&actlit, "(= (mod x 2) 0)").unwrap();
-        assert! {
-            solver.check_sat_act( Some(& actlit) ).unwrap()
-        }
+        assert!(solver.check_sat_act(Some(&actlit)).unwrap());
         solver.de_actlit(actlit).unwrap();
 
         solver.kill().unwrap()
@@ -267,18 +259,13 @@ pub mod yices_2 {
         let actlit = solver.get_actlit().expect("get actlit");
         let mut buf: Vec<u8> = vec![];
         actlit.write(&mut buf).unwrap();
-        assert_eq! {
-            "|rsmt2 actlit 0|",
-            ::std::str::from_utf8(& buf).unwrap()
-        }
+        assert_eq!("|rsmt2 actlit 0|", ::std::str::from_utf8(&buf).unwrap());
 
         solver.assert_act(&actlit, "(> x 7)").expect("assert act 1");
         solver
             .assert_act(&actlit, "(= (* x 2) 24)")
             .expect("assert act 2");
-        assert! {
-            solver.check_sat_act( Some(& actlit) ).expect("check sat act")
-        }
+        assert!(solver.check_sat_act(Some(&actlit)).expect("check sat act"));
 
         let model = solver.get_values(&["x"]).expect("get value");
 

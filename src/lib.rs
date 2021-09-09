@@ -13,16 +13,15 @@
 //!
 //! In rsmt2, solvers run in a separate process and communication is achieved *via* system pipes.
 //! This means that to use a solver, it needs to be available as a binary in your path. For the
-//! moment, only [z3][z3] is officially supported, although there is experimental support for
-//! [cvc4][cvc4] and [yices 2][yices 2].
+//! moment, only [z3] is officially supported, although there is experimental support for [cvc4] and
+//! [yices 2].
 //!
 //! **NB**: most of the tests and documentation examples in this crate will not work unless you have
-//! [z3][z3] in your path under the name `z3`.
+//! [z3] in your path under the name `z3`.
 //!
 //! This library does **not** have a structure for S-expressions. It must be provided by the user,
 //! as well as the relevant printing and parsing functions. Printing-related traits are discussed in
-//! the [`print`](self::print) module, and parsing-related traits are in the [`parse`](self::parse)
-//! module.
+//! the [`mod@print`] module, and parsing-related traits are in the [`mod@parse`] module.
 //!
 //!
 //! # Note on Backend Solvers
@@ -30,8 +29,8 @@
 //! This crate supports the following solvers:
 //!
 //! - [z3]: full support
-//! - [cvc4]: full support in theory, but only partially tested. Note that `get-value` is
-//!   known to crash some versions of CVC4.
+//! - [cvc4]: full support in theory, but only partially tested. Note that `get-value` is known to
+//!   crash some versions of CVC4.
 //! - [yices 2]: full support in theory, but only partially tested. Command `get-model` will only
 //!   work on Yices 2 > `2.6.1`, and needs to be activated with [`SmtConf::models`]. To understand
 //!   why, see <https://github.com/SRI-CSL/yices2/issues/162>.
@@ -90,7 +89,7 @@
 //! solver.assert("(= (+ (* n n) (* m m)) 7)")?;
 //!
 //! let is_sat = solver.check_sat()?;
-//! assert! { ! is_sat }
+//! assert!(! is_sat);
 //! # Ok(())
 //! # }
 //! # do_smt_stuff().unwrap()
@@ -157,16 +156,16 @@
 //! solver.assert("(and (< n 5) (> n 0) (> m 0))")?;
 //!
 //! let is_sat = solver.check_sat()?;
-//! assert! { is_sat }
+//! assert!(is_sat);
 //! let mut model = solver.get_model()?;
 //! model.sort(); // Order might vary, sorting for assert below.
-//! assert_eq! {
+//! assert_eq!(
 //!     model,
 //!     vec![
 //!         ("m".into(), vec![], "Int".into(), "5".into()),
 //!         ("n".into(), vec![], "Int".into(), "2".into()),
 //!     ]
-//! }
+//! );
 //! # Ok(())
 //! # }
 //! # do_smt_stuff().unwrap()
@@ -223,7 +222,7 @@
 //! let my_check_sat = solver.print_check_sat()?;
 //! // Solver is working, we can do other things.
 //! let is_sat = solver.parse_check_sat(my_check_sat)?;
-//! assert! { is_sat }
+//! assert!(is_sat);
 //! # Ok(())
 //! # }
 //! # do_smt_stuff().unwrap()
@@ -349,7 +348,9 @@ extern crate error_chain;
 
 /// Common rsmt2 type and helpers.
 pub mod prelude {
-    pub use super::{errors::SmtRes, parse::*, print::*, SmtConf, Solver};
+    pub use crate::{
+        actlit, common::NamedExpr, errors::SmtRes, parse::*, print::*, SmtConf, Solver,
+    };
 }
 
 /// Errors.
@@ -452,7 +453,7 @@ pub mod conf;
 pub mod parse;
 mod solver;
 
-pub use crate::common::Logic;
+pub use crate::common::{Logic, NamedExpr};
 pub use crate::conf::{SmtConf, SmtStyle};
 pub use crate::errors::SmtRes;
 pub use crate::solver::Solver;
@@ -471,7 +472,9 @@ pub mod examples {}
 
 /// Traits your types must implement so that rsmt2 can use them.
 pub mod print {
-    pub use crate::common::{Expr2Smt, Sort2Smt, Sym2Smt};
+    pub use crate::common::{
+        AdtDecl, AdtVariant, AdtVariantField, Expr2Smt, Sort2Smt, Sym2Smt, SymAndSort,
+    };
 }
 
 #[cfg(test)]

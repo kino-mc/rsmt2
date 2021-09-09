@@ -1,3 +1,48 @@
+# v0.13.1
+
+- added *named assert* function on `Solver`s
+    - `Solver::named_assert_act_with`: named + actlit + print info
+    - `Solver::named_assert_with`: named + print info
+    - `Solver::named_assert`: named
+- simplified most `Solver` function signatures
+    - take ownership over expressions, symbols and sorts (previously took references)
+
+        still accepts refs since `T: Sym2Smt<Info>` ⇒ `&T: Sym2Smt<Info>`, same for `Expr2Smt` and
+        `Sort2Smt`.
+    - `Solver` functions taking collections (iterators) now abstract over what they expect the items
+        to be. Previously, they had to be (constrained) pairs or triplets. They now expect some type
+        implementing the relevant trait for the information they expect (`SymAndSort` for instance).
+        These traits are implemented for the pairs/triplets from previous versions: this new
+        workflow should not break existing code.
+    - **[breaking]** revamp of `declare_datatypes`, see documentation.
+
+        Relevant traits are `AdtDecl`, `AdtVariant` and `AdtVariantField`.
+
+## Breaking Changes
+
+- Use of `declare_datatypes` has changed significantly, will most likely break everything. Refer to
+    the documentation for details, sorry.
+
+# v0.13.0
+
+- named expression
+    - added `NamedExpr<Sym, Expr>` which wraps an expression and a symbol and encodes a named expression
+    - added `into_named` and `as_named` methods on `Expr2Smt` trait for easy expression naming
+    - added `into_name_for` and `as_name_for` methods on `Sym2Smt`
+- unsat cores now working (best used with `NamedExpr` to name expressions)
+    - relies on the `ParseSym` trait to parse symbols from the core
+- interpolants (`get-interpolant`) now supported
+    - only Z3 supports this
+    - `SmtConf` produces an error if interpolant production is activated on a non-Z3 solver
+    - uses `Sym2Smt`
+    - best used with `NamedExpr` to name expressions
+- `assert`-like functions on `Solver` no longer require the expression to be a reference
+    - goes with `Expr2Smt<Info>` being auto-impl-ed for all `T: Expr2Smt<Info>`
+- `Actlit` now implies `Sym2Smt`
+- added `actlit::CondExpr`, which wraps an `Actlit` and a user expression; allows to use `Actlit`s
+  in normal `check-sat` commands
+- `SmtConf` now has `set_...` functions for model/unsat core/... production
+
 # v0.12.0
 
 - adapted parser for Z3's new `get-model` output, which does not use the `model` keyword

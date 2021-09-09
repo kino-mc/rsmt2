@@ -3,26 +3,26 @@
 //! For an explanation of what activation literal are, see [the discussion below][why actlits].
 //!
 //! **NB**: while `rmst2`'s actlit API declares some constant symbols in the underlying solver,
-//! these will not appear in the result of [`get_model`](super::Solver::get_model) queries.
+//! these will not appear in the result of [`Solver::get_model`] queries.
 //!
 //!
-//! # Relevant functions on [`Solver`](super::Solver)s
+//! # Relevant functions on [`Solver`]s
 //!
-//! - [`Solver::get_actlit`](super::Solver::get_actlit)
-//! - [`Solver::de_actlit`](super::Solver::de_actlit)
-//! - [`Solver::set_actlit`](super::Solver::set_actlit)
-//! - [`Solver::assert_act`](super::Solver::assert_act)
-//! - [`Solver::assert_act_with`](super::Solver::assert_act_with)
-//! - [`Solver::print_check_sat_act`](super::Solver::print_check_sat_act)
-//! - [`Solver::check_sat_act`](super::Solver::check_sat_act)
-//! - [`Solver::check_sat_act_or_unk`](super::Solver::check_sat_act_or_unk)
+//! - [`Solver::get_actlit`]
+//! - [`Solver::de_actlit`]
+//! - [`Solver::set_actlit`]
+//! - [`Solver::assert_act`]
+//! - [`Solver::assert_act_with`]
+//! - [`Solver::print_check_sat_act`]
+//! - [`Solver::check_sat_act`]
+//! - [`Solver::check_sat_act_or_unk`]
 //!
 //!
 //!
 //! # Usage
 //!
 //! First, one can of course create activation literals by hand, and use them in `check-sat`s with
-//! [`check_sat_assuming`](super::Solver::check_sat_assuming):
+//! [`Solver::check_sat_assuming`]:
 //!
 //! ```
 //! use rsmt2::*;
@@ -222,16 +222,139 @@
 //! (get-value (x))
 //! ```
 //!
-//! This is much more efficient than `push`/`pop`: the conditional `check-sat`s basically force the
-//! activation literals directly in the SAT part of the SMT solver. Long story short, this means
-//! everything the solver learns during the checks is still valid afterwards. Conversely, after a
-//! `pop` solvers are usually unable to decide what to keep from the checks before the `pop`, and
-//! thus drop everything.
+//! This is much more efficient than [`push`][Solver::push]/[`pop`][Solver::pop]: the conditional
+//! `check-sat`s basically force the activation literals directly in the SAT part of the SMT solver.
+//! Long story short, this means everything the solver learns during the checks is still valid
+//! afterwards. Conversely, after a `pop` solvers are usually unable to decide what to keep from the
+//! checks before the `pop`, and thus drop everything.
 //!
-//! Actlits are **not** equivalent to `push`/`pop` however. Pushing a scope allows to declare/define
-//! function symbols and then discard them, while keeping whatever's outside of the scope. Actlits
-//! (mostly) just guard assertions and cannot accomplish this.
+//! Actlits are **not** equivalent to [`push`][Solver::push]/[`pop`][Solver::pop] however. Pushing a
+//! scope allows to declare/define function symbols and then discard them, while keeping whatever's
+//! outside of the scope. Actlits (mostly) just guard assertions and cannot accomplish this.
 //!
 //! [why actlits]: #discussion-on-activation-literals (Activation literals, why?)
 
-pub use crate::solver::Actlit;
+#[allow(unused_imports)]
+// Only used by doc links.
+use crate::prelude::*;
+
+/// Prefix of an actlit identifier.
+pub(crate) static ACTLIT_PREF: &str = "|rsmt2 actlit ";
+
+/// Suffix of an actlit identifier.
+pub(crate) static ACTLIT_SUFF: &str = "|";
+
+/// An activation literal is an opaque wrapper around a `usize`.
+///
+/// Obtained by a call to [`Solver::get_actlit`].
+#[derive(Debug)]
+pub struct Actlit {
+    /// ID of the actlit.
+    pub(crate) id: usize,
+}
+impl AsRef<Actlit> for Actlit {
+    fn as_ref(&self) -> &Self {
+        self
+    }
+}
+impl Actlit {
+    /// Constructor.
+    pub(crate) fn new(id: usize) -> Self {
+        Self { id }
+    }
+    /// Unique number of this actlit.
+    pub fn uid(&self) -> usize {
+        self.id
+    }
+    /// Writes the actlit as an SMT-LIB 2 symbol.
+    pub fn write<W>(&self, w: &mut W) -> SmtRes<()>
+    where
+        W: std::io::Write,
+    {
+        write!(w, "{}{}{}", ACTLIT_PREF, self.id, ACTLIT_SUFF)?;
+        Ok(())
+    }
+    /// Builds an implication between an actlit and an expression.
+    ///
+    /// Allows to use normal `assert` function over [`Solver`].
+    ///
+    /// ```rust
+    /// # use rsmt2::Solver;
+    /// let mut solver = Solver::default_z3(()).expect("failed to spawn solver");
+    /// let actlit = solver.get_actlit().expect("failed to declare actlit");
+    /// let conditional = actlit.implies("(> 0 1)");
+    /// solver.assert(&conditional).expect("failed to assert conditional expr");
+    /// let is_sat = solver.check_sat_assuming(Some(&actlit)).expect("failed to perform check-sat");
+    /// assert!(!is_sat);
+    /// ```
+    pub fn implies<Expr>(&self, expr: Expr) -> CondExpr<Expr> {
+        CondExpr {
+            actlit: Self { id: self.id },
+            expr,
+        }
+    }
+}
+impl Expr2Smt<()> for Actlit {
+    fn expr_to_smt2<Writer>(&self, w: &mut Writer, _: ()) -> SmtRes<()>
+    where
+        Writer: ::std::io::Write,
+    {
+        self.write(w)
+    }
+}
+impl Sym2Smt<()> for Actlit {
+    fn sym_to_smt2<Writer>(&self, w: &mut Writer, _: ()) -> SmtRes<()>
+    where
+        Writer: std::io::Write,
+    {
+        self.write(w)
+    }
+}
+impl ::std::ops::Deref for Actlit {
+    type Target = usize;
+    fn deref(&self) -> &usize {
+        &self.id
+    }
+}
+
+/// An implication between an [Actlit] and some expression.
+pub struct CondExpr<Expr> {
+    /// The actlit.
+    actlit: Actlit,
+    /// The expression.
+    expr: Expr,
+}
+impl<Expr> CondExpr<Expr> {
+    /// Constructor.
+    pub fn new(actlit: Actlit, expr: Expr) -> Self {
+        Self { actlit, expr }
+    }
+    /// Destructor.
+    pub fn destroy(self) -> (Actlit, Expr) {
+        (self.actlit, self.expr)
+    }
+    /// Actlit accessor.
+    pub fn actlit(&self) -> &Actlit {
+        &self.actlit
+    }
+    /// Expression accessor.
+    pub fn expr(&self) -> &Expr {
+        &self.expr
+    }
+}
+impl<Expr, Info> crate::print::Expr2Smt<Info> for CondExpr<Expr>
+where
+    Expr: crate::print::Expr2Smt<Info>,
+{
+    fn expr_to_smt2<Writer>(&self, w: &mut Writer, i: Info) -> SmtRes<()>
+    where
+        Writer: std::io::Write,
+    {
+        write!(w, "(=> ")?;
+        self.actlit.write(w)?;
+        write!(w, " ")?;
+        self.expr.expr_to_smt2(w, i)?;
+        write!(w, ")")?;
+        Ok(())
+    }
+}

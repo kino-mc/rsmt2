@@ -7,53 +7,11 @@ use std::io::{BufReader, BufWriter, Read, Write};
 use std::process::{Child, ChildStdin, ChildStdout, Command, Stdio};
 
 use crate::{
+    actlit::Actlit,
     common::*,
     conf::SmtConf,
-    parse::{ExprParser, IdentParser, ModelParser, RSmtParser, ValueParser},
+    parse::{ExprParser, IdentParser, ModelParser, RSmtParser, SymParser, ValueParser},
 };
-
-/// Prefix of an actlit identifier.
-pub static ACTLIT_PREF: &str = "|rsmt2 actlit ";
-
-/// Suffix of an actlit identifier.
-pub static ACTLIT_SUFF: &str = "|";
-
-/// An activation literal is an opaque wrapper around a `usize`.
-///
-/// Obtained by a call to [`Solver::get_actlit`].
-#[derive(Debug)]
-pub struct Actlit {
-    /// ID of the actlit.
-    id: usize,
-}
-impl Actlit {
-    /// Unique number of this actlit.
-    pub fn uid(&self) -> usize {
-        self.id
-    }
-    /// Writes the actlit as an SMT-LIB 2 symbol.
-    pub fn write<W>(&self, w: &mut W) -> SmtRes<()>
-    where
-        W: Write,
-    {
-        write!(w, "{}{}{}", ACTLIT_PREF, self.id, ACTLIT_SUFF)?;
-        Ok(())
-    }
-}
-impl Expr2Smt<()> for Actlit {
-    fn expr_to_smt2<Writer>(&self, w: &mut Writer, _: ()) -> SmtRes<()>
-    where
-        Writer: ::std::io::Write,
-    {
-        self.write(w)
-    }
-}
-impl ::std::ops::Deref for Actlit {
-    type Target = usize;
-    fn deref(&self) -> &usize {
-        &self.id
-    }
-}
 
 /// Promise for an asynchronous check-sat.
 pub struct FutureCheckSat {
@@ -65,7 +23,7 @@ fn future_check_sat() -> FutureCheckSat {
 
 /// Solver providing most of the SMT-LIB 2.5 commands.
 ///
-/// Note the [`tee` function](Self::tee), which takes a file writer to which it will write
+/// Note the [`Self::tee`] function, which takes a file writer to which it will write
 /// everything sent to the solver.
 pub struct Solver<Parser> {
     /// Solver configuration.
@@ -181,7 +139,7 @@ impl<Parser> Solver<Parser> {
         let tee = None;
         let actlit = 0;
 
-        Ok(Solver {
+        let mut slf = Solver {
             kid,
             stdin,
             tee,
@@ -189,7 +147,16 @@ impl<Parser> Solver<Parser> {
             smt_parser,
             parser,
             actlit,
-        })
+        };
+
+        if slf.conf.get_models() {
+            slf.produce_models()?;
+        }
+        if slf.conf.get_unsat_cores() {
+            slf.produce_unsat_cores()?;
+        }
+
+        Ok(slf)
     }
 
     /// Creates a solver kid with the default z3 configuration.
@@ -219,7 +186,7 @@ impl<Parser> Solver<Parser> {
     ///
     /// The command used to run a particular solver is up to the end-user. As such, it **does not
     /// make sense** to use default commands for anything else than local testing. You should
-    /// explicitely pass the command to use with [`Self::z3`](Self::z3) instead.
+    /// explicitely pass the command to use with [`Self::z3`] instead.
     pub fn default_z3(parser: Parser) -> SmtRes<Self> {
         Self::new(SmtConf::default_z3(), parser)
     }
@@ -233,7 +200,7 @@ impl<Parser> Solver<Parser> {
     ///
     /// The command used to run a particular solver is up to the end-user. As such, it **does not
     /// make sense** to use default commands for anything else than local testing. You should
-    /// explicitely pass the command to use with [`Self::cvc4`](Self::cvc4) instead.
+    /// explicitely pass the command to use with [`Self::cvc4`] instead.
     pub fn default_cvc4(parser: Parser) -> SmtRes<Self> {
         Self::new(SmtConf::default_cvc4(), parser)
     }
@@ -247,7 +214,7 @@ impl<Parser> Solver<Parser> {
     ///
     /// The command used to run a particular solver is up to the end-user. As such, it **does not
     /// make sense** to use default commands for anything else than local testing. You should
-    /// explicitely pass the command to use with [`Self::yices_2`](Self::yices_2) instead.
+    /// explicitely pass the command to use with [`Self::yices_2`] instead.
     pub fn default_yices_2(parser: Parser) -> SmtRes<Self> {
         Self::new(SmtConf::default_yices_2(), parser)
     }
@@ -260,7 +227,7 @@ impl<Parser> Solver<Parser> {
     /// Forces the solver to write all communications to a file.
     ///
     /// - fails if the solver is already tee-ed;
-    /// - see also [`path_tee`](Self::path_tee).
+    /// - see also [`Self::path_tee`].
     pub fn tee(&mut self, file: File) -> SmtRes<()> {
         if self.tee.is_some() {
             bail!("Trying to tee a solver that's already tee-ed")
@@ -279,7 +246,7 @@ impl<Parser> Solver<Parser> {
     ///
     /// - opens `file` with `create` and `write`;
     /// - fails if the solver is already tee-ed;
-    /// - see also [`tee`](Self::tee).
+    /// - see also [`Self::tee`].
     pub fn path_tee<P>(&mut self, path: P) -> SmtRes<()>
     where
         P: AsRef<::std::path::Path>,
@@ -372,16 +339,13 @@ impl<Parser> Solver<Parser> {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```rust
     /// # use rsmt2::Solver;
     /// let mut solver = Solver::default_z3(()).unwrap();
     /// solver.assert("(= 0 1)").unwrap();
     /// ```
     #[inline]
-    pub fn assert<Expr>(&mut self, expr: &Expr) -> SmtRes<()>
-    where
-        Expr: ?Sized + Expr2Smt<()>,
-    {
+    pub fn assert(&mut self, expr: impl Expr2Smt) -> SmtRes<()> {
         self.assert_with(expr, ())
     }
 
@@ -389,16 +353,18 @@ impl<Parser> Solver<Parser> {
     ///
     /// # See also
     ///
-    /// - [`print_check_sat`](Self::print_check_sat)
-    /// - [`parse_check_sat`](Self::parse_check_sat)
+    /// - [`Self::print_check_sat`]
+    /// - [`Self::parse_check_sat`]
     ///
     /// If you want a more natural way to handle unknown results, see `parse_check_sat_or_unk`.
     ///
     /// # Examples
     ///
-    /// ```
-    /// # use rsmt2::Solver;
-    /// # let mut solver = Solver::default_z3(()).unwrap();
+    /// ```rust
+    /// # use rsmt2::prelude::*;
+    /// let mut conf = SmtConf::default_z3();
+    /// conf.option("-t:10");
+    /// let mut solver = Solver::new(conf, ()).unwrap();
     /// solver.declare_const("x", "Int").unwrap();
     /// solver.declare_const("y", "Int").unwrap();
     ///
@@ -428,13 +394,16 @@ impl<Parser> Solver<Parser> {
     ///
     /// # See also
     ///
-    /// - [`parse_check_sat_or_unk`][Self::parse_check_sat_or_unk]
+    /// - [`Self::parse_check_sat_or_unk`]
     ///
     /// # Examples
     ///
-    /// ```
-    /// # use rsmt2::Solver;
-    /// # let mut solver = Solver::default_z3(()).unwrap();
+    /// ```rust
+    /// # use rsmt2::prelude::*;
+    /// let mut conf = SmtConf::default_z3();
+    /// conf.option("-t:10");
+    /// # let mut solver = Solver::new(conf, ()).unwrap();
+    /// solver.path_tee("./log.smt2").unwrap();
     /// solver.declare_const("x", "Int").unwrap();
     /// solver.declare_const("y", "Int").unwrap();
     ///
@@ -458,13 +427,13 @@ impl<Parser> Solver<Parser> {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```rust
     /// # use rsmt2::Solver;
     /// let mut solver = Solver::default_z3(()).unwrap();
     /// solver.assert("(= 0 1)").unwrap();
-    /// assert! { ! solver.check_sat().unwrap() }
+    /// assert!(! solver.check_sat().unwrap());
     /// solver.reset().unwrap();
-    /// assert! { solver.check_sat().unwrap() }
+    /// assert!(solver.check_sat().unwrap());
     /// ```
     #[inline]
     pub fn reset(&mut self) -> SmtRes<()> {
@@ -479,23 +448,19 @@ impl<Parser> Solver<Parser> {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```rust
     /// # use rsmt2::Solver;
     /// let mut solver = Solver::default_z3(()).unwrap();
     /// solver.declare_const("x", "Int").unwrap()
     /// ```
     #[inline]
-    pub fn declare_const<Sym, Sort>(&mut self, symbol: &Sym, out_sort: &Sort) -> SmtRes<()>
-    where
-        Sym: ?Sized + Sym2Smt<()>,
-        Sort: ?Sized + Sort2Smt,
-    {
+    pub fn declare_const(&mut self, symbol: impl Sym2Smt, out_sort: impl Sort2Smt) -> SmtRes<()> {
         self.declare_const_with(symbol, out_sort, ())
     }
 
     /// Declares a new function symbol.
     ///
-    /// ```
+    /// ```rust
     /// # use rsmt2::Solver;
     /// let mut solver = Solver::default_z3(()).unwrap();
     /// solver.declare_fun(
@@ -503,17 +468,17 @@ impl<Parser> Solver<Parser> {
     /// ).unwrap()
     /// ```
     #[inline]
-    pub fn declare_fun<'a, FunSym, ArgSort, Args, OutSort>(
+    pub fn declare_fun<FunSym, Args, OutSort>(
         &mut self,
-        symbol: &FunSym,
+        symbol: FunSym,
         args: Args,
-        out: &OutSort,
+        out: OutSort,
     ) -> SmtRes<()>
     where
-        FunSym: ?Sized + Sym2Smt<()>,
-        ArgSort: ?Sized + Sort2Smt + 'a,
-        OutSort: ?Sized + Sort2Smt,
-        Args: IntoIterator<Item = &'a ArgSort>,
+        FunSym: Sym2Smt<()>,
+        OutSort: Sort2Smt,
+        Args: IntoIterator,
+        Args::Item: Sort2Smt,
     {
         self.declare_fun_with(symbol, args, out, ())
     }
@@ -522,7 +487,7 @@ impl<Parser> Solver<Parser> {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```rust
     /// # use rsmt2::Solver;
     /// let mut solver = Solver::default_z3(()).unwrap();
     /// solver.define_const(
@@ -530,17 +495,12 @@ impl<Parser> Solver<Parser> {
     /// ).unwrap()
     /// ```
     #[inline]
-    pub fn define_const<FunSym, OutSort, Body>(
+    pub fn define_const(
         &mut self,
-        symbol: &FunSym,
-        out: &OutSort,
-        body: &Body,
-    ) -> SmtRes<()>
-    where
-        OutSort: ?Sized + Sort2Smt,
-        FunSym: ?Sized + Sym2Smt<()>,
-        Body: ?Sized + Expr2Smt<()>,
-    {
+        symbol: impl Sym2Smt,
+        out: impl Sort2Smt,
+        body: impl Expr2Smt,
+    ) -> SmtRes<()> {
         self.define_const_with(symbol, out, body, ())
     }
 
@@ -548,7 +508,7 @@ impl<Parser> Solver<Parser> {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```rust
     /// # use rsmt2::Solver;
     /// let mut solver = Solver::default_z3(()).unwrap();
     /// solver.define_fun(
@@ -556,31 +516,30 @@ impl<Parser> Solver<Parser> {
     /// ).unwrap()
     /// ```
     #[inline]
-    pub fn define_fun<'a, FunSym, ArgSym, ArgSort, Args, OutSort, Body>(
+    pub fn define_fun<Args>(
         &mut self,
-        symbol: &FunSym,
+        symbol: impl Sym2Smt,
         args: Args,
-        out: &OutSort,
-        body: &Body,
+        out: impl Sort2Smt,
+        body: impl Expr2Smt,
     ) -> SmtRes<()>
     where
-        ArgSort: Sort2Smt + 'a,
-        OutSort: ?Sized + Sort2Smt,
-        FunSym: ?Sized + Sym2Smt<()>,
-        ArgSym: Sym2Smt<()> + 'a,
-        Body: ?Sized + Expr2Smt<()>,
-        Args: IntoIterator<Item = &'a (ArgSym, ArgSort)>,
+        Args: IntoIterator,
+        Args::Item: SymAndSort,
     {
         self.define_fun_with(symbol, args, out, body, ())
     }
 
     /// Pushes `n` layers on the assertion stack.
     ///
-    /// - see also [`pop`](Self::pop).
+    /// - see also [`Self::pop`].
+    ///
+    /// Note that using [actlits][crate::actlit] is more efficient than push/pop, and is useable for
+    /// most push/pop use-cases.
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```rust
     /// # use rsmt2::Solver;
     /// let mut solver = Solver::default_z3(()).unwrap();
     /// solver.declare_const("x", "Int").unwrap();
@@ -608,7 +567,10 @@ impl<Parser> Solver<Parser> {
 
     /// Pops `n` layers off the assertion stack.
     ///
-    /// - see also [`push`](Self::push).
+    /// - see also [`Self::push`].
+    ///
+    /// Note that using [actlits][crate::actlit] is more efficient than push/pop, and is useable for
+    /// most push/pop use-cases.
     #[inline]
     pub fn pop(&mut self, n: u8) -> SmtRes<()> {
         tee_write! {
@@ -618,22 +580,26 @@ impl<Parser> Solver<Parser> {
     }
 
     /// Check-sat assuming command, turns `unknown` results into errors.
-    pub fn check_sat_assuming<'a, Ident, Idents>(&mut self, idents: Idents) -> SmtRes<bool>
+    ///
+    /// - see also [actlits][crate::actlit].
+    pub fn check_sat_assuming<Idents>(&mut self, idents: Idents) -> SmtRes<bool>
     where
-        Ident: ?Sized + Sym2Smt<()> + 'a,
-        Idents: IntoIterator<Item = &'a Ident>,
+        Idents: IntoIterator,
+        Idents::Item: Sym2Smt,
     {
         self.check_sat_assuming_with(idents, ())
     }
 
     /// Check-sat assuming command, turns `unknown` results into `None`.
-    pub fn check_sat_assuming_or_unk<'a, Ident, Idents>(
+    ///
+    /// - see also [actlits][crate::actlit].
+    pub fn check_sat_assuming_or_unk<Ident, Idents>(
         &mut self,
         idents: Idents,
     ) -> SmtRes<Option<bool>>
     where
-        Ident: ?Sized + Sym2Smt<()> + 'a,
-        Idents: IntoIterator<Item = &'a Ident>,
+        Idents: IntoIterator,
+        Idents::Item: Sym2Smt,
     {
         self.check_sat_assuming_or_unk_with(idents, ())
     }
@@ -642,7 +608,7 @@ impl<Parser> Solver<Parser> {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```rust
     /// # use rsmt2::{SmtConf, Solver};
     /// let mut solver = Solver::default_z3(()).unwrap();
     /// solver.set_logic( ::rsmt2::Logic::QF_UF ).unwrap();
@@ -663,16 +629,13 @@ impl<Parser> Solver<Parser> {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```rust
     /// # use rsmt2::{SmtConf, Solver};
     /// let mut solver = Solver::default_z3(()).unwrap();
     /// solver.set_custom_logic("QF_UFBV").unwrap();
     /// ```
     #[inline]
-    pub fn set_custom_logic<Str>(&mut self, logic: Str) -> SmtRes<()>
-    where
-        Str: AsRef<str>,
-    {
+    pub fn set_custom_logic(&mut self, logic: impl AsRef<str>) -> SmtRes<()> {
         tee_write! {
           self, |w| {
             write_str(w, "(set-logic ")?;
@@ -687,7 +650,7 @@ impl<Parser> Solver<Parser> {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```rust
     /// # use rsmt2::Solver;
     /// let mut solver = Solver::default_z3(()).unwrap();
     /// solver.define_fun_rec(
@@ -695,20 +658,16 @@ impl<Parser> Solver<Parser> {
     /// ).unwrap()
     /// ```
     #[inline]
-    pub fn define_fun_rec<'a, FunSym, ArgSym, ArgSort, Args, OutSort, Body>(
+    pub fn define_fun_rec<Args>(
         &mut self,
-        symbol: &FunSym,
+        symbol: impl Sym2Smt,
         args: Args,
-        out: &OutSort,
-        body: &Body,
+        out: impl Sort2Smt,
+        body: impl Expr2Smt,
     ) -> SmtRes<()>
     where
-        ArgSort: Sort2Smt + 'a,
-        OutSort: ?Sized + Sort2Smt,
-        FunSym: ?Sized + Sym2Smt<()>,
-        ArgSym: Sym2Smt<()> + 'a,
-        Body: ?Sized + Expr2Smt<()>,
-        Args: IntoIterator<Item = &'a (ArgSym, ArgSort)>,
+        Args: IntoIterator,
+        Args::Item: SymAndSort,
     {
         self.define_fun_rec_with(symbol, args, out, body, ())
     }
@@ -717,87 +676,201 @@ impl<Parser> Solver<Parser> {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```rust
     /// # use rsmt2::Solver;
     /// let mut solver = Solver::default_z3(()).unwrap();
     /// solver.define_funs_rec( & [
-    ///     ("abs_1", & [ ("n", "Int") ], "Int", "(ite (< x 0) (abs_2 (- x)) x)"),
-    ///     ("abs_2", & [ ("n", "Int") ], "Int", "(ite (< x 0) (abs_3 (- x)) x)"),
-    ///     ("abs_3", & [ ("n", "Int") ], "Int", "(ite (< x 0) (abs_1 (- x)) x)"),
+    ///     ("abs_1", [ ("n", "Int") ], "Int", "(ite (< x 0) (abs_2 (- x)) x)"),
+    ///     ("abs_2", [ ("n", "Int") ], "Int", "(ite (< x 0) (abs_3 (- x)) x)"),
+    ///     ("abs_3", [ ("n", "Int") ], "Int", "(ite (< x 0) (abs_1 (- x)) x)"),
     /// ] ).unwrap()
     /// ```
     #[inline]
-    pub fn define_funs_rec<'a, FunSym, ArgSym, ArgSort, Args, ArgsRef, OutSort, Body, Funs>(
-        &mut self,
-        funs: Funs,
-    ) -> SmtRes<()>
+    pub fn define_funs_rec<Defs>(&mut self, funs: Defs) -> SmtRes<()>
     where
-        FunSym: Sym2Smt<()> + 'a,
-        ArgSym: Sym2Smt<()> + 'a,
-        ArgSort: Sort2Smt + 'a,
-        OutSort: Sort2Smt + 'a,
-        Body: Expr2Smt<()> + 'a,
-        &'a Args: IntoIterator<Item = &'a (ArgSym, ArgSort)> + 'a,
-        Args: ?Sized,
-        ArgsRef: 'a + AsRef<Args>,
-        Funs: IntoIterator<Item = &'a (FunSym, ArgsRef, OutSort, Body)>,
-        Funs::IntoIter: Clone,
+        Defs: IntoIterator + Clone,
+        Defs::Item: FunDef,
     {
         self.define_funs_rec_with(funs, ())
     }
 
     /// Declares mutually recursive datatypes.
     ///
-    /// A relatively recent version of z3 is recommended.
+    /// A relatively recent version of z3 is recommended. Sort definition is a relatively expert
+    /// action, this function is a bit complex. The example below goes over how it works.
     ///
     /// # Examples
     ///
-    /// ```no_run
-    /// # use rsmt2::Solver;
-    /// let mut solver = Solver::default_z3(()).unwrap();
-    /// solver.declare_datatypes( & [
-    ///     ( "Tree", 1, ["T"],
-    ///         [ "leaf", "(node (value T) (children (TreeList T)))" ] ),
-    ///     ( "TreeList", 1, ["T"],
-    ///         [ "nil", "(cons (car (Tree T)) (cdr (TreeList T)))" ]),
-    /// ] ).unwrap();
+    /// ```rust
+    /// use rsmt2::print::{AdtDecl, AdtVariantField, AdtVariant};
     ///
-    /// solver.declare_const( "t1", "(Tree Int)" ).unwrap();
-    /// solver.declare_const( "t2", "(Tree Bool)" ).unwrap();
+    /// // Alright, so we're going to declare two mutually recursive sorts. It is easier to pack the
+    /// // sort-declaration data in custom types. If you want to declare a sort, you most likely
+    /// // already have a representation for it, so working on custom types is reasonable.
+    ///
+    /// // Notice that the `AdtDecl`, `AdtVariantField` and `AdtVariant` traits from `rsmt2::print::_`
+    /// // are in scope. This is what our custom types will need to generate to declare the sort.
+    ///
+    /// // We'll use static string slices for simplicity as `&str` implements all printing traits.
+    /// type Sym = &'static str;
+    /// type Sort = &'static str;
+    ///
+    /// // Let's start with the top-level sort type.
+    /// struct MySort {
+    ///     // Name of the sort, for instance `List`.
+    ///     sym: Sym,
+    ///     // Symbol(s) for the type parameter(s), for instance `T` for `List<T>`. Must be a collection
+    ///     // of known length, because rsmt2 needs to access the arity (number of type parameters).
+    ///     args: Vec<Sym>,
+    ///     // Body of the sort: its variants. For instance the `nil` and `cons` variants for `List<T>`.
+    ///     variants: Vec<Variant>,
+    /// }
+    /// impl MySort {
+    ///     // This thing build the actual definition expected by rsmt2. Its output is something that
+    ///     // implements `AdtDecl` and can only live as long as the input ref to `self`.
+    ///     fn as_decl<'me>(&'me self) -> impl AdtDecl + 'me {
+    ///         // Check out rsmt2's documentation and you'll see that `AdtDecl` is already implemented for
+    ///         // certain triplets.
+    ///         (
+    ///             // Symbol.
+    ///             &self.sym,
+    ///             // Sized collection of type-parameter symbols.
+    ///             &self.args,
+    ///             // Variant, collection of iterator over `impl AdtVariant` (see below).
+    ///             self.variants.iter().map(Variant::as_decl),
+    ///         )
+    ///     }
+    ///
+    ///     fn tree() -> Self {
+    ///         Self {
+    ///             sym: "Tree",
+    ///             args: vec!["T"],
+    ///             variants: vec![Variant::tree_leaf(), Variant::tree_node()],
+    ///         }
+    ///     }
+    /// }
+    ///
+    /// // Next up, variants. A variant is a symbol (*e.g.* `nil` or `cons` for `List<T>`) and some
+    /// // fields which describe the data stored in the variant.
+    /// struct Variant {
+    ///     sym: Sym,
+    ///     fields: Vec<Field>,
+    /// }
+    /// impl Variant {
+    ///     // Variant declaration; again, `AdtVariant` is implemented for certain types of pairs.
+    ///     fn as_decl<'me>(&'me self) -> impl AdtVariant + 'me {
+    ///         (
+    ///             // Symbol.
+    ///             self.sym,
+    ///             // Iterator over field declarations.
+    ///             self.fields.iter().map(Field::as_decl),
+    ///         )
+    ///     }
+    ///
+    ///     fn tree_leaf() -> Self {
+    ///         Self {
+    ///             sym: "leaf",
+    ///             fields: vec![],
+    ///         }
+    ///     }
+    ///     fn tree_node() -> Self {
+    ///         Self {
+    ///             sym: "node",
+    ///             fields: vec![Field::tree_node_value(), Field::tree_node_children()],
+    ///         }
+    ///     }
+    /// }
+    ///
+    /// // A symbol and a sort: describes a piece of data in a variant with a symbol to retrieve it,
+    /// // *i.e.* the name of the field.
+    /// struct Field {
+    ///     sym: Sym,
+    ///     sort: Sort,
+    /// }
+    /// impl Field {
+    ///     // As usual, `AdtVariantField` is implemented for certain pairs.
+    ///     fn as_decl(&self) -> impl AdtVariantField {
+    ///         (self.sym, self.sort)
+    ///     }
+    ///
+    ///     fn tree_node_value() -> Self {
+    ///         Self {
+    ///             sym: "value",
+    ///             sort: "T",
+    ///         }
+    ///     }
+    ///     fn tree_node_children() -> Self {
+    ///         Self {
+    ///             sym: "children",
+    ///             sort: "(TreeList T)",
+    ///         }
+    ///     }
+    /// }
+    ///
+    /// let tree = MySort::tree();
+    ///
+    /// // Now this `tree` uses an non-existing `(TreeList T)` sort to store its children, let's declare
+    /// // it now.
+    ///
+    /// let nil = Variant {
+    ///     sym: "nil",
+    ///     fields: vec![],
+    /// };
+    /// let cons = Variant {
+    ///     sym: "cons",
+    ///     fields: vec![
+    ///         Field {
+    ///             sym: "car",
+    ///             sort: "(Tree T)",
+    ///         },
+    ///         Field {
+    ///             sym: "cdr",
+    ///             sort: "(TreeList T)",
+    ///         },
+    ///     ],
+    /// };
+    /// let tree_list = MySort {
+    ///     sym: "TreeList",
+    ///     args: vec!["T"],
+    ///     variants: vec![nil, cons],
+    /// };
+    ///
+    /// let mut solver = rsmt2::Solver::default_z3(()).unwrap();
+    ///
+    /// solver
+    ///     // These sort are mutually recursive, `Solver::declare_datatypes` needs to declare them at the
+    ///     // same time.
+    ///     .declare_datatypes(&[tree.as_decl(), tree_list.as_decl()])
+    ///     .unwrap();
+    ///
+    /// // That's it! Solver now knows these sorts and we can use them.
+    ///
+    /// solver.declare_const("t1", "(Tree Int)").unwrap();
+    /// solver.declare_const("t2", "(Tree Bool)").unwrap();
     ///
     /// solver.assert("(> (value t1) 20)").unwrap();
     /// solver.assert("(not (is-leaf t2))").unwrap();
     /// solver.assert("(not (value t2))").unwrap();
     ///
     /// let sat = solver.check_sat().unwrap();
-    /// assert! { sat } panic! { "aaa" }
+    /// assert!(sat);
     /// ```
-    pub fn declare_datatypes<'a, Sort, Param, ParamList, Def, DefList, All>(
-        &mut self,
-        defs: All,
-    ) -> SmtRes<()>
+    pub fn declare_datatypes<Defs>(&mut self, defs: Defs) -> SmtRes<()>
     where
-        Sort: Sort2Smt + 'a,
-
-        Param: Sort2Smt + 'a,
-        &'a ParamList: IntoIterator<Item = &'a Param> + 'a,
-
-        Def: Sort2Smt + 'a,
-        &'a DefList: IntoIterator<Item = &'a Def> + 'a,
-        All: IntoIterator<Item = &'a (Sort, usize, ParamList, DefList)> + 'a,
-        All::IntoIter: Clone,
+        Defs: IntoIterator + Clone,
+        Defs::Item: AdtDecl,
     {
         tee_write! {
           self, |w| write!(w, "(declare-datatypes (") ?
         }
 
-        let def_iter = defs.into_iter();
-
-        for &(ref sort, arity, _, _) in def_iter.clone() {
+        for def in defs.clone() {
+            let sort_sym = def.sort_sym();
+            let arity = def.arity();
             tee_write! {
               self, |w| {
                 write!(w, " (")?;
-                sort.sort_to_smt2(w)?;
+                sort_sym.sym_to_smt2(w, ())?;
                 write!(w, " {})", arity) ?
               }
             }
@@ -807,28 +880,51 @@ impl<Parser> Solver<Parser> {
           self, |w| write!(w, " ) (") ?
         }
 
-        for &(_, arity, ref params, ref defs) in def_iter {
-            tee_write! {
-              self, |w| {
-                write!(w, " (")?;
-
-                if arity > 0 {
-                  write!(w, "par (")?;
-                  for param in params {
-                    write!(w, " ")?;
-                    param.sort_to_smt2(w)?;
-                  }
-                  write!(w, " ) (") ?
+        for def in defs {
+            let arity = def.arity();
+            let args = def.args();
+            let variants = def.variants();
+            tee_write! { self, |w| write!(w, " (")? };
+            if arity > 0 {
+                tee_write! { self, |w| write!(w, "par (")? };
+                for param in args {
+                    tee_write! { self, |w| {
+                        write!(w, " ")?;
+                        param.sym_to_smt2(w, ())?;
+                    }}
                 }
-              }
+                tee_write! { self, |w| write!(w, " ) (")? };
             }
 
-            for def in defs {
-                tee_write! {
-                  self, |w| {
-                    write!(w, " ")?;
-                    def.sort_to_smt2(w) ?
-                  }
+            for variant in variants {
+                let sym = variant.sym();
+                let mut fields = variant.fields();
+                let first_field = fields.next();
+
+                tee_write! { self, |w| write!(w, " ")? };
+
+                if first_field.is_some() {
+                    tee_write! { self, |w| write!(w, "(")? };
+                }
+
+                tee_write! { self, |w| sym.sym_to_smt2(w, ())? };
+
+                if let Some(first) = first_field {
+                    for field in Some(first).into_iter().chain(fields) {
+                        let sym = field.sym();
+                        let sort = field.sort();
+                        tee_write! {
+                            self, |w| {
+                                write!(w, " (")?;
+                                sym.sym_to_smt2(w, ())?;
+                                write!(w, " ")?;
+                                sort.sort_to_smt2(w)?;
+                                write!(w, ")")?;
+                            }
+                        }
+                    }
+
+                    tee_write! { self, |w| write!(w, ")")? };
                 }
             }
 
@@ -856,8 +952,8 @@ impl<Parser> Solver<Parser> {
     /// Get-model command.
     pub fn get_model<Ident, Type, Value>(&mut self) -> SmtRes<Model<Ident, Type, Value>>
     where
-        Parser: for<'a> IdentParser<Ident, Type, &'a mut RSmtParser>
-            + for<'a> ModelParser<Ident, Type, Value, &'a mut RSmtParser>,
+        Parser: for<'p> IdentParser<Ident, Type, &'p mut RSmtParser>
+            + for<'p> ModelParser<Ident, Type, Value, &'p mut RSmtParser>,
     {
         self.print_get_model()?;
         self.parse_get_model()
@@ -866,8 +962,8 @@ impl<Parser> Solver<Parser> {
     /// Get-model command when all the symbols are nullary.
     pub fn get_model_const<Ident, Type, Value>(&mut self) -> SmtRes<Vec<(Ident, Type, Value)>>
     where
-        Parser: for<'a> IdentParser<Ident, Type, &'a mut RSmtParser>
-            + for<'a> ModelParser<Ident, Type, Value, &'a mut RSmtParser>,
+        Parser: for<'p> IdentParser<Ident, Type, &'p mut RSmtParser>
+            + for<'p> ModelParser<Ident, Type, Value, &'p mut RSmtParser>,
     {
         self.print_get_model()?;
         self.parse_get_model_const()
@@ -877,28 +973,97 @@ impl<Parser> Solver<Parser> {
     ///
     /// Notice that the input expression type and the output one have no reason
     /// to be the same.
-    pub fn get_values<'a, Expr, Exprs, PExpr, PValue>(
-        &mut self,
-        exprs: Exprs,
-    ) -> SmtRes<Vec<(PExpr, PValue)>>
+    pub fn get_values<Exprs, PExpr, PValue>(&mut self, exprs: Exprs) -> SmtRes<Vec<(PExpr, PValue)>>
     where
-        Parser: for<'b> ExprParser<PExpr, (), &'b mut RSmtParser>
-            + for<'b> ValueParser<PValue, &'b mut RSmtParser>,
-        Expr: ?Sized + Expr2Smt<()> + 'a,
-        Exprs: IntoIterator<Item = &'a Expr>,
+        Parser: for<'p> ExprParser<PExpr, (), &'p mut RSmtParser>
+            + for<'p> ValueParser<PValue, &'p mut RSmtParser>,
+        Exprs: IntoIterator,
+        Exprs::Item: Expr2Smt,
     {
         self.get_values_with(exprs, ())
             .map_err(|e| self.conf.enrich_get_values_error(e))
+    }
+
+    /// Get-values command.
+    ///
+    /// Notice that the input expression type and the output one have no reason to be the same.
+    fn get_values_with<Exprs, PExpr, PValue, Info>(
+        &mut self,
+        exprs: Exprs,
+        info: Info,
+    ) -> SmtRes<Vec<(PExpr, PValue)>>
+    where
+        Info: Copy,
+        Parser: for<'p> ExprParser<PExpr, Info, &'p mut RSmtParser>
+            + for<'p> ValueParser<PValue, &'p mut RSmtParser>,
+        Exprs: IntoIterator,
+        Exprs::Item: Expr2Smt<Info>,
+    {
+        self.print_get_values_with(exprs, info)?;
+        self.parse_get_values_with(info)
+    }
+
+    /// Get-unsat-core command.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use rsmt2::Solver;
+    ///
+    /// let mut solver = Solver::default_z3(()).unwrap();
+    ///
+    /// solver.declare_const("x", "Int").unwrap();
+    /// solver.declare_const("y", "Int").unwrap();
+    ///
+    /// solver.assert("(= (+ x y) 0)").unwrap();
+    ///
+    /// let future = solver.print_check_sat().unwrap();
+    /// // Do stuff while the solver works.
+    /// let sat = solver.parse_check_sat(future).unwrap();
+    /// assert!(sat);
+    /// ```
+    pub fn get_unsat_core<Sym>(&mut self) -> SmtRes<Vec<Sym>>
+    where
+        Parser: for<'p> SymParser<Sym, &'p mut RSmtParser>,
+    {
+        self.print_get_unsat_core()?;
+        self.parse_get_unsat_core()
+    }
+
+    /// Get-interpolant command.
+    pub fn get_interpolant<Expr>(
+        &mut self,
+        sym_1: impl Sym2Smt,
+        sym_2: impl Sym2Smt,
+    ) -> SmtRes<Expr>
+    where
+        Parser: for<'p> ExprParser<Expr, (), &'p mut RSmtParser>,
+    {
+        self.get_interpolant_with(sym_1, sym_2, ())
+    }
+
+    /// Get-interpolant command.
+    pub fn get_interpolant_with<Info, Expr>(
+        &mut self,
+        sym_1: impl Sym2Smt,
+        sym_2: impl Sym2Smt,
+        info: Info,
+    ) -> SmtRes<Expr>
+    where
+        Parser: for<'p> ExprParser<Expr, Info, &'p mut RSmtParser>,
+    {
+        self.print_get_interpolant(sym_1, sym_2)?;
+        self.parse_get_interpolant(info)
     }
 }
 
 /// # Actlit-Related Functions.
 ///
-/// See the [`actlit` module](super::actlit) for more details.
+/// See the [`actlit` module][crate::actlit] for more details.
 impl<Parser> Solver<Parser> {
     /// True if no actlits have been created since the last reset.
     ///
-    /// See the [`actlit` module](super::actlit) for more details.
+    /// See the [`actlit` module][crate::actlit] for more details.
     #[inline]
     fn has_actlits(&self) -> bool {
         self.actlit > 0
@@ -906,24 +1071,24 @@ impl<Parser> Solver<Parser> {
 
     /// Introduces a new actlit.
     ///
-    /// See the [`actlit` module](super::actlit) for more details.
+    /// See the [`actlit` module][crate::actlit] for more details.
     #[inline]
-    pub fn get_actlit(&mut self) -> SmtRes<Actlit> {
+    pub fn get_actlit(&mut self) -> SmtRes<crate::actlit::Actlit> {
         let id = self.actlit;
         self.actlit += 1;
-        let next_actlit = Actlit { id };
+        let next_actlit = crate::actlit::Actlit::new(id);
         tee_write! {
-          self, |w| writeln!(
-            w, "(declare-fun {}{}{} () Bool)",
-            ACTLIT_PREF, next_actlit.id, ACTLIT_SUFF
-          ) ?
+          self, |w|
+            write!(w, "(declare-fun ")?;
+            next_actlit.write(w)?;
+            writeln!(w, " () Bool)")?
         }
         Ok(next_actlit)
     }
 
     /// Deactivates an activation literal, alias for `solver.set_actlit(actlit, false)`.
     ///
-    /// See the [`actlit` module](super::actlit) for more details.
+    /// See the [`actlit` module][crate::actlit] for more details.
     #[inline]
     pub fn de_actlit(&mut self, actlit: Actlit) -> SmtRes<()> {
         self.set_actlit(actlit, false)
@@ -931,7 +1096,7 @@ impl<Parser> Solver<Parser> {
 
     /// Forces the value of an actlit and consumes it.
     ///
-    /// See the [`actlit` module](super::actlit) for more details.
+    /// See the [`actlit` module][crate::actlit] for more details.
     #[inline]
     pub fn set_actlit(&mut self, actlit: Actlit, b: bool) -> SmtRes<()> {
         tee_write! {
@@ -955,20 +1120,18 @@ impl<Parser> Solver<Parser> {
 
     /// Asserts an expression without print information, guarded by an activation literal.
     ///
-    /// See the [`actlit` module](super::actlit) for more details.
+    /// See the [`actlit` module][crate::actlit] for more details.
     #[inline]
-    pub fn assert_act<Expr>(&mut self, actlit: &Actlit, expr: &Expr) -> SmtRes<()>
-    where
-        Expr: ?Sized + Expr2Smt<()>,
-    {
+    pub fn assert_act(&mut self, actlit: &Actlit, expr: impl Expr2Smt) -> SmtRes<()> {
         self.assert_act_with(actlit, expr, ())
     }
 
     /// Check-sat command with activation literals, turns `unknown` results into
     /// errors.
-    pub fn check_sat_act<'a, Actlits>(&mut self, actlits: Actlits) -> SmtRes<bool>
+    pub fn check_sat_act<Actlits>(&mut self, actlits: Actlits) -> SmtRes<bool>
     where
-        Actlits: IntoIterator<Item = &'a Actlit>,
+        Actlits: IntoIterator,
+        Actlits::Item: Sym2Smt,
     {
         let future = self.print_check_sat_act(actlits)?;
         self.parse_check_sat(future)
@@ -976,9 +1139,10 @@ impl<Parser> Solver<Parser> {
 
     /// Check-sat command with activation literals, turns `unknown` results in
     /// `None`.
-    pub fn check_sat_act_or_unk<'a, Actlits>(&mut self, actlits: Actlits) -> SmtRes<Option<bool>>
+    pub fn check_sat_act_or_unk<Actlits>(&mut self, actlits: Actlits) -> SmtRes<Option<bool>>
     where
-        Actlits: IntoIterator<Item = &'a Actlit>,
+        Actlits: IntoIterator,
+        Actlits::Item: Sym2Smt,
     {
         let future = self.print_check_sat_act(actlits)?;
         self.parse_check_sat_or_unk(future)
@@ -990,24 +1154,44 @@ impl<Parser> Solver<Parser> {
     /// Prints a check-sat command.
     ///
     /// Allows to print the `check-sat` and get the result later, *e.g.* with
-    /// [`parse_check_sat`](Self::parse_check_sat).
+    /// [`Self::parse_check_sat`].
+    ///
+    /// See also
+    ///
+    /// - [`NamedExpr`]: a convenient wrapper around any expression that gives it a name.
     ///
     /// # Examples
     ///
-    /// ```
-    /// use rsmt2::Solver;
+    /// ```rust
+    /// use rsmt2::prelude::*;
+    /// let mut conf = SmtConf::default_z3();
+    /// conf.unsat_cores();
+    /// # println!("unsat_cores: {}", conf.get_unsat_cores());
     ///
-    /// let mut solver = Solver::default_z3(()).unwrap();
+    /// let mut solver = Solver::new(conf, ()).unwrap();
+    /// solver.declare_const("n", "Int").unwrap();
+    /// solver.declare_const("m", "Int").unwrap();
     ///
-    /// solver.declare_const("x", "Int").unwrap();
-    /// solver.declare_const("y", "Int").unwrap();
+    /// solver.assert("true").unwrap();
     ///
-    /// solver.assert("(= (+ x y) 0)").unwrap();
+    /// let e_1 = "(> n 7)";
+    /// let label_e_1 = "e_1";
+    /// let named = NamedExpr::new(label_e_1, e_1);
+    /// solver.assert(&named).unwrap();
     ///
-    /// let future = solver.print_check_sat().unwrap();
-    /// // Do stuff while the solver works.
-    /// let sat = solver.parse_check_sat(future).unwrap();
-    /// assert! { sat }
+    /// let e_2 = "(> m 0)";
+    /// let label_e_2 = "e_2";
+    /// let named = NamedExpr::new(label_e_2, e_2);
+    /// solver.assert(&named).unwrap();
+    ///
+    /// let e_3 = "(< n 3)";
+    /// let label_e_3 = "e_3";
+    /// let named = NamedExpr::new(label_e_3, e_3);
+    /// solver.assert(&named).unwrap();
+    ///
+    /// assert!(!solver.check_sat().unwrap());
+    /// let core: Vec<String> = solver.get_unsat_core().unwrap();
+    /// assert_eq!(core, vec![label_e_1, label_e_3]);
     /// ```
     #[inline]
     pub fn print_check_sat(&mut self) -> SmtRes<FutureCheckSat> {
@@ -1019,11 +1203,12 @@ impl<Parser> Solver<Parser> {
 
     /// Check-sat command, with actlits.
     ///
-    /// See the [`actlit` module](super::actlit) for more details.
+    /// See the [`actlit` module][crate::actlit] for more details.
     #[inline]
-    pub fn print_check_sat_act<'a, Actlits>(&mut self, actlits: Actlits) -> SmtRes<FutureCheckSat>
+    pub fn print_check_sat_act<Actlits>(&mut self, actlits: Actlits) -> SmtRes<FutureCheckSat>
     where
-        Actlits: IntoIterator<Item = &'a Actlit>,
+        Actlits: IntoIterator,
+        Actlits::Item: Sym2Smt,
     {
         match self.conf.get_check_sat_assuming() {
             Some(ref cmd) => {
@@ -1034,7 +1219,7 @@ impl<Parser> Solver<Parser> {
                     tee_write! {
                       self, |w| {
                         write!(w, " ")?;
-                        actlit.write(w) ?
+                        actlit.sym_to_smt2(w, ()) ?
                       }
                     }
                 }
@@ -1064,6 +1249,26 @@ impl<Parser> Solver<Parser> {
     #[inline]
     pub fn parse_check_sat_or_unk(&mut self, _: FutureCheckSat) -> SmtRes<Option<bool>> {
         self.smt_parser.check_sat()
+    }
+
+    /// Get-interpolant command.
+    ///
+    /// At the time of writing, only Z3 supports this command.
+    #[inline]
+    pub fn print_get_interpolant(
+        &mut self,
+        sym_1: impl Sym2Smt<()>,
+        sym_2: impl Sym2Smt<()>,
+    ) -> SmtRes<()> {
+        tee_write! {
+            self, |w|
+                write_str(w, "(get-interpolant ")?;
+                sym_1.sym_to_smt2(w, ())?;
+                write_str(w, " ")?;
+                sym_2.sym_to_smt2(w, ())?;
+                write_str(w, ")\n")?
+        }
+        Ok(())
     }
 
     /// Get-model command.
@@ -1117,15 +1322,11 @@ impl<Parser> Solver<Parser> {
     }
 
     /// Get-values command.
-    fn print_get_values_with<'a, Info, Expr, Exprs>(
-        &mut self,
-        exprs: Exprs,
-        info: Info,
-    ) -> SmtRes<()>
+    fn print_get_values_with<Exprs, Info>(&mut self, exprs: Exprs, info: Info) -> SmtRes<()>
     where
         Info: Copy,
-        Expr: ?Sized + Expr2Smt<Info> + 'a,
-        Exprs: IntoIterator<Item = &'a Expr>,
+        Exprs: IntoIterator,
+        Exprs::Item: Expr2Smt<Info>,
     {
         tee_write! {
           self, |w| write!(w, "(get-value (") ?
@@ -1145,27 +1346,24 @@ impl<Parser> Solver<Parser> {
     }
 
     /// Check-sat with assumptions command with unit info.
-    pub fn print_check_sat_assuming<'a, Ident, Idents>(
-        &mut self,
-        bool_vars: Idents,
-    ) -> SmtRes<FutureCheckSat>
+    pub fn print_check_sat_assuming<Idents>(&mut self, bool_vars: Idents) -> SmtRes<FutureCheckSat>
     where
-        Ident: ?Sized + Sym2Smt<()> + 'a,
-        Idents: IntoIterator<Item = &'a Ident>,
+        Idents: IntoIterator,
+        Idents::Item: Sym2Smt,
     {
         self.print_check_sat_assuming_with(bool_vars, ())
     }
 
     /// Check-sat with assumptions command.
-    pub fn print_check_sat_assuming_with<'a, Info, Ident, Idents>(
+    pub fn print_check_sat_assuming_with<Idents, Info>(
         &mut self,
         bool_vars: Idents,
         info: Info,
     ) -> SmtRes<FutureCheckSat>
     where
         Info: Copy,
-        Ident: ?Sized + Sym2Smt<Info> + 'a,
-        Idents: IntoIterator<Item = &'a Ident>,
+        Idents: IntoIterator,
+        Idents::Item: Sym2Smt<Info>,
     {
         match self.conf.get_check_sat_assuming() {
             Some(ref cmd) => {
@@ -1192,11 +1390,11 @@ impl<Parser> Solver<Parser> {
         }
     }
 
-    /// Parse the result of a get-model.
+    /// Parse the result of a `get-model`.
     fn parse_get_model<Ident, Type, Value>(&mut self) -> SmtRes<Model<Ident, Type, Value>>
     where
-        Parser: for<'a> IdentParser<Ident, Type, &'a mut RSmtParser>
-            + for<'a> ModelParser<Ident, Type, Value, &'a mut RSmtParser>,
+        Parser: for<'p> IdentParser<Ident, Type, &'p mut RSmtParser>
+            + for<'p> ModelParser<Ident, Type, Value, &'p mut RSmtParser>,
     {
         let has_actlits = self.has_actlits();
         let res = self.smt_parser.get_model(has_actlits, self.parser);
@@ -1212,11 +1410,19 @@ impl<Parser> Solver<Parser> {
         }
     }
 
-    /// Parse the result of a get-model where all the symbols are nullary.
+    /// Parses the result of a `get-unsat-core`.
+    fn parse_get_unsat_core<Sym>(&mut self) -> SmtRes<Vec<Sym>>
+    where
+        Parser: for<'p> SymParser<Sym, &'p mut RSmtParser>,
+    {
+        self.smt_parser.get_unsat_core(self.parser)
+    }
+
+    /// Parse the result of a `get-model` where all the symbols are nullary.
     fn parse_get_model_const<Ident, Type, Value>(&mut self) -> SmtRes<Vec<(Ident, Type, Value)>>
     where
-        Parser: for<'a> IdentParser<Ident, Type, &'a mut RSmtParser>
-            + for<'a> ModelParser<Ident, Type, Value, &'a mut RSmtParser>,
+        Parser: for<'p> IdentParser<Ident, Type, &'p mut RSmtParser>
+            + for<'p> ModelParser<Ident, Type, Value, &'p mut RSmtParser>,
     {
         let has_actlits = self.has_actlits();
         let res = self.smt_parser.get_model_const(has_actlits, self.parser);
@@ -1236,45 +1442,45 @@ impl<Parser> Solver<Parser> {
     fn parse_get_values_with<Info, Expr, Val>(&mut self, info: Info) -> SmtRes<Vec<(Expr, Val)>>
     where
         Info: Copy,
-        Parser: for<'a> ExprParser<Expr, Info, &'a mut RSmtParser>
-            + for<'a> ValueParser<Val, &'a mut RSmtParser>,
+        Parser: for<'p> ExprParser<Expr, Info, &'p mut RSmtParser>
+            + for<'p> ValueParser<Val, &'p mut RSmtParser>,
     {
         let res = self.smt_parser.get_values(self.parser, info);
         if res.is_err() && !self.conf.get_models() {
             res.chain_err(|| {
-                "\
-                 Note: model production is not active \
-                 for this SmtConf (`conf.models()`)\
-                 "
+                "Note: model production is not active \
+                for this SmtConf (`conf.models()`)"
             })
         } else {
             res
         }
     }
 
-    /// Get-values command.
-    ///
-    /// Notice that the input expression type and the output one have no reason to be the same.
-    fn get_values_with<'a, Info, Expr, Exprs, PExpr, PValue>(
-        &mut self,
-        exprs: Exprs,
-        info: Info,
-    ) -> SmtRes<Vec<(PExpr, PValue)>>
+    /// Parses the result of a `get-interpolant`.
+    fn parse_get_interpolant<Expr, Info>(&mut self, info: Info) -> SmtRes<Expr>
     where
-        Info: Copy,
-        Parser: for<'b> ExprParser<PExpr, Info, &'b mut RSmtParser>
-            + for<'b> ValueParser<PValue, &'b mut RSmtParser>,
-        Expr: ?Sized + Expr2Smt<Info> + 'a,
-        Exprs: IntoIterator<Item = &'a Expr>,
+        Parser: for<'p> ExprParser<Expr, Info, &'p mut RSmtParser>,
     {
-        self.print_get_values_with(exprs, info)?;
-        self.parse_get_values_with(info)
+        let mut res = self.smt_parser.get_interpolant(self.parser, info);
+        if res.is_err() {
+            if !self.conf.style().is_z3() {
+                res = res.chain_err(|| {
+                    format!(
+                        "`{}` does not support interpolant production, only Z3 does",
+                        self.conf.style()
+                    )
+                })
+            } else if !self.conf.get_interpolants() {
+                res = res.chain_err(|| format!("interpolant production is not active"))
+            }
+        }
+        res
     }
 }
 
 /// # Non-blocking commands.
 impl<Parser: Send + 'static> Solver<Parser> {
-    /// Asynchronous check-sat, see the [`asynch` module](crate::asynch) for details.
+    /// Asynchronous check-sat, see the [`asynch` module][crate::asynch] for details.
     ///
     /// This function is not `unsafe` in the sense that it **cannot** create undefined behavior.
     /// However, it is *unsafe* because the asynchronous check might end up running forever in the
@@ -1290,7 +1496,7 @@ impl<Parser> Solver<Parser> {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```rust
     /// # use rsmt2::Solver;
     /// let mut solver = Solver::default_z3(()).unwrap();
     /// solver.declare_sort("A", 0).unwrap();
@@ -1303,10 +1509,7 @@ impl<Parser> Solver<Parser> {
     /// let sat = solver.check_sat().unwrap();
     /// ```
     #[inline]
-    pub fn declare_sort<Sort>(&mut self, sort: &Sort, arity: u8) -> SmtRes<()>
-    where
-        Sort: ?Sized + Sort2Smt,
-    {
+    pub fn declare_sort(&mut self, sort: impl Sort2Smt, arity: u8) -> SmtRes<()> {
         tee_write! {
           self, |w| {
             write_str(w, "(declare-sort ")?;
@@ -1321,10 +1524,9 @@ impl<Parser> Solver<Parser> {
     ///
     /// # Examples
     ///
-    /// Note the use of [`define_null_sort`](Self::define_null_sort) to avoid problems with empty
-    /// arguments.
+    /// Note the use of [`Self::define_null_sort`] to avoid problems with empty arguments.
     ///
-    /// ```
+    /// ```rust
     /// # use rsmt2::Solver;
     /// let mut solver = Solver::default_z3(()).unwrap();
     /// solver.define_sort("MySet", & ["T"], "(Array T Bool)").unwrap();
@@ -1344,22 +1546,20 @@ impl<Parser> Solver<Parser> {
     /// let sat = solver.check_sat().unwrap();
     /// ```
     #[inline]
-    pub fn define_sort<'a, Sort, Arg, Args, Body>(
+    pub fn define_sort<Args>(
         &mut self,
-        sort: &Sort,
+        sort_sym: impl Sym2Smt,
         args: Args,
-        body: &Body,
+        body: impl Sort2Smt,
     ) -> SmtRes<()>
     where
-        Sort: ?Sized + Sort2Smt,
-        Arg: ?Sized + Sort2Smt + 'a,
-        Body: ?Sized + Sort2Smt,
-        Args: IntoIterator<Item = &'a Arg>,
+        Args: IntoIterator,
+        Args::Item: Sort2Smt,
     {
         tee_write! {
           self, |w| {
             write_str(w, "( define-sort ")?;
-            sort.sort_to_smt2(w)?;
+            sort_sym.sym_to_smt2(w, ())?;
             write_str(w, "\n   ( ")?;
           }
         }
@@ -1383,19 +1583,14 @@ impl<Parser> Solver<Parser> {
 
     /// Defines a new nullary sort.
     ///
-    /// When using [`define_sort`](Self::define_sort), rust complains because it does not know what
-    /// the `Arg` type parameter is, since the `args` parameter is empty. So this function can be
-    /// useful.
-    ///
-    /// This could be fixed with a default type for `Arg`, like `Body` for instance, but this is
-    /// currently not possible in a function.
+    /// When using [`Self::define_sort`] with empty `args`, rust complains because it does not know
+    /// what the `Arg` type parameter is. This function addresses this problem by not having
+    /// arguments.
     #[inline]
-    pub fn define_null_sort<Sort, Body>(&mut self, sort: &Sort, body: &Body) -> SmtRes<()>
-    where
-        Sort: ?Sized + Sort2Smt,
-        Body: ?Sized + Sort2Smt,
-    {
-        self.define_sort::<Sort, Body, Option<&Body>, Body>(sort, None, body)
+    pub fn define_null_sort(&mut self, sym: impl Sym2Smt, body: impl Sort2Smt) -> SmtRes<()> {
+        // Does not matter, just needs to implement `Sort2Smt`
+        //                                                vvvv
+        self.define_sort(sym, None as Option<&str>, body)
     }
 }
 
@@ -1403,16 +1598,14 @@ impl<Parser> Solver<Parser> {
 impl<Parser> Solver<Parser> {
     /// Declares a new constant.
     #[inline]
-    pub fn declare_const_with<Info, Sym, Sort>(
+    pub fn declare_const_with<Info>(
         &mut self,
-        symbol: &Sym,
-        out_sort: &Sort,
+        symbol: impl Sym2Smt<Info>,
+        out_sort: impl Sort2Smt,
         info: Info,
     ) -> SmtRes<()>
     where
         Info: Copy,
-        Sym: ?Sized + Sym2Smt<Info>,
-        Sort: ?Sized + Sort2Smt,
     {
         tee_write! {
           self, |w| {
@@ -1428,19 +1621,17 @@ impl<Parser> Solver<Parser> {
 
     /// Declares a new function symbol.
     #[inline]
-    pub fn declare_fun_with<'a, Info, FunSym, ArgSort, Args, OutSort>(
+    pub fn declare_fun_with<Args, Info>(
         &mut self,
-        symbol: &FunSym,
+        symbol: impl Sym2Smt<Info>,
         args: Args,
-        out: &OutSort,
+        out: impl Sort2Smt,
         info: Info,
     ) -> SmtRes<()>
     where
         Info: Copy,
-        FunSym: ?Sized + Sym2Smt<Info>,
-        ArgSort: ?Sized + Sort2Smt + 'a,
-        OutSort: ?Sized + Sort2Smt,
-        Args: IntoIterator<Item = &'a ArgSort>,
+        Args: IntoIterator,
+        Args::Item: Sort2Smt,
     {
         tee_write! {
           self, |w| {
@@ -1469,18 +1660,15 @@ impl<Parser> Solver<Parser> {
 
     /// Defines a new constant.
     #[inline]
-    pub fn define_const_with<Info, Sym, Sort, Body>(
+    pub fn define_const_with<Info>(
         &mut self,
-        symbol: &Sym,
-        out_sort: &Sort,
-        body: &Body,
+        symbol: impl Sym2Smt<Info>,
+        out_sort: impl Sort2Smt,
+        body: impl Expr2Smt<Info>,
         info: Info,
     ) -> SmtRes<()>
     where
         Info: Copy,
-        Sym: ?Sized + Sym2Smt<Info>,
-        Sort: ?Sized + Sort2Smt,
-        Body: ?Sized + Expr2Smt<Info>,
     {
         tee_write! {
           self, |w| {
@@ -1498,22 +1686,18 @@ impl<Parser> Solver<Parser> {
 
     /// Defines a new function symbol.
     #[inline]
-    pub fn define_fun_with<'a, Info, FunSym, ArgSym, ArgSort, Args, OutSort, Body>(
+    pub fn define_fun_with<Args, Info>(
         &mut self,
-        symbol: &FunSym,
+        symbol: impl Sym2Smt<Info>,
         args: Args,
-        out: &OutSort,
-        body: &Body,
+        out: impl Sort2Smt,
+        body: impl Expr2Smt<Info>,
         info: Info,
     ) -> SmtRes<()>
     where
         Info: Copy,
-        ArgSort: Sort2Smt + 'a,
-        OutSort: ?Sized + Sort2Smt,
-        FunSym: ?Sized + Sym2Smt<Info>,
-        ArgSym: Sym2Smt<Info> + 'a,
-        Body: ?Sized + Expr2Smt<Info>,
-        Args: IntoIterator<Item = &'a (ArgSym, ArgSort)>,
+        Args: IntoIterator,
+        Args::Item: SymAndSort<Info>,
     {
         tee_write! {
           self, |w| {
@@ -1523,7 +1707,8 @@ impl<Parser> Solver<Parser> {
           }
         }
         for arg in args {
-            let (ref sym, ref sort) = *arg;
+            let sym = arg.sym();
+            let sort = arg.sort();
             tee_write! {
               self, |w| {
                 write_str(w, "(")?;
@@ -1547,65 +1732,42 @@ impl<Parser> Solver<Parser> {
     }
 
     /// Defines some new (possibily mutually) recursive functions.
-    #[inline]
-    pub fn define_funs_rec_with<
-        'a,
-        Info,
-        FunSym,
-        ArgSym,
-        ArgSort,
-        Args,
-        ArgsRef,
-        OutSort,
-        Body,
-        Funs,
-    >(
-        &mut self,
-        funs: Funs,
-        info: Info,
-    ) -> SmtRes<()>
+    pub fn define_funs_rec_with<Defs, Info>(&mut self, funs: Defs, info: Info) -> SmtRes<()>
     where
         Info: Copy,
-        FunSym: Sym2Smt<Info> + 'a,
-        ArgSym: Sym2Smt<Info> + 'a,
-        ArgSort: Sort2Smt + 'a,
-        OutSort: Sort2Smt + 'a,
-        Body: Expr2Smt<Info> + 'a,
-        &'a Args: IntoIterator<Item = &'a (ArgSym, ArgSort)> + 'a,
-        Args: ?Sized,
-        ArgsRef: 'a + AsRef<Args>,
-        Funs: IntoIterator<Item = &'a (FunSym, ArgsRef, OutSort, Body)>,
-        Funs::IntoIter: Clone,
+        Defs: IntoIterator + Clone,
+        Defs::Item: FunDef<Info>,
     {
         // Header.
         tee_write! {
           self, |w| write_str(w, "(define-funs-rec (\n") ?
         }
 
-        let fun_iter = funs.into_iter();
-
         // Signatures.
-        for fun in fun_iter.clone() {
-            let (ref sym, ref args, ref out, _) = *fun;
+        for fun in funs.clone() {
+            let sym = fun.fun_sym();
+            let args = fun.args();
+            let out = fun.out_sort();
 
             tee_write! {
-              self, |w| {
-                write_str(w, "   (")?;
-                sym.sym_to_smt2(w, info)?;
-                write_str(w, " ( ") ?
-              }
+                self, |w| {
+                    write_str(w, "   (")?;
+                    sym.sym_to_smt2(w, info)?;
+                    write_str(w, " ( ") ?
+                }
             }
 
-            for arg in args.as_ref() {
+            for arg in args {
                 tee_write! {
-                  self, |w| {
-                    let (ref sym, ref sort) = * arg;
-                    write_str(w, "(")?;
-                    sym.sym_to_smt2(w, info)?;
-                    write_str(w, " ")?;
-                    sort.sort_to_smt2(w)?;
-                    write_str(w, ") ") ?
-                  }
+                    self, |w| {
+                        let sym = arg.sym();
+                        let sort = arg.sort();
+                        write_str(w, "(")?;
+                        sym.sym_to_smt2(w, info)?;
+                        write_str(w, " ")?;
+                        sort.sort_to_smt2(w)?;
+                        write_str(w, ") ") ?
+                    }
                 }
             }
 
@@ -1622,8 +1784,8 @@ impl<Parser> Solver<Parser> {
         }
 
         // Bodies
-        for fun in fun_iter {
-            let (_, _, _, ref body) = *fun;
+        for fun in funs {
+            let body = fun.body();
             tee_write! {
               self, |w| {
                 write_str(w, "\n   ")?;
@@ -1639,22 +1801,18 @@ impl<Parser> Solver<Parser> {
 
     /// Defines a new recursive function.
     #[inline]
-    pub fn define_fun_rec_with<'a, Info, FunSym, ArgSym, ArgSort, Args, OutSort, Body>(
+    pub fn define_fun_rec_with<Args, Info>(
         &mut self,
-        symbol: &FunSym,
+        symbol: impl Sym2Smt<Info>,
         args: Args,
-        out: &OutSort,
-        body: &Body,
+        out: impl Sort2Smt,
+        body: impl Expr2Smt<Info>,
         info: Info,
     ) -> SmtRes<()>
     where
         Info: Copy,
-        ArgSort: Sort2Smt + 'a,
-        OutSort: ?Sized + Sort2Smt,
-        FunSym: ?Sized + Sym2Smt<Info>,
-        ArgSym: Sym2Smt<Info> + 'a,
-        Body: ?Sized + Expr2Smt<Info>,
-        Args: IntoIterator<Item = &'a (ArgSym, ArgSort)>,
+        Args: IntoIterator,
+        Args::Item: SymAndSort<Info>,
     {
         // Header.
         tee_write! {
@@ -1671,7 +1829,8 @@ impl<Parser> Solver<Parser> {
         }
 
         for arg in args {
-            let (ref sym, ref sort) = *arg;
+            let sym = arg.sym();
+            let sort = arg.sort();
             tee_write! {
               self, |w| {
                 write_str(w, "(")?;
@@ -1699,81 +1858,147 @@ impl<Parser> Solver<Parser> {
         Ok(())
     }
 
-    /// Asserts an expression with some print information, guarded by an activation literal.
-    ///
-    /// See the [`actlit` module](super::actlit) for more details.
+    /// Asserts an expression with info, optional actlit and optional name.
     #[inline]
-    pub fn assert_act_with<Info, Expr>(
+    pub fn full_assert<Act, Name, Info>(
         &mut self,
-        actlit: &Actlit,
-        expr: &Expr,
+        actlit: Option<Act>,
+        name: Option<Name>,
+        expr: impl Expr2Smt<Info>,
         info: Info,
     ) -> SmtRes<()>
     where
         Info: Copy,
-        Expr: ?Sized + Expr2Smt<Info>,
+        Name: Sym2Smt,
+        Act: Sym2Smt,
     {
         tee_write! {
-          self, |w| {
-            write_str(w, "(assert\n  (=>\n    ")?;
-            actlit.write(w)?;
-            write_str(w, "\n    ")?;
-            expr.expr_to_smt2(w, info)?;
-            write_str(w, "\n  )\n)\n") ?
-          }
+            self, |w| {
+                write_str(w, "(assert")?;
+                if name.is_some() {
+                    write_str(w, " (!")?;
+                }
+                if let Some(actlit) = actlit.as_ref() {
+                    write_str(w, " (=> ")?;
+                    actlit.sym_to_smt2(w, ())?;
+                }
+                write_str(w, "\n    ")?;
+                expr.expr_to_smt2(w, info)?;
+                write_str(w, "\n")?;
+                if actlit.is_some() {
+                    write_str(w, ")")?;
+                }
+                if let Some(name) = name.as_ref() {
+                    write_str(w, " :named ")?;
+                    name.sym_to_smt2(w, ())?;
+                    write_str(w, ")")?;
+                }
+                write_str(w, ")\n")?;
+            }
         }
         Ok(())
+    }
+
+    /// Asserts an expression with an activation literal, a name and some print info.
+    #[inline]
+    pub fn named_assert_act_with<Info>(
+        &mut self,
+        actlit: &Actlit,
+        name: impl Sym2Smt,
+        expr: impl Expr2Smt<Info>,
+        info: Info,
+    ) -> SmtRes<()>
+    where
+        Info: Copy,
+    {
+        self.full_assert(Some(actlit), Some(name), expr, info)
+    }
+
+    /// Asserts an expression with some print information, guarded by an activation literal.
+    ///
+    /// See the [`actlit` module][crate::actlit] for more details.
+    #[inline]
+    pub fn assert_act_with<Info>(
+        &mut self,
+        actlit: &Actlit,
+        expr: impl Expr2Smt<Info>,
+        info: Info,
+    ) -> SmtRes<()>
+    where
+        Info: Copy,
+    {
+        let name: Option<&str> = None;
+        self.full_assert(Some(actlit.as_ref()), name, expr, info)
     }
 
     /// Asserts an expression with some print information.
     #[inline]
-    pub fn assert_with<Info, Expr>(&mut self, expr: &Expr, info: Info) -> SmtRes<()>
+    pub fn assert_with<Info, Expr>(&mut self, expr: Expr, info: Info) -> SmtRes<()>
     where
         Info: Copy,
-        Expr: ?Sized + Expr2Smt<Info>,
+        Expr: Expr2Smt<Info>,
     {
-        tee_write! {
-          self, |w| {
-            write_str(w, "(assert\n  ")?;
-            expr.expr_to_smt2(w, info)?;
-            write_str(w, "\n)\n") ?
-          }
-        }
-        Ok(())
+        let name: Option<&str> = None;
+        let act: Option<Actlit> = None;
+        self.full_assert(act, name, expr, info)
+    }
+
+    /// Asserts a named expression.
+    #[inline]
+    pub fn named_assert<Expr, Name>(&mut self, name: Name, expr: Expr) -> SmtRes<()>
+    where
+        Name: Sym2Smt,
+        Expr: Expr2Smt,
+    {
+        let act: Option<Actlit> = None;
+        self.full_assert(act, Some(name), expr, ())
+    }
+
+    /// Asserts an expression with a name and some print info.
+    #[inline]
+    pub fn named_assert_with<Name, Info, Expr>(
+        &mut self,
+        name: Name,
+        expr: Expr,
+        info: Info,
+    ) -> SmtRes<()>
+    where
+        Info: Copy,
+        Expr: Expr2Smt<Info>,
+        Name: Sym2Smt,
+    {
+        let act: Option<Actlit> = None;
+        self.full_assert(act, Some(name), expr, info)
     }
 
     /// Check-sat assuming command, turns `unknown` results into errors.
-    pub fn check_sat_assuming_with<'a, Info, Ident, Idents>(
-        &mut self,
-        idents: Idents,
-        info: Info,
-    ) -> SmtRes<bool>
+    pub fn check_sat_assuming_with<Info, Syms>(&mut self, idents: Syms, info: Info) -> SmtRes<bool>
     where
         Info: Copy,
-        Ident: ?Sized + Sym2Smt<Info> + 'a,
-        Idents: IntoIterator<Item = &'a Ident>,
+        Syms: IntoIterator,
+        Syms::Item: Sym2Smt<Info>,
     {
         let future = self.print_check_sat_assuming_with(idents, info)?;
         self.parse_check_sat(future)
     }
 
     /// Check-sat assuming command, turns `unknown` results into `None`.
-    pub fn check_sat_assuming_or_unk_with<'a, Info, Ident, Idents>(
+    pub fn check_sat_assuming_or_unk_with<Idents, Info>(
         &mut self,
         idents: Idents,
         info: Info,
     ) -> SmtRes<Option<bool>>
     where
         Info: Copy,
-        Ident: ?Sized + Sym2Smt<Info> + 'a,
-        Idents: IntoIterator<Item = &'a Ident>,
+        Idents: IntoIterator,
+        Idents::Item: Sym2Smt<Info>,
     {
         let future = self.print_check_sat_assuming_with(idents, info)?;
         self.parse_check_sat_or_unk(future)
     }
 }
 
-/// # Other commands (either untested or not useful right now).
+/// # Other commands.
 impl<Parser> Solver<Parser> {
     /// Set option command.
     #[inline]
@@ -1801,8 +2026,13 @@ impl<Parser> Solver<Parser> {
 
     /// Activates unsat core production.
     #[inline]
-    pub fn produce_unsat_core(&mut self) -> SmtRes<()> {
+    pub fn produce_unsat_cores(&mut self) -> SmtRes<()> {
         self.set_option(":produce-unsat-cores", "true")
+    }
+    /// Activates model production.
+    #[inline]
+    pub fn produce_models(&mut self) -> SmtRes<()> {
+        self.set_option(":produce-models", "true")
     }
 
     /// Resets the assertions in the solver.
