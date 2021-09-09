@@ -76,19 +76,28 @@ where
     }
 }
 
+/// Function definition data.
+///
+/// Used by [`Solver::define_funs_rec`] and [`Solver::define_funs_rec`].
 pub trait FunDef<Info = ()> {
+    /// Type of the function's symbol (name).
     type FunSym: Sym2Smt<Info>;
+    /// Type of the arguments (name, sort).
     type SortedSym: SymAndSort<Info>;
+    /// Type of the iterator over the arguments.
     type ArgsIter: Iterator<Item = Self::SortedSym>;
+    /// Type of the function's output sort.
     type OutSort: Sort2Smt;
+    /// Type of the body.
     type Body: Expr2Smt<Info>;
 
+    /// Function name accessor.
     fn fun_sym(&self) -> &Self::FunSym;
-
+    /// Arguments accessor.
     fn args(&self) -> Self::ArgsIter;
-
+    /// Output sort accessor.
     fn out_sort(&self) -> &Self::OutSort;
-
+    /// Function's body accessor.
     fn body(&self) -> &Self::Body;
 }
 impl<'a, T, Info> FunDef<Info> for &'a T
@@ -145,11 +154,36 @@ where
     }
 }
 
+/// Contains data for a field of a variant of an ADT.
+///
+/// - Used by [`AdtVariant`].
+/// - `T: AdtVariantField` ⇒ `&T: AdtVariantField`
+///
+/// Implementing this trait for you own types is totally fine but if you don't, you can
+/// use pairs `(impl Sym2Smt, impl Sort2Smt)` which implement this trait. See examples.
+///
+/// # Examples
+///
+/// ```rust
+/// use rsmt2::print::*;
+///
+/// let field = ("impl Sym2Smt", "impl Sort2Smt");
+/// let _ = field.field_sym();
+/// let _ = field.field_sort();
+///
+/// fn test(_: impl AdtVariantField) {}
+/// test(&field);
+/// test(field);
+/// ```
 pub trait AdtVariantField {
+    /// Field symbol (name).
     type FieldSym: Sym2Smt;
+    /// Field sort.
     type FieldSort: Sort2Smt;
-    fn sym(&self) -> &Self::FieldSym;
-    fn sort(&self) -> &Self::FieldSort;
+    /// Field symbol accessor.
+    fn field_sym(&self) -> &Self::FieldSym;
+    /// Field sort accessor.
+    fn field_sort(&self) -> &Self::FieldSort;
 }
 impl<'a, T> AdtVariantField for &'a T
 where
@@ -157,11 +191,11 @@ where
 {
     type FieldSym = T::FieldSym;
     type FieldSort = T::FieldSort;
-    fn sym(&self) -> &Self::FieldSym {
-        (*self).sym()
+    fn field_sym(&self) -> &Self::FieldSym {
+        (*self).field_sym()
     }
-    fn sort(&self) -> &Self::FieldSort {
-        (*self).sort()
+    fn field_sort(&self) -> &Self::FieldSort {
+        (*self).field_sort()
     }
 }
 impl<FieldSym, FieldSort> AdtVariantField for (FieldSym, FieldSort)
@@ -172,20 +206,47 @@ where
     type FieldSym = FieldSym;
     type FieldSort = FieldSort;
 
-    fn sym(&self) -> &FieldSym {
+    fn field_sym(&self) -> &FieldSym {
         &self.0
     }
-    fn sort(&self) -> &FieldSort {
+    fn field_sort(&self) -> &FieldSort {
         &self.1
     }
 }
 
+/// Stores data for a variant of an ADT.
+///
+/// - Used by [`AdtDecl`].
+/// - `T: AdtVariant` ⇒ `&T: AdtVariant`
+///
+/// Implementing this trait for you own types is totally fine but if you don't, you can use pairs
+/// `(impl Sym2Smt, impl IntoIterator<Item: AdtVariantField>)` which implement this trait. See
+/// examples.
+///
+/// # Examples
+///
+/// ```rust
+/// use rsmt2::print::*;
+///
+/// let field = ("impl Sym2Smt", "impl Sort2Smt");
+/// let fields = vec![field];
+/// let variant = ("impl Sym2Smt", &fields);
+///
+/// fn test(_: impl AdtVariant) {}
+/// test(&variant);
+/// test(variant);
+/// ```
 pub trait AdtVariant {
+    /// Variant symbol (name).
     type VariantSym: Sym2Smt;
+    /// Type of the variant's fields.
     type Field: AdtVariantField;
+    /// Iterator over the variant's fields.
     type FieldIter: Iterator<Item = Self::Field>;
 
+    /// Variant symbol accessor.
     fn sym(&self) -> &Self::VariantSym;
+    /// Variant fields accessor.
     fn fields(&self) -> Self::FieldIter;
 }
 impl<'a, T> AdtVariant for &'a T
@@ -221,48 +282,99 @@ where
     }
 }
 
+/// Gathers data for an ADT declaration.
+///
+/// - Used by [`Solver::declare_datatypes`].
+/// - `T: AdtDecl` ⇒ `&T: AdtDecl`
+///
+/// Implementing this trait for you own types is totally fine but if you don't, you can use triplets
+/// `(impl Sym2Smt, impl IntoIterator<Item: Sort2Smt>, impl IntoIterator<Item: AdtVariant>)` which
+/// implement this trait. The second type (sort parameter iterator) must also implement
+/// [`ExactSizeIterator`] to access the ADT's arity easily.
+///
+/// # Examples
+///
+/// ```rust
+/// use rsmt2::print::*;
+///
+/// let cons_head_field = ("head", "T");
+/// let cons_tail_field = ("tail", "(List T)");
+/// // Could use any iterable collection here.
+/// let cons_fields = vec![cons_head_field, cons_tail_field];
+/// let cons_variant = ("cons", &cons_fields);
+///
+/// // Could use any iterable collection here.
+/// let nil_fields = vec![];
+/// let nil_variant = ("nil", &nil_fields);
+///
+/// // Could use any iterable collection here.
+/// let variants = [cons_variant, nil_variant];
+/// // Could use any exact-size-iterable collection here.
+/// let sort_args = ["T"];
+///
+/// let list_adt = ("List", &sort_args, &variants);
+///
+/// fn test(_: impl AdtDecl) {}
+/// test(&list_adt);
+/// test(list_adt);
+/// ```
 pub trait AdtDecl {
-    type SortSym: Sym2Smt;
+    /// ADT symbol (name).
+    type AdtSym: Sym2Smt;
+    /// Type of the symbols (names) of the variants (if any).
     type VariantSym: Sym2Smt;
 
+    /// Sort arguments of the ADT.
     type SortArg: Sym2Smt;
-    type ArgsIter: Iterator<Item = Self::SortArg> + ExactSizeIterator;
+    /// Iterator over the sort arguments.
+    ///
+    /// [`ExactSizeIterator`] because this is how we retrieve the ADT's arity (number of sort
+    /// arguments).
+    type SortArgsIter: Iterator<Item = Self::SortArg> + ExactSizeIterator;
 
+    /// Type of the ADT's variants.
     type Variant: AdtVariant;
+    /// Iterator over the ADT variants.
     type VariantIter: Iterator<Item = Self::Variant>;
 
-    fn sort_sym(&self) -> &Self::SortSym;
-    fn args(&self) -> Self::ArgsIter;
+    /// ADT symbol accessor.
+    fn adt_sym(&self) -> &Self::AdtSym;
+    /// ADT sort parameters accessor.
+    fn adt_sort_args(&self) -> Self::SortArgsIter;
+    /// ADT arity.
+    ///
+    /// Same as `self.adt_sort_args().len()` (actually defined that way).
     fn arity(&self) -> usize {
-        self.args().len()
+        self.adt_sort_args().len()
     }
-    fn variants(&self) -> Self::VariantIter;
+    /// ADT variants accessor.
+    fn adt_variants(&self) -> Self::VariantIter;
 }
-impl<SortSym, ArgsIntoIter, VariantIntoIter> AdtDecl for (SortSym, ArgsIntoIter, VariantIntoIter)
+impl<AdtSym, ArgsIntoIter, VariantIntoIter> AdtDecl for (AdtSym, ArgsIntoIter, VariantIntoIter)
 where
-    SortSym: Sym2Smt,
+    AdtSym: Sym2Smt,
     ArgsIntoIter: IntoIterator + Clone,
     ArgsIntoIter::IntoIter: ExactSizeIterator,
     ArgsIntoIter::Item: Sym2Smt,
     VariantIntoIter: IntoIterator + Clone,
     VariantIntoIter::Item: AdtVariant,
 {
-    type SortSym = SortSym;
+    type AdtSym = AdtSym;
     type VariantSym = ArgsIntoIter::Item;
 
     type SortArg = ArgsIntoIter::Item;
-    type ArgsIter = ArgsIntoIter::IntoIter;
+    type SortArgsIter = ArgsIntoIter::IntoIter;
 
     type Variant = VariantIntoIter::Item;
     type VariantIter = VariantIntoIter::IntoIter;
 
-    fn sort_sym(&self) -> &SortSym {
+    fn adt_sym(&self) -> &AdtSym {
         &self.0
     }
-    fn args(&self) -> ArgsIntoIter::IntoIter {
+    fn adt_sort_args(&self) -> ArgsIntoIter::IntoIter {
         self.1.clone().into_iter()
     }
-    fn variants(&self) -> VariantIntoIter::IntoIter {
+    fn adt_variants(&self) -> VariantIntoIter::IntoIter {
         self.2.clone().into_iter()
     }
 }
@@ -270,23 +382,23 @@ impl<'a, T> AdtDecl for &'a T
 where
     T: AdtDecl,
 {
-    type SortSym = T::SortSym;
+    type AdtSym = T::AdtSym;
     type VariantSym = T::VariantSym;
     type SortArg = T::SortArg;
 
-    type ArgsIter = T::ArgsIter;
+    type SortArgsIter = T::SortArgsIter;
 
     type Variant = T::Variant;
     type VariantIter = T::VariantIter;
 
-    fn sort_sym(&self) -> &Self::SortSym {
-        (*self).sort_sym()
+    fn adt_sym(&self) -> &Self::AdtSym {
+        (*self).adt_sym()
     }
-    fn args(&self) -> Self::ArgsIter {
-        (*self).args()
+    fn adt_sort_args(&self) -> Self::SortArgsIter {
+        (*self).adt_sort_args()
     }
-    fn variants(&self) -> Self::VariantIter {
-        (*self).variants()
+    fn adt_variants(&self) -> Self::VariantIter {
+        (*self).adt_variants()
     }
 }
 

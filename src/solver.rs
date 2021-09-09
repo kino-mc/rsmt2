@@ -865,7 +865,7 @@ impl<Parser> Solver<Parser> {
         }
 
         for def in defs.clone() {
-            let sort_sym = def.sort_sym();
+            let sort_sym = def.adt_sym();
             let arity = def.arity();
             tee_write! {
               self, |w| {
@@ -882,8 +882,8 @@ impl<Parser> Solver<Parser> {
 
         for def in defs {
             let arity = def.arity();
-            let args = def.args();
-            let variants = def.variants();
+            let args = def.adt_sort_args();
+            let variants = def.adt_variants();
             tee_write! { self, |w| write!(w, " (")? };
             if arity > 0 {
                 tee_write! { self, |w| write!(w, "par (")? };
@@ -911,8 +911,8 @@ impl<Parser> Solver<Parser> {
 
                 if let Some(first) = first_field {
                     for field in Some(first).into_iter().chain(fields) {
-                        let sym = field.sym();
-                        let sort = field.sort();
+                        let sym = field.field_sym();
+                        let sort = field.field_sort();
                         tee_write! {
                             self, |w| {
                                 write!(w, " (")?;
