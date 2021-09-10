@@ -15,6 +15,9 @@ edition = "2018"
 [[example]]
 name = "custom_cmd"
 test = true
+[[example]]
+name = "adt"
+test = true
 
 [badges]
 travis-ci = { repository = "kino-mc/rsmt2", service = "github" }

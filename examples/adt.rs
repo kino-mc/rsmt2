@@ -1,3 +1,8 @@
+#[test]
+fn test_adt() {
+    run()
+}
+
 fn run() {
     use rsmt2::{
         print::{AdtDecl, AdtVariant, AdtVariantField},
