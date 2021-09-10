@@ -171,7 +171,7 @@
 //! [nom]: https://crates.io/crates/nom (nom crate on crates.io)
 //! [regex]: https://crates.io/crates/regex (regex crate on crates.io)
 
-use crate::common::*;
+use crate::prelude::*;
 
 use std::io::{BufRead, BufReader, Read};
 use std::process::ChildStdout;
@@ -1491,6 +1491,28 @@ where
         self.parse_type(input.get_sexpr()?)
     }
 }
+impl<'a, Br> IdentParser<&'a str, &'a str, &'a mut SmtParser<Br>> for ()
+where
+    Br: BufRead,
+{
+    fn parse_ident(self, input: &'a mut SmtParser<Br>) -> SmtRes<&'a str> {
+        input.get_sexpr()
+    }
+    fn parse_type(self, input: &'a mut SmtParser<Br>) -> SmtRes<&'a str> {
+        input.get_sexpr()
+    }
+}
+impl<'a, Br> IdentParser<String, String, &'a mut SmtParser<Br>> for ()
+where
+    Br: BufRead,
+{
+    fn parse_ident(self, input: &'a mut SmtParser<Br>) -> SmtRes<String> {
+        input.get_sexpr().map(String::from)
+    }
+    fn parse_type(self, input: &'a mut SmtParser<Br>) -> SmtRes<String> {
+        input.get_sexpr().map(String::from)
+    }
+}
 
 /// Can parse models. Used for [`Solver::get_model`][crate::Solver::get_model].
 ///
@@ -1545,6 +1567,34 @@ where
         self.parse_value(input.get_sexpr()?, name, inputs, output)
     }
 }
+impl<'a, Br> ModelParser<&'a str, &'a str, &'a str, &'a mut SmtParser<Br>> for ()
+where
+    Br: BufRead,
+{
+    fn parse_value(
+        self,
+        input: &'a mut SmtParser<Br>,
+        _name: &&'a str,
+        _inputs: &[(&'a str, &'a str)],
+        _output: &&'a str,
+    ) -> SmtRes<&'a str> {
+        input.get_sexpr()
+    }
+}
+impl<'a, Br> ModelParser<String, String, String, &'a mut SmtParser<Br>> for ()
+where
+    Br: BufRead,
+{
+    fn parse_value(
+        self,
+        input: &'a mut SmtParser<Br>,
+        _name: &String,
+        _inputs: &[(String, String)],
+        _output: &String,
+    ) -> SmtRes<String> {
+        input.get_sexpr().map(String::from)
+    }
+}
 
 /// Can parse values. Used for [`Solver::get_values`][crate::Solver::get_values].
 ///
@@ -1570,11 +1620,28 @@ where
         self.parse_value(input.get_sexpr()?)
     }
 }
+impl<'a, Br> ValueParser<&'a str, &'a mut SmtParser<Br>> for ()
+where
+    Br: BufRead,
+{
+    fn parse_value(self, input: &'a mut SmtParser<Br>) -> SmtRes<&'a str> {
+        input.get_sexpr()
+    }
+}
+impl<'a, Br> ValueParser<String, &'a mut SmtParser<Br>> for ()
+where
+    Br: BufRead,
+{
+    fn parse_value(self, input: &'a mut SmtParser<Br>) -> SmtRes<String> {
+        input.get_sexpr().map(String::from)
+    }
+}
 
 /// Can parse expressions. Used for [`Solver::get_values`][crate::Solver::get_values].
 ///
 /// For more information refer to the [module-level documentation](self).
 pub trait ExprParser<Expr, Info, Input>: Copy {
+    /// Parses an expression given some info.
     fn parse_expr(self, i: Input, info: Info) -> SmtRes<Expr>;
 }
 impl<'a, Expr, Info, T> ExprParser<Expr, Info, &'a str> for T
@@ -1594,11 +1661,28 @@ where
         self.parse_expr(input.get_sexpr()?, info)
     }
 }
+impl<'a, Br> ExprParser<&'a str, (), &'a mut SmtParser<Br>> for ()
+where
+    Br: BufRead,
+{
+    fn parse_expr(self, input: &'a mut SmtParser<Br>, _info: ()) -> SmtRes<&'a str> {
+        input.get_sexpr()
+    }
+}
+impl<'a, Br> ExprParser<String, (), &'a mut SmtParser<Br>> for ()
+where
+    Br: BufRead,
+{
+    fn parse_expr(self, input: &'a mut SmtParser<Br>, _info: ()) -> SmtRes<String> {
+        input.get_sexpr().map(String::from)
+    }
+}
 
 /// Can parse proofs. Currenly unused.
 ///
 /// For more information refer to the [module-level documentation](self).
 pub trait ProofParser<Proof, Input>: Copy {
+    /// Parses a proof.
     fn parse_proof(self, i: Input) -> SmtRes<Proof>;
 }
 impl<'a, Proof, T> ProofParser<Proof, &'a str> for T

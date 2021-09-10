@@ -50,5 +50,7 @@ jobs:
       run: cargo build --verbose
     - name: Build release
       run: cargo build --release --verbose
+    - name: Documentation check
+      run: cargo doc
     - name: Run tests
       run: cargo test --verbose -- --skip cvc4 --skip yices_2

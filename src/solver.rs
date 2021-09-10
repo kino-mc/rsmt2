@@ -6,12 +6,7 @@ use std::fs::File;
 use std::io::{BufReader, BufWriter, Read, Write};
 use std::process::{Child, ChildStdin, ChildStdout, Command, Stdio};
 
-use crate::{
-    actlit::Actlit,
-    common::*,
-    conf::SmtConf,
-    parse::{ExprParser, IdentParser, ModelParser, RSmtParser, SymParser, ValueParser},
-};
+use crate::{actlit::Actlit, parse::*, prelude::*, print::*};
 
 /// Promise for an asynchronous check-sat.
 pub struct FutureCheckSat {
@@ -403,7 +398,6 @@ impl<Parser> Solver<Parser> {
     /// let mut conf = SmtConf::default_z3();
     /// conf.option("-t:10");
     /// # let mut solver = Solver::new(conf, ()).unwrap();
-    /// solver.path_tee("./log.smt2").unwrap();
     /// solver.declare_const("x", "Int").unwrap();
     /// solver.declare_const("y", "Int").unwrap();
     ///
@@ -950,6 +944,44 @@ impl<Parser> Solver<Parser> {
 /// # Basic SMT-LIB commands using the user's parser.
 impl<Parser> Solver<Parser> {
     /// Get-model command.
+    ///
+    /// - See also [`Self::get_model_const`].
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use rsmt2::Solver;
+    ///
+    /// let mut solver = Solver::default_z3(()).unwrap();
+    ///
+    /// solver.declare_const("x", "Int").unwrap();
+    /// solver.declare_const("y", "Int").unwrap();
+    ///
+    /// solver.assert("(= (+ x y) 0)").unwrap();
+    ///
+    /// let is_sat = solver.check_sat().unwrap();
+    /// assert!(is_sat);
+    /// let model = solver.get_model().unwrap();
+    /// # println!("model: {:?}", model);
+    ///
+    /// let (mut x, mut y) = (None, None);
+    /// // `x` and `y` are constants, *i.e.* functions taking no arguments. In general however,
+    /// // `get_model` can yield functions. Hence the list of arguments
+    /// //          vvvv
+    /// for (ident, args, sort, value) in model {
+    ///     assert!(args.is_empty());
+    ///     if ident == "x" {
+    ///         x = Some(isize::from_str_radix(&value, 10).expect("while parsing `x` value"))
+    ///     } else if ident == "y" {
+    ///         y = Some(isize::from_str_radix(&value, 10).expect("while parsing `y` value"))
+    ///     } else {
+    ///         panic!("unexpected ident `{}` in model", ident)
+    ///     }
+    /// }
+    ///
+    /// let (x, y) = (x.expect("`x` not found in model"), y.expect("`y` not found in model"));
+    /// assert_eq!(x + y, 0)
+    /// ```
     pub fn get_model<Ident, Type, Value>(&mut self) -> SmtRes<Model<Ident, Type, Value>>
     where
         Parser: for<'p> IdentParser<Ident, Type, &'p mut RSmtParser>
@@ -960,6 +992,45 @@ impl<Parser> Solver<Parser> {
     }
 
     /// Get-model command when all the symbols are nullary.
+    ///
+    /// - See also [`Self::get_model`].
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use rsmt2::Solver;
+    ///
+    /// let mut solver = Solver::default_z3(()).unwrap();
+    ///
+    /// solver.declare_const("x", "Int").unwrap();
+    /// solver.declare_const("y", "Int").unwrap();
+    ///
+    /// solver.assert("(= (+ x y) 0)").unwrap();
+    ///
+    /// let is_sat = solver.check_sat().unwrap();
+    /// assert!(is_sat);
+    /// // We only have `x` and `y` which are constant symbols (functions with no arguments).
+    /// // Using `get_model_const` instead of `get_model` will generate a model where symbols
+    /// // have no arguments.
+    /// let model = solver.get_model_const().unwrap();
+    /// # println!("model: {:?}", model);
+    ///
+    /// let (mut x, mut y) = (None, None);
+    /// // No list of arguments in the model, as opposed to models from `get_model`.
+    /// //   vvvvvvvvvvvvvvvvvv
+    /// for (ident, sort, value) in model {
+    ///     if ident == "x" {
+    ///         x = Some(isize::from_str_radix(&value, 10).expect("while parsing `x` value"))
+    ///     } else if ident == "y" {
+    ///         y = Some(isize::from_str_radix(&value, 10).expect("while parsing `y` value"))
+    ///     } else {
+    ///         panic!("unexpected ident `{}` in model", ident)
+    ///     }
+    /// }
+    ///
+    /// let (x, y) = (x.expect("`x` not found in model"), y.expect("`y` not found in model"));
+    /// assert_eq!(x + y, 0)
+    /// ```
     pub fn get_model_const<Ident, Type, Value>(&mut self) -> SmtRes<Vec<(Ident, Type, Value)>>
     where
         Parser: for<'p> IdentParser<Ident, Type, &'p mut RSmtParser>
@@ -971,8 +1042,47 @@ impl<Parser> Solver<Parser> {
 
     /// Get-values command.
     ///
+    /// - See also [`Self::get_values_with`].
+    ///
     /// Notice that the input expression type and the output one have no reason
     /// to be the same.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use rsmt2::Solver;
+    ///
+    /// let mut solver = Solver::default_z3(()).unwrap();
+    ///
+    /// solver.declare_const("x", "Int").unwrap();
+    /// solver.declare_const("y", "Int").unwrap();
+    ///
+    /// solver.assert("(= (+ x y) 0)").unwrap();
+    ///
+    /// let is_sat = solver.check_sat().unwrap();
+    /// assert!(is_sat);
+    ///
+    /// let vars = ["x", "y"];
+    /// let values = solver.get_values(&vars).unwrap();
+    /// # println!("values: {:?}", values);
+    /// assert_eq!(vars.len(), values.len());
+    ///
+    /// let mut sum = 0;
+    /// let mut values = values.into_iter();
+    ///
+    /// let (var, val) = values.next().unwrap();
+    /// assert_eq!(var, "x");
+    /// let val = isize::from_str_radix(&val, 10).expect("while parsing `x` value");
+    /// sum += val;
+    ///
+    /// let (var, val) = values.next().unwrap();
+    /// assert_eq!(var, "y");
+    /// let val = isize::from_str_radix(&val, 10).expect("while parsing `y` value");
+    /// sum += val;
+    ///
+    /// assert_eq!(values.next(), None);
+    /// assert_eq!(sum, 0);
+    /// ```
     pub fn get_values<Exprs, PExpr, PValue>(&mut self, exprs: Exprs) -> SmtRes<Vec<(PExpr, PValue)>>
     where
         Parser: for<'p> ExprParser<PExpr, (), &'p mut RSmtParser>
@@ -986,8 +1096,10 @@ impl<Parser> Solver<Parser> {
 
     /// Get-values command.
     ///
+    /// - See also [`Self::get_values`].
+    ///
     /// Notice that the input expression type and the output one have no reason to be the same.
-    fn get_values_with<Exprs, PExpr, PValue, Info>(
+    pub fn get_values_with<Exprs, PExpr, PValue, Info>(
         &mut self,
         exprs: Exprs,
         info: Info,
@@ -1005,22 +1117,42 @@ impl<Parser> Solver<Parser> {
 
     /// Get-unsat-core command.
     ///
+    /// See also
+    ///
+    /// - [`NamedExpr`]: a convenient wrapper around any expression that gives it a name.
+    ///
     /// # Examples
     ///
     /// ```rust
-    /// use rsmt2::Solver;
+    /// use rsmt2::prelude::*;
+    /// let mut conf = SmtConf::default_z3();
+    /// conf.unsat_cores();
+    /// # println!("unsat_cores: {}", conf.get_unsat_cores());
     ///
-    /// let mut solver = Solver::default_z3(()).unwrap();
+    /// let mut solver = Solver::new(conf, ()).unwrap();
+    /// solver.declare_const("n", "Int").unwrap();
+    /// solver.declare_const("m", "Int").unwrap();
     ///
-    /// solver.declare_const("x", "Int").unwrap();
-    /// solver.declare_const("y", "Int").unwrap();
+    /// solver.assert("true").unwrap();
     ///
-    /// solver.assert("(= (+ x y) 0)").unwrap();
+    /// let e_1 = "(> n 7)";
+    /// let label_e_1 = "e_1";
+    /// let named = NamedExpr::new(label_e_1, e_1);
+    /// solver.assert(&named).unwrap();
     ///
-    /// let future = solver.print_check_sat().unwrap();
-    /// // Do stuff while the solver works.
-    /// let sat = solver.parse_check_sat(future).unwrap();
-    /// assert!(sat);
+    /// let e_2 = "(> m 0)";
+    /// let label_e_2 = "e_2";
+    /// let named = NamedExpr::new(label_e_2, e_2);
+    /// solver.assert(&named).unwrap();
+    ///
+    /// let e_3 = "(< n 3)";
+    /// let label_e_3 = "e_3";
+    /// let named = NamedExpr::new(label_e_3, e_3);
+    /// solver.assert(&named).unwrap();
+    ///
+    /// assert!(!solver.check_sat().unwrap());
+    /// let core: Vec<String> = solver.get_unsat_core().unwrap();
+    /// assert_eq!(core, vec![label_e_1, label_e_3]);
     /// ```
     pub fn get_unsat_core<Sym>(&mut self) -> SmtRes<Vec<Sym>>
     where
@@ -1031,6 +1163,8 @@ impl<Parser> Solver<Parser> {
     }
 
     /// Get-interpolant command.
+    ///
+    /// - See [`Solver::get_interpolant_with`].
     pub fn get_interpolant<Expr>(
         &mut self,
         sym_1: impl Sym2Smt,
@@ -1043,6 +1177,54 @@ impl<Parser> Solver<Parser> {
     }
 
     /// Get-interpolant command.
+    ///
+    /// - See [Craig interpolation].
+    /// - Only supported by recent versions of Z3.
+    /// - This command is only legal after an `unsat` result.
+    /// - The order of the two inputs symbols *matters*.
+    ///
+    /// Typically, you should assert two **named** formulas `f_1` and `f_2` (example
+    /// [below](#examples)). Assuming you issue `check-sat` and get `unsat` (meaning `f_1 ⇒ ¬f_2`),
+    /// then `get_interpolant(f_1, f_2)` produces a formula `I` such that
+    /// - `f_1 ⇒ I`, *i.e.* `f_1 ∧ ¬I` is unsat,
+    /// - `I ⇒ ¬f_2`, *i.e.* `I ∧ f_2` is unsat, and
+    /// - `I` only mentions variables (constant symbols) that appear in both `f_1` and `f_2`.
+    ///
+    /// One way to think about interpolation is that `I` captures the reason for `f_1 ∧ f_2` being
+    /// unsat from the *point of view of `f_1`*, in the sense that `I` does not contain variables
+    /// that do not appear in `f_1`.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use rsmt2::prelude::*;
+    ///
+    /// let mut solver = Solver::default_z3(()).unwrap();
+    ///
+    /// let (n, m) = ("n", "m");
+    /// solver.declare_const(n, "Int").expect("declaring n");
+    /// solver.declare_const(m, "Int").expect("declaring m");
+    ///
+    /// let f_1 = "(or (= (mod n 2) 0) (> n 42))";
+    /// solver.assert(f_1.to_smt_named("f_1")).expect("assert f_1");
+    ///
+    /// let f_2 = "(and (< n m) (< m 9) (= (mod n 2) 1))";
+    /// solver.assert(f_2.to_smt_named("f_2")).expect("assert f_2");
+    ///
+    /// let is_sat = solver.check_sat().unwrap();
+    /// assert!(!is_sat);
+    ///
+    /// let interpolant: String = solver.get_interpolant("f_1", "f_2").unwrap();
+    /// # println!("interpolant 1: {:?}", interpolant);
+    /// assert_eq!(&interpolant, "(or (not (<= n 42)) (= (mod n 2) 0))");
+    ///
+    /// // Let's try again, but this time we switch the arguments of `get_interpolant`.
+    /// let interpolant: String = solver.get_interpolant("f_2", "f_1").unwrap();
+    /// # println!("interpolant 2: {:?}", interpolant);
+    /// assert_eq!(&interpolant, "(and (= (mod n 2) 1) (<= n 7))");
+    /// ```
+    ///
+    /// [Craig interpolation]: https://en.wikipedia.org/wiki/Craig_interpolation
     pub fn get_interpolant_with<Info, Expr>(
         &mut self,
         sym_1: impl Sym2Smt,
@@ -1053,7 +1235,18 @@ impl<Parser> Solver<Parser> {
         Parser: for<'p> ExprParser<Expr, Info, &'p mut RSmtParser>,
     {
         self.print_get_interpolant(sym_1, sym_2)?;
-        self.parse_get_interpolant(info)
+        let res = self.parse_get_interpolant(info);
+        if res.is_err() && self.conf.style().is_z3() {
+            res.chain_err(|| {
+                format!(
+                    "`get-interpolant` is not legal for {} solvers",
+                    self.conf.style()
+                )
+            })
+            .chain_err(|| format!("only Z3 supports `get-interpolant`"))
+        } else {
+            res
+        }
     }
 }
 
@@ -1156,42 +1349,22 @@ impl<Parser> Solver<Parser> {
     /// Allows to print the `check-sat` and get the result later, *e.g.* with
     /// [`Self::parse_check_sat`].
     ///
-    /// See also
-    ///
-    /// - [`NamedExpr`]: a convenient wrapper around any expression that gives it a name.
-    ///
     /// # Examples
     ///
     /// ```rust
-    /// use rsmt2::prelude::*;
-    /// let mut conf = SmtConf::default_z3();
-    /// conf.unsat_cores();
-    /// # println!("unsat_cores: {}", conf.get_unsat_cores());
+    /// use rsmt2::Solver;
     ///
-    /// let mut solver = Solver::new(conf, ()).unwrap();
-    /// solver.declare_const("n", "Int").unwrap();
-    /// solver.declare_const("m", "Int").unwrap();
+    /// let mut solver = Solver::default_z3(()).unwrap();
     ///
-    /// solver.assert("true").unwrap();
+    /// solver.declare_const("x", "Int").unwrap();
+    /// solver.declare_const("y", "Int").unwrap();
     ///
-    /// let e_1 = "(> n 7)";
-    /// let label_e_1 = "e_1";
-    /// let named = NamedExpr::new(label_e_1, e_1);
-    /// solver.assert(&named).unwrap();
+    /// solver.assert("(= (+ x y) 0)").unwrap();
     ///
-    /// let e_2 = "(> m 0)";
-    /// let label_e_2 = "e_2";
-    /// let named = NamedExpr::new(label_e_2, e_2);
-    /// solver.assert(&named).unwrap();
-    ///
-    /// let e_3 = "(< n 3)";
-    /// let label_e_3 = "e_3";
-    /// let named = NamedExpr::new(label_e_3, e_3);
-    /// solver.assert(&named).unwrap();
-    ///
-    /// assert!(!solver.check_sat().unwrap());
-    /// let core: Vec<String> = solver.get_unsat_core().unwrap();
-    /// assert_eq!(core, vec![label_e_1, label_e_3]);
+    /// let future = solver.print_check_sat().unwrap();
+    /// // Do stuff while the solver works.
+    /// let sat = solver.parse_check_sat(future).unwrap();
+    /// assert!(sat);
     /// ```
     #[inline]
     pub fn print_check_sat(&mut self) -> SmtRes<FutureCheckSat> {

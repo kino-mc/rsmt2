@@ -1,3 +1,9 @@
+# v0.14.0
+
+- `Solver::get_interpolant` now mature enough for actual use (examples in doc)
+- `()` now implements all parser traits but `ProofParser` (generates `&str` or `String`)
+- overall improvements documentation-wise, including more examples
+
 # v0.13.1
 
 - added *named assert* function on `Solver`s
