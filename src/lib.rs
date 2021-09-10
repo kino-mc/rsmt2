@@ -343,14 +343,14 @@
 //! [`custom_cmd` example]: https://github.com/kino-mc/rsmt2/tree/master/examples/custom_cmd.rs
 //! (Example of passing a custom solver command to rsmt2)
 
+#![deny(missing_docs, rustdoc::broken_intra_doc_links)]
+
 #[macro_use]
 extern crate error_chain;
 
 /// Common rsmt2 type and helpers.
 pub mod prelude {
-    pub use crate::{
-        actlit, common::NamedExpr, errors::SmtRes, parse::*, print::*, SmtConf, Solver,
-    };
+    pub use crate::{actlit, errors::SmtRes, parse::*, print::*, Logic, SmtConf, Solver};
 }
 
 /// Errors.
@@ -451,9 +451,10 @@ pub mod actlit;
 pub mod asynch;
 pub mod conf;
 pub mod parse;
+pub mod print;
 mod solver;
 
-pub use crate::common::{Logic, NamedExpr};
+pub use crate::common::Logic;
 pub use crate::conf::{SmtConf, SmtStyle};
 pub use crate::errors::SmtRes;
 pub use crate::solver::Solver;
@@ -469,13 +470,6 @@ pub mod examples;
 /// Examples, only available if the `examples` feature is active.
 #[cfg(not(any(test, feature = "examples")))]
 pub mod examples {}
-
-/// Traits your types must implement so that rsmt2 can use them.
-pub mod print {
-    pub use crate::common::{
-        AdtDecl, AdtVariant, AdtVariantField, Expr2Smt, Sort2Smt, Sym2Smt, SymAndSort,
-    };
-}
 
 #[cfg(test)]
 mod tests;

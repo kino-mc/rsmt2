@@ -6,7 +6,7 @@
 // Parser library.
 use std::io::Write;
 
-use crate::{common::*, parse::*};
+use crate::{parse::*, print::*};
 
 #[cfg(test)]
 use crate::examples::get_solver;
