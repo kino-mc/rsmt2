@@ -1,3 +1,7 @@
+# v0.14.1
+
+- properly `wait` for child solver process, [#29](https://github.com/kino-mc/rsmt2/issues/29)
+
 # v0.14.0
 
 - `Solver::get_interpolant` now mature enough for actual use (examples in doc)

@@ -287,16 +287,18 @@ impl<Parser> Solver<Parser> {
         let _ = writeln!(self.stdin, "(exit)");
         let _ = self.stdin.flush();
         let _ = self.kid.kill();
-        let join = self
-            .kid
-            .try_wait()
-            .chain_err(|| "waiting for child process to exit")?;
-        if join.is_none() {
-            self.kid
-                .kill()
-                .chain_err::<_, ErrorKind>(|| "while killing child process".into())?
+        let wait_time = std::time::Duration::from_millis(10);
+        for _ in 0..100 {
+            let join = self
+                .kid
+                .try_wait()
+                .chain_err(|| "waiting for child process to exit")?;
+            if join.is_some() {
+                return Ok(());
+            }
+            std::thread::sleep(wait_time);
         }
-        Ok(())
+        bail!("failed to wait for child process to properly terminate")
     }
 
     /// Internal comment function.
