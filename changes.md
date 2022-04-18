@@ -1,4 +1,4 @@
-# v0.15.0
+# v0.15.1
 
 - `eof` token has been renamed to `eoi`
 - fixed a bug in SMT-level error parsing
