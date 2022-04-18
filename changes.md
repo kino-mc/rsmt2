@@ -1,3 +1,9 @@
+# v0.15.0
+
+- `eof` token has been renamed to `eoi`
+- fixed a bug in SMT-level error parsing
+- minor internal revamping (`try_load_sexpr`)
+
 # v0.14.1
 
 - properly `wait` for child solver process, [#29](https://github.com/kino-mc/rsmt2/issues/29)

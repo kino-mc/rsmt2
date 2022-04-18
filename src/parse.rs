@@ -156,14 +156,22 @@
 //! }
 //!
 //! use rsmt2::errors::ErrorKind;
-//! match * parser.get_model_const( false, & Parser ).unwrap_err().kind() {
-//!     ErrorKind::ParseError(ref msg, ref token) => {
+//! let e = parser.get_model_const( false, & Parser ).unwrap_err();
+//! # println!("error:");
+//! # for e in e.iter() {
+//! #     for (idx, line) in e.to_string().lines().enumerate() {
+//! #         if idx == 0 { print!("- ") } else { print!("  ") }
+//! #         println!("{}", line);
+//! #     }
+//! # }
+//! match e.kind() {
+//!     ErrorKind::ParseError(msg, token) => {
 //!         assert_eq!(
 //!             msg, "expected `(` opening define-fun or `)` closing model"
 //!         );
-//!         assert_eq!(token, "eof")
+//!         assert_eq!(token, "eoi")
 //!     },
-//!     ref error => panic!("unexpected error: {}", error)
+//!     error => panic!("unexpected error: {}", error)
 //! }
 //! # }
 //! ```
@@ -294,8 +302,9 @@ impl<R: BufRead> SmtParser<R> {
 
     /// Loads lines until a full s-expr is loaded.
     ///
-    /// Returns the next position of the end of the sexpr. The cursor will be set at its beginning.
-    fn load_sexpr(&mut self) -> SmtRes<usize> {
+    /// Returns the position following the end of the sexpr. The cursor will be set at its
+    /// beginning.
+    fn try_load_sexpr(&mut self) -> SmtRes<Option<usize>> {
         self.spc_cmt();
 
         let (mut op_paren, mut cl_paren) = (0, 0);
@@ -305,9 +314,9 @@ impl<R: BufRead> SmtParser<R> {
 
         'load: loop {
             if sexpr_start == self.buff.len() {
-                let eof = !self.read_line()?;
-                if eof {
-                    bail!("reached eof")
+                let eoi = !self.read_line()?;
+                if eoi {
+                    return Ok(None);
                 }
             }
             debug_assert!(op_paren >= cl_paren);
@@ -366,7 +375,19 @@ impl<R: BufRead> SmtParser<R> {
         }
 
         self.spc_cmt();
-        Ok(sexpr_end)
+        Ok(Some(sexpr_end))
+    }
+
+    /// Loads lines until a full s-expr is loaded.
+    ///
+    /// Returns the position following the end of the sexpr. The cursor will be set at its
+    /// beginning.
+    fn load_sexpr(&mut self) -> SmtRes<usize> {
+        if let Some(end) = self.try_load_sexpr()? {
+            Ok(end)
+        } else {
+            bail!("reached eoi")
+        }
     }
 
     /// Clears the buffer up to the current position.
@@ -496,9 +517,9 @@ impl<R: BufRead> SmtParser<R> {
                         ()
                     }
                 }
-                let eof = !self.read_line()?;
+                let eoi = !self.read_line()?;
                 self.spc_cmt();
-                if eof {
+                if eoi {
                     return Ok(false);
                 }
             } else if &self.buff[self.cursor..self.cursor + tag.len()] == tag {
@@ -524,9 +545,12 @@ impl<R: BufRead> SmtParser<R> {
     ///
     /// Returns `()` exactly when [`Self::try_tag`] returns `true`, and an error otherwise.
     pub fn tag_info(&mut self, tag: &str, err_msg: &str) -> SmtRes<()> {
+        println!("  try_tag(`{}`)", tag);
         if self.try_tag(tag)? {
+            println!("  - got it");
             Ok(())
         } else {
+            println!("  - fail time");
             self.fail_with(format!("expected `{}` {}", tag, err_msg))
         }
     }
@@ -651,10 +675,7 @@ impl<R: BufRead> SmtParser<R> {
     /// Generates a failure at the current position.
     pub fn fail_with<T, Str: Into<String>>(&mut self, msg: Str) -> SmtRes<T> {
         self.try_error()?;
-        let sexpr = match self.get_sexpr() {
-            Ok(e) => Some(e.to_string()),
-            _ => None,
-        };
+        let sexpr = self.get_sexpr().map(str::to_string).ok();
         let sexpr = if let Some(e) = sexpr {
             e
         } else if self.cursor < self.buff.len() {
@@ -665,7 +686,7 @@ impl<R: BufRead> SmtParser<R> {
                 " ".to_string()
             }
         } else {
-            "eof".to_string()
+            "eoi".to_string()
         };
         if sexpr == "unsupported" {
             bail!(ErrorKind::Unsupported)
@@ -1069,9 +1090,9 @@ impl<R: BufRead> SmtParser<R> {
                 }
                 self.spc_cmt();
                 if let Some((den_start, den_end)) = self.try_uint_indices()? {
-                    let not_eof = den_end + 1 < self.buff.len();
+                    let not_eoi = den_end + 1 < self.buff.len();
                     let point_zero = &self.buff[den_end..(den_end + 2)] == ".0";
-                    if not_eof && point_zero {
+                    if not_eoi && point_zero {
                         self.cursor = den_end + 2
                     // } else if den_end < self.buff.len()
                     // && & self.buff[ den_end .. (den_end + 1) ] == "." {
@@ -1198,7 +1219,7 @@ impl<R: BufRead> SmtParser<R> {
     /// use rsmt2::parse::{ IdentParser, ValueParser };
     /// use rsmt2::SmtRes;
     /// let txt = "\
-    ///     ( error \"huge panic\" )
+    ///     ( error \"huge panic\n\n'something' () parens\" )
     /// ";
     /// let mut parser = SmtParser::of_str(txt);
     /// if let Err(e) = parser.try_error() {
@@ -1207,7 +1228,7 @@ impl<R: BufRead> SmtParser<R> {
     /// #            println!("{}", line)
     /// #        }
     /// #    }
-    ///     assert_eq! { & format!("{}", e), "solver error: \"huge panic\"" }
+    ///     assert_eq! { & format!("{}", e), "solver error: \"huge panic\n\n'something' () parens\"" }
     /// } else {
     ///     panic!("expected error, got nothing :(")
     /// }
@@ -1215,6 +1236,9 @@ impl<R: BufRead> SmtParser<R> {
     /// ```
     pub fn try_error(&mut self) -> SmtRes<()> {
         let start_pos = self.pos();
+        if self.try_load_sexpr()?.is_none() {
+            return Ok(());
+        }
         if self.try_tag("(")? {
             self.spc_cmt();
             if self.try_tag("error")? {
@@ -1222,11 +1246,18 @@ impl<R: BufRead> SmtParser<R> {
                 if self.try_tag("\"")? {
                     let err_start = self.pos();
                     let mut err_end = err_start;
-                    loop {
-                        if err_end < self.buff.len() && &self.buff[err_end..err_end + 1] != "\"" {
-                            err_end += 1
-                        } else {
+                    while err_end < self.buff.len() {
+                        if err_end + 1 < self.buff.len() {
+                            if &self.buff[err_end..err_end + 2] == "\\\"" {
+                                err_end += 2;
+                                continue;
+                            }
+                        }
+                        if &self.buff[err_end..err_end + 1] == "\"" {
                             break;
+                        } else {
+                            err_end += 1;
+                            continue;
                         }
                     }
                     self.cursor = err_end + 1;
@@ -1305,21 +1336,30 @@ impl<R: BufRead> SmtParser<R> {
         self.tag("(")?;
         self.try_tag("model")?;
         while !self.try_tag(")")? {
+            println!("1");
             self.tag_info("(", "opening define-fun or `)` closing model")?;
+            println!("2");
             self.tag("define-fun")?;
+            println!("3");
 
             if prune_actlits && self.try_actlit_id()? {
+                println!("4.1");
                 self.tags(&["(", ")"])?;
                 self.tag("Bool")?;
                 self.bool()?;
             } else {
+                println!("5.1");
                 let id = parser.parse_ident(self)?;
+                println!("5.2");
                 self.tags(&["(", ")"])?;
+                println!("5.3");
                 let typ = parser.parse_type(self)?;
+                println!("5.4");
                 let value = parser.parse_value(self, &id, &[], &typ)?;
+                println!("5.5");
                 model.push((id, typ, value));
             }
-            self.tag(")")?
+            self.tag(")")?;
         }
         self.clear();
         Ok(model)

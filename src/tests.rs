@@ -78,7 +78,7 @@ pub mod cvc4 {
                 &e.to_ml_string(),
                 "- some versions of CVC4 produce errors on `get-value` commands, \
                  consider using `get-model` instead\n\
-                 - parse error: expected `(` on `eof`"
+                 - parse error: expected `(` on `eoi`"
             ),
         }
     }
