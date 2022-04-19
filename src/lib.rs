@@ -1,4 +1,4 @@
-//! A wrapper around SMT Lib 2(.5)-compliant SMT solvers.
+//! A wrapper around SMT-LIB 2(.5)-compliant SMT solvers.
 //!
 //! See [`CHANGES.md`][changes] for the list of changes.
 //!

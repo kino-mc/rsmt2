@@ -88,7 +88,7 @@ impl SmtStyle {
                 options: vec!["-in".into(), "-smt2".into()],
                 models: true,
                 incremental: true,
-                parse_success: false,
+                check_success: false,
                 unsat_cores: false,
                 interpolants: true,
                 check_sat_assuming: supported("check-sat-assuming"),
@@ -104,7 +104,7 @@ impl SmtStyle {
                 ],
                 models: false,
                 incremental: false,
-                parse_success: false,
+                check_success: false,
                 unsat_cores: false,
                 interpolants: false,
                 check_sat_assuming: unsupported(),
@@ -115,7 +115,7 @@ impl SmtStyle {
                 options: vec![],
                 models: false,
                 incremental: false,
-                parse_success: false,
+                check_success: false,
                 unsat_cores: false,
                 interpolants: false,
                 check_sat_assuming: supported("check-sat-assuming"),
@@ -225,7 +225,7 @@ pub struct SmtConf {
     /// Incrementality.
     incremental: bool,
     /// Parse success.
-    parse_success: bool,
+    check_success: bool,
     /// Triggers unsat-core production.
     unsat_cores: bool,
     /// Triggers interpolant production.
@@ -761,48 +761,45 @@ impl SmtConf {
         self.check_sat_assuming.as_ref().map(|s| *s)
     }
 
-    /// Indicates if print success is active.
+    /// Indicates if success-checking is active, see [`Solver`](crate::Solver#check-success).
     ///
     /// # Examples
     ///
     /// ```rust
     /// # use rsmt2::SmtConf;
-    /// assert!(! SmtConf::default_z3().get_print_success());
+    /// assert!(! SmtConf::default_z3().get_check_success());
     /// ```
     #[inline]
-    #[cfg(not(no_parse_success))]
-    pub fn get_print_success(&self) -> bool {
-        self.parse_success
+    pub fn get_check_success(&self) -> bool {
+        self.check_success
     }
-    /// Activates parse sucess.
+    /// Activates success-checking, see [`Solver`](crate::Solver#check-success).
     ///
     /// # Examples
     ///
     /// ```rust
     /// # use rsmt2::SmtConf;
     /// let mut conf = SmtConf::default_z3();
-    /// conf.print_success();
-    /// assert!(conf.get_print_success());
+    /// conf.check_success();
+    /// assert!(conf.get_check_success());
     /// ```
     #[inline]
-    #[cfg(not(no_parse_success))]
-    pub fn print_success(&mut self) {
-        self.set_print_success(true)
+    pub fn check_success(&mut self) {
+        self.set_check_success(true)
     }
-    /// (De)activates parse sucess.
+    /// (De)activates sucess-checking, see [`Solver`](crate::Solver#check-success).
     ///
     /// # Examples
     ///
     /// ```rust
     /// # use rsmt2::SmtConf;
     /// let mut conf = SmtConf::default_z3();
-    /// conf.set_print_success(true);
-    /// assert!(conf.get_print_success());
+    /// conf.set_check_success(true);
+    /// assert!(conf.get_check_success());
     /// ```
     #[inline]
-    #[cfg(not(no_parse_success))]
-    pub fn set_print_success(&mut self, val: bool) {
-        self.parse_success = val
+    pub fn set_check_success(&mut self, val: bool) {
+        self.check_success = val
     }
 
     /// Indicates if interpolant production is active.

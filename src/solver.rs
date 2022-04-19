@@ -1,4 +1,4 @@
-//! Wrapper around an SMT Lib 2 compliant solver.
+//! Wrapper around an SMT-LIB 2 compliant solver.
 //!
 //! The underlying solver runs in a separate process, communication goes through system pipes.
 
@@ -20,6 +20,104 @@ fn future_check_sat() -> FutureCheckSat {
 ///
 /// Note the [`Self::tee`] function, which takes a file writer to which it will write
 /// everything sent to the solver.
+///
+/// # Check Success
+///
+/// By default, SMT-LIB 2 commands such as `declare-...`, `define-...`, `assert`, *etc.* are
+/// **silent** in the sense that, if successful, they do not cause the solver output anything. As a
+/// consequence, rmst2 does not check for errors after these commands are issued: since the command
+/// does not produce anything on success, how long should we wait for an error before deciding the
+/// command seems to have succeeded?
+///
+/// The problem is that when an error-producing command is issued, the actual error will only be
+/// seen by rsmt2 when it parses a result ---typically for a later `check-sat` or a `get-model`.
+/// This can be an issue when debugging, or when passing unchecked expressions or commands from
+/// downstream users.
+///
+/// ```rust
+/// # use rsmt2::Solver;
+/// let mut solver = Solver::default_z3(()).unwrap();
+/// //             vvvvvvvvvv~~~~ probably gonna cause an error
+/// solver.assert("(> true 7)").unwrap();
+/// solver.assert("(= 0 1)").unwrap();
+/// solver.assert("(= 0 2)").unwrap();
+/// solver.assert("(= 0 3)").unwrap();
+/// solver.assert("(= 0 4)").unwrap();
+/// solver.assert("(= 0 5)").unwrap();
+/// // zero error so far
+/// let e = solver.check_sat().unwrap_err();
+/// # println!("{}", e);
+/// assert_eq!(
+///     &e.to_string(),
+///     "\
+///         solver error: \"line 3 column 13: \
+///         Sort mismatch at argument #1 for function (declare-fun > (Int Int) Bool) \
+///         supplied sort is Bool\"\
+///     ",
+/// );
+/// ```
+///
+/// SMT-LIB 2 has a `:print-success` option that forces all commands that do not produce a result
+/// to issue `success` on the solver's `stdout` when it's done handling them. This allows rsmt2 to
+/// notice and handle errors as soon as they happen, since it must check for `success` every time.
+///
+/// ```rust
+/// # use rsmt2::{Solver, SmtConf};
+/// let mut conf = SmtConf::default_z3();
+/// // activates `success`-printing
+/// conf.check_success();
+///
+/// let mut solver = Solver::new(conf, ()).unwrap();
+///
+/// //                        vvvvvvvvvv~~~~ probably gonna cause an error
+/// let res = solver.assert("(> true 7)");
+/// // did it?
+/// let e = res.unwrap_err();
+/// # println!("{}", e);
+/// assert_eq!(
+///     &e.to_string(),
+///     "\
+///         solver error: \"line 4 column 13: \
+///         Sort mismatch at argument #1 for function (declare-fun > (Int Int) Bool) \
+///         supplied sort is Bool\"\
+///     ",
+/// );
+/// solver.assert("(= 0 1)").unwrap();
+/// solver.assert("(= 0 2)").unwrap();
+/// solver.assert("(= 0 3)").unwrap();
+/// solver.assert("(= 0 4)").unwrap();
+/// solver.assert("(= 0 5)").unwrap();
+/// let is_sat = solver.check_sat().unwrap();
+/// ```
+///
+/// We can also activate `success`-checking at solver level.
+///
+/// ```rust
+/// # use rsmt2::{Solver};
+/// let mut solver = Solver::default_z3(()).unwrap();
+/// // activates `success` printing and checking.
+/// solver.print_success().unwrap();
+///
+/// //                        vvvvvvvvvv~~~~ probably gonna cause an error
+/// let res = solver.assert("(> true 7)");
+/// // did it?
+/// let e = res.unwrap_err();
+/// # println!("{}", e);
+/// assert_eq!(
+///     &e.to_string(),
+///     "\
+///         solver error: \"line 4 column 13: \
+///         Sort mismatch at argument #1 for function (declare-fun > (Int Int) Bool) \
+///         supplied sort is Bool\"\
+///     ",
+/// );
+/// ```
+///
+/// The downside is that rsmt2 will not parse `success` on all commands that do not produce
+/// results. This workflow is usually considered acceptable as parsing `success` is expected to be
+/// very, very cheap compared to whatever SMT check(s) the solver performs. This might not apply to
+/// users performing a lot of small, very fast checks; especially if you declare/define/assert a
+/// lot of things, as each declaration/definition/assertion causes to parse `success`.
 pub struct Solver<Parser> {
     /// Solver configuration.
     conf: SmtConf,
@@ -35,6 +133,8 @@ pub struct Solver<Parser> {
     parser: Parser,
     /// Actlit counter.
     actlit: usize,
+    /// If true, check for `success` every time.
+    check_success: bool,
 }
 
 impl<Parser> Write for Solver<Parser> {
@@ -58,9 +158,9 @@ impl<Parser> Read for Solver<Parser> {
     }
 }
 
-/// Writes something in both the solver and the teed output.
+/// Writes something in both the solver and the tee-ed output.
 macro_rules! tee_write {
-  ($slf:expr, |$w:ident| $($tail:tt)*) => ({
+  ($slf:expr, no_check |$w:ident| $($tail:tt)*) => ({
     if let Some(ref mut $w) = $slf.tee {
       $($tail)*;
       writeln!($w)?;
@@ -68,7 +168,13 @@ macro_rules! tee_write {
     }
     let $w = & mut $slf.stdin;
     $($tail)*;
-    $w.flush() ?
+    $w.flush()?;
+  });
+  ($slf:expr, |$w:ident| $($tail:tt)*) => ({
+    tee_write! { $slf, no_check |$w| $($tail)* }
+    if $slf.check_success {
+        $slf.check_success()?
+    }
   });
 }
 
@@ -142,8 +248,12 @@ impl<Parser> Solver<Parser> {
             smt_parser,
             parser,
             actlit,
+            check_success: false,
         };
 
+        if slf.conf.get_check_success() {
+            slf.print_success()?;
+        }
         if slf.conf.get_models() {
             slf.produce_models()?;
         }
@@ -332,6 +442,28 @@ impl<Parser> Solver<Parser> {
 
 /// # Basic SMT-LIB parser-agnostic commands.
 impl<Parser> Solver<Parser> {
+    /// Activates print-success, see [here](Self#check-success).
+    #[inline]
+    pub fn print_success(&mut self) -> SmtRes<()> {
+        self.check_success = true;
+        self.set_option(":print-success", "true")
+    }
+    /// Parses a `success`, see [here](Self#check-success).
+    #[inline]
+    pub fn check_success(&mut self) -> SmtRes<()> {
+        self.smt_parser.success()
+    }
+    /// Activates unsat core production.
+    #[inline]
+    pub fn produce_unsat_cores(&mut self) -> SmtRes<()> {
+        self.set_option(":produce-unsat-cores", "true")
+    }
+    /// Activates model production.
+    #[inline]
+    pub fn produce_models(&mut self) -> SmtRes<()> {
+        self.set_option(":produce-models", "true")
+    }
+
     /// Asserts an expression.
     ///
     /// # Examples
@@ -857,14 +989,14 @@ impl<Parser> Solver<Parser> {
         Defs::Item: AdtDecl,
     {
         tee_write! {
-          self, |w| write!(w, "(declare-datatypes (") ?
+          self, no_check |w| write!(w, "(declare-datatypes (") ?
         }
 
         for def in defs.clone() {
             let sort_sym = def.adt_sym();
             let arity = def.arity();
             tee_write! {
-              self, |w| {
+              self, no_check |w| {
                 write!(w, " (")?;
                 sort_sym.sym_to_smt2(w, ())?;
                 write!(w, " {})", arity) ?
@@ -873,7 +1005,7 @@ impl<Parser> Solver<Parser> {
         }
 
         tee_write! {
-          self, |w| write!(w, " ) (") ?
+          self, no_check |w| write!(w, " ) (") ?
         }
 
         for def in defs {
@@ -882,14 +1014,14 @@ impl<Parser> Solver<Parser> {
             let variants = def.adt_variants();
             tee_write! { self, |w| write!(w, " (")? };
             if arity > 0 {
-                tee_write! { self, |w| write!(w, "par (")? };
+                tee_write! { self, no_check |w| write!(w, "par (")? };
                 for param in args {
-                    tee_write! { self, |w| {
+                    tee_write! { self, no_check |w| {
                         write!(w, " ")?;
                         param.sym_to_smt2(w, ())?;
                     }}
                 }
-                tee_write! { self, |w| write!(w, " ) (")? };
+                tee_write! { self, no_check |w| write!(w, " ) (")? };
             }
 
             for variant in variants {
@@ -897,20 +1029,20 @@ impl<Parser> Solver<Parser> {
                 let mut fields = variant.fields();
                 let first_field = fields.next();
 
-                tee_write! { self, |w| write!(w, " ")? };
+                tee_write! { self, no_check |w| write!(w, " ")? };
 
                 if first_field.is_some() {
-                    tee_write! { self, |w| write!(w, "(")? };
+                    tee_write! { self, no_check |w| write!(w, "(")? };
                 }
 
-                tee_write! { self, |w| sym.sym_to_smt2(w, ())? };
+                tee_write! { self, no_check |w| sym.sym_to_smt2(w, ())? };
 
                 if let Some(first) = first_field {
                     for field in Some(first).into_iter().chain(fields) {
                         let sym = field.field_sym();
                         let sort = field.field_sort();
                         tee_write! {
-                            self, |w| {
+                            self, no_check |w| {
                                 write!(w, " (")?;
                                 sym.sym_to_smt2(w, ())?;
                                 write!(w, " ")?;
@@ -920,12 +1052,12 @@ impl<Parser> Solver<Parser> {
                         }
                     }
 
-                    tee_write! { self, |w| write!(w, ")")? };
+                    tee_write! { self, no_check |w| write!(w, ")")? };
                 }
             }
 
             tee_write! {
-              self, |w| {
+              self, no_check |w| {
                 write!(w, " )")?;
 
                 if arity > 0 {
@@ -1371,7 +1503,7 @@ impl<Parser> Solver<Parser> {
     #[inline]
     pub fn print_check_sat(&mut self) -> SmtRes<FutureCheckSat> {
         tee_write! {
-          self, |w| write_str(w, "(check-sat)\n") ?
+          self, no_check |w| write_str(w, "(check-sat)\n") ?
         }
         Ok(future_check_sat())
     }
@@ -1388,11 +1520,11 @@ impl<Parser> Solver<Parser> {
         match self.conf.get_check_sat_assuming() {
             Some(ref cmd) => {
                 tee_write! {
-                  self, |w| write!(w, "({} (", cmd) ?
+                  self, no_check |w| write!(w, "({} (", cmd) ?
                 }
                 for actlit in actlits {
                     tee_write! {
-                      self, |w| {
+                      self, no_check |w| {
                         write!(w, " ")?;
                         actlit.sym_to_smt2(w, ()) ?
                       }
@@ -1436,7 +1568,7 @@ impl<Parser> Solver<Parser> {
         sym_2: impl Sym2Smt<()>,
     ) -> SmtRes<()> {
         tee_write! {
-            self, |w|
+            self, no_check |w|
                 write_str(w, "(get-interpolant ")?;
                 sym_1.sym_to_smt2(w, ())?;
                 write_str(w, " ")?;
@@ -1450,7 +1582,7 @@ impl<Parser> Solver<Parser> {
     #[inline]
     fn print_get_model(&mut self) -> SmtRes<()> {
         tee_write! {
-          self, |w| write_str(w, "(get-model)\n") ?
+          self, no_check |w| write_str(w, "(get-model)\n") ?
         }
         Ok(())
     }
@@ -1459,7 +1591,7 @@ impl<Parser> Solver<Parser> {
     #[allow(dead_code)]
     fn print_get_assertions(&mut self) -> SmtRes<()> {
         tee_write! {
-          self, |w| write_str(w, "(get-assertions)\n") ?
+          self, no_check |w| write_str(w, "(get-assertions)\n") ?
         }
         Ok(())
     }
@@ -1467,7 +1599,7 @@ impl<Parser> Solver<Parser> {
     #[allow(dead_code)]
     fn print_get_assignment(&mut self) -> SmtRes<()> {
         tee_write! {
-          self, |w| write_str(w, "(get-assignment)\n") ?
+          self, no_check |w| write_str(w, "(get-assignment)\n") ?
         }
         Ok(())
     }
@@ -1475,7 +1607,7 @@ impl<Parser> Solver<Parser> {
     #[allow(dead_code)]
     fn print_get_unsat_assumptions(&mut self) -> SmtRes<()> {
         tee_write! {
-          self, |w| write_str(w, "(get-unsat-assumptions)\n") ?
+          self, no_check |w| write_str(w, "(get-unsat-assumptions)\n") ?
         }
         Ok(())
     }
@@ -1483,7 +1615,7 @@ impl<Parser> Solver<Parser> {
     #[allow(dead_code)]
     fn print_get_proof(&mut self) -> SmtRes<()> {
         tee_write! {
-          self, |w| write_str(w, "(get-proof)\n") ?
+          self, no_check |w| write_str(w, "(get-proof)\n") ?
         }
         Ok(())
     }
@@ -1491,7 +1623,7 @@ impl<Parser> Solver<Parser> {
     #[allow(dead_code)]
     fn print_get_unsat_core(&mut self) -> SmtRes<()> {
         tee_write! {
-          self, |w| write_str(w, "(get-unsat-core)\n") ?
+          self, no_check |w| write_str(w, "(get-unsat-core)\n") ?
         }
         Ok(())
     }
@@ -1504,18 +1636,18 @@ impl<Parser> Solver<Parser> {
         Exprs::Item: Expr2Smt<Info>,
     {
         tee_write! {
-          self, |w| write!(w, "(get-value (") ?
+          self, no_check |w| write!(w, "(get-value (") ?
         }
         for e in exprs {
             tee_write! {
-              self, |w| {
+              self, no_check |w| {
                 write_str(w, "\n  ")?;
                 e.expr_to_smt2(w, info) ?
               }
             }
         }
         tee_write! {
-          self, |w| write_str(w, "\n) )\n") ?
+          self, no_check |w| write_str(w, "\n) )\n") ?
         }
         Ok(())
     }
@@ -1543,18 +1675,18 @@ impl<Parser> Solver<Parser> {
         match self.conf.get_check_sat_assuming() {
             Some(ref cmd) => {
                 tee_write! {
-                  self, |w| write!(w, "({} (\n ", cmd) ?
+                  self, no_check |w| write!(w, "({} (\n ", cmd) ?
                 }
                 for sym in bool_vars {
                     tee_write! {
-                      self, |w| {
+                      self, no_check |w| {
                         write_str(w, "  ")?;
                         sym.sym_to_smt2(w, info) ?
                       }
                     }
                 }
                 tee_write! {
-                  self, |w| write_str(w, "\n))\n") ?
+                  self, no_check |w| write_str(w, "\n))\n") ?
                 }
                 Ok(future_check_sat())
             }
@@ -1577,7 +1709,7 @@ impl<Parser> Solver<Parser> {
             res.chain_err(|| {
                 "\
                  Note: model production is not active \
-                 for this SmtConf (`conf.models()`)\
+                 for this SmtConf, see [`SmtConf::models`]\
                  "
             })
         } else {
@@ -1732,7 +1864,7 @@ impl<Parser> Solver<Parser> {
         Args::Item: Sort2Smt,
     {
         tee_write! {
-          self, |w| {
+          self, no_check |w| {
             write_str(w, "( define-sort ")?;
             sort_sym.sym_to_smt2(w, ())?;
             write_str(w, "\n   ( ")?;
@@ -1740,7 +1872,7 @@ impl<Parser> Solver<Parser> {
         }
         for arg in args {
             tee_write! {
-              self, |w| {
+              self, no_check |w| {
                 arg.sort_to_smt2(w)?;
                 write_str(w, " ") ?
               }
@@ -1809,7 +1941,7 @@ impl<Parser> Solver<Parser> {
         Args::Item: Sort2Smt,
     {
         tee_write! {
-          self, |w| {
+          self, no_check |w| {
             write_str(w, "(declare-fun ")?;
             symbol.sym_to_smt2(w, info)?;
             write_str(w, " ( ") ?
@@ -1817,7 +1949,7 @@ impl<Parser> Solver<Parser> {
         }
         for arg in args {
             tee_write! {
-              self, |w| {
+              self, no_check |w| {
                 arg.sort_to_smt2(w)?;
                 write_str(w, " ") ?
               }
@@ -1875,7 +2007,7 @@ impl<Parser> Solver<Parser> {
         Args::Item: SymAndSort<Info>,
     {
         tee_write! {
-          self, |w| {
+          self, no_check |w| {
             write_str(w, "(define-fun ")?;
             symbol.sym_to_smt2(w, info)?;
             write_str(w, " ( ") ?
@@ -1885,7 +2017,7 @@ impl<Parser> Solver<Parser> {
             let sym = arg.sym();
             let sort = arg.sort();
             tee_write! {
-              self, |w| {
+              self, no_check |w| {
                 write_str(w, "(")?;
                 sym.sym_to_smt2(w, info)?;
                 write_str(w, " ")?;
@@ -1915,7 +2047,7 @@ impl<Parser> Solver<Parser> {
     {
         // Header.
         tee_write! {
-          self, |w| write_str(w, "(define-funs-rec (\n") ?
+          self, no_check |w| write_str(w, "(define-funs-rec (\n") ?
         }
 
         // Signatures.
@@ -1925,7 +2057,7 @@ impl<Parser> Solver<Parser> {
             let out = fun.out_sort();
 
             tee_write! {
-                self, |w| {
+                self, no_check |w| {
                     write_str(w, "   (")?;
                     sym.sym_to_smt2(w, info)?;
                     write_str(w, " ( ") ?
@@ -1934,7 +2066,7 @@ impl<Parser> Solver<Parser> {
 
             for arg in args {
                 tee_write! {
-                    self, |w| {
+                    self, no_check |w| {
                         let sym = arg.sym();
                         let sort = arg.sort();
                         write_str(w, "(")?;
@@ -1947,7 +2079,7 @@ impl<Parser> Solver<Parser> {
             }
 
             tee_write! {
-              self, |w| {
+              self, no_check |w| {
                 write_str(w, ") ")?;
                 out.sort_to_smt2(w)?;
                 write_str(w, ")\n") ?
@@ -1955,14 +2087,14 @@ impl<Parser> Solver<Parser> {
             }
         }
         tee_write! {
-          self, |w| write_str(w, " ) (") ?
+          self, no_check |w| write_str(w, " ) (") ?
         }
 
         // Bodies
         for fun in funs {
             let body = fun.body();
             tee_write! {
-              self, |w| {
+              self, no_check |w| {
                 write_str(w, "\n   ")?;
                 body.expr_to_smt2(w, info) ?
               }
@@ -1991,11 +2123,11 @@ impl<Parser> Solver<Parser> {
     {
         // Header.
         tee_write! {
-          self, |w| write_str(w, "(define-fun-rec (\n") ?
+          self, no_check |w| write_str(w, "(define-fun-rec (\n") ?
         }
 
         tee_write! {
-          self, |w| {
+          self, no_check |w| {
             // Signature.
             write_str(w, "   (")?;
             symbol.sym_to_smt2(w, info)?;
@@ -2007,7 +2139,7 @@ impl<Parser> Solver<Parser> {
             let sym = arg.sym();
             let sort = arg.sort();
             tee_write! {
-              self, |w| {
+              self, no_check |w| {
                 write_str(w, "(")?;
                 sym.sym_to_smt2(w, info)?;
                 write_str(w, " ")?;
@@ -2184,11 +2316,6 @@ impl<Parser> Solver<Parser> {
     ) -> SmtRes<()> {
         match option {
             ":interactive_mode" => return Err("illegal set-option on interactive mode".into()),
-            ":print_success" => {
-                return Err("illegal set-option on print success, \
-                            use `SmtConf` to activate it"
-                    .into())
-            }
             _ => (),
         };
         tee_write! {
@@ -2197,17 +2324,6 @@ impl<Parser> Solver<Parser> {
           ) ?
         }
         Ok(())
-    }
-
-    /// Activates unsat core production.
-    #[inline]
-    pub fn produce_unsat_cores(&mut self) -> SmtRes<()> {
-        self.set_option(":produce-unsat-cores", "true")
-    }
-    /// Activates model production.
-    #[inline]
-    pub fn produce_models(&mut self) -> SmtRes<()> {
-        self.set_option(":produce-models", "true")
     }
 
     /// Resets the assertions in the solver.
@@ -2225,7 +2341,7 @@ impl<Parser> Solver<Parser> {
     #[inline]
     pub fn get_info(&mut self, flag: &str) -> SmtRes<()> {
         tee_write! {
-          self, |w| writeln!(w, "(get-info {})", flag) ?
+          self, no_check |w| writeln!(w, "(get-info {})", flag) ?
         }
         Ok(())
     }
@@ -2233,7 +2349,7 @@ impl<Parser> Solver<Parser> {
     #[inline]
     pub fn get_option(&mut self, option: &str) -> SmtRes<()> {
         tee_write! {
-          self, |w| writeln!(w, "(get-option {})", option) ?
+          self, no_check |w| writeln!(w, "(get-option {})", option) ?
         }
         Ok(())
     }
@@ -2252,7 +2368,7 @@ impl<Parser> Solver<Parser> {
     #[inline]
     pub fn echo(&mut self, text: &str) -> SmtRes<()> {
         tee_write! {
-          self, |w| writeln!(w, "(echo \"{}\")", text) ?
+          self, no_check |w| writeln!(w, "(echo \"{}\")", text) ?
         }
         Ok(())
     }

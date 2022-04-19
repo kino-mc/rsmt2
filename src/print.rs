@@ -16,7 +16,7 @@ pub use crate::{errors::*, prelude::*};
 /// Type of a model.
 pub type Model<Ident, Type, Value> = Vec<(Ident, Vec<(Ident, Type)>, Type, Value)>;
 
-/// A symbol printable in the SMT Lib 2 standard given some info.
+/// A symbol printable in the SMT-LIB 2 standard given some info.
 pub trait Sym2Smt<Info = ()> {
     /// Prints a symbol to a writer given some info.
     fn sym_to_smt2<Writer>(&self, w: &mut Writer, i: Info) -> SmtRes<()>
@@ -24,7 +24,7 @@ pub trait Sym2Smt<Info = ()> {
         Writer: io::Write;
 }
 
-/// An expression printable in the SMT Lib 2 standard given some info.
+/// An expression printable in the SMT-LIB 2 standard given some info.
 pub trait Expr2Smt<Info = ()> {
     /// Prints an expression to a writer given some info.
     fn expr_to_smt2<Writer>(&self, w: &mut Writer, i: Info) -> SmtRes<()>
@@ -49,7 +49,7 @@ pub trait Expr2Smt<Info = ()> {
     }
 }
 
-/// A sort printable in the SMT Lib 2 standard.
+/// A sort printable in the SMT-LIB 2 standard.
 pub trait Sort2Smt {
     /// Prints a sort to a writer info.
     fn sort_to_smt2<Writer>(&self, w: &mut Writer) -> SmtRes<()>

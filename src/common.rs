@@ -4,7 +4,7 @@ use std::{fmt, io};
 
 use crate::prelude::*;
 
-/// SMT Lib 2 logics, used with [`Solver::set_logic`][crate::Solver::set_logic].
+/// SMT-LIB 2 logics, used with [`Solver::set_logic`][crate::Solver::set_logic].
 #[allow(non_camel_case_types)]
 #[derive(Clone, Copy)]
 pub enum Logic {
@@ -56,7 +56,7 @@ impl fmt::Display for Logic {
     }
 }
 impl Logic {
-    /// Prints the logic in a writer in SMT Lib 2 format.
+    /// Prints the logic in a writer in SMT-LIB 2 format.
     pub fn to_smt2<W: io::Write>(self, writer: &mut W, _: ()) -> SmtRes<()> {
         write!(writer, "{}", self)?;
         Ok(())

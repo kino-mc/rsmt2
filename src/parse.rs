@@ -1,4 +1,4 @@
-//! SMT Lib 2 result parsers.
+//! SMT-LIB 2 result parsers.
 //!
 //! Depending on the commands you plan to use, your parser will need to implement
 //!
