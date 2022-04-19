@@ -11,9 +11,9 @@
 //! ## Print functions
 //!
 //! Since the structure for S-expressions is provided by users, they also need to provide functions
-//! to print it in SMT Lib 2.
+//! to print it in SMT-LIB 2.
 //!
-//! To use all SMT Lib 2 commands in a type-safe manner, the library requires printers over
+//! To use all SMT-LIB 2 commands in a type-safe manner, the library requires printers over
 //!
 //! - sorts: [`Sort2Smt`](crate::print::Sort2Smt) trait, *e.g.* for
 //!   [`Solver::declare_fun`](crate::Solver::declare_fun),
@@ -336,15 +336,25 @@ use crate::examples::get_solver;
 /// Operators. Just implements `Display`, never manipulated directly by the solver.
 #[derive(Copy, Clone)]
 pub enum Op {
+    /// Addition.
     Add,
+    /// Subtraction.
     Sub,
+    /// Multiplication.
     Mul,
+    /// Conjunction.
     Conj,
+    /// Disjunction.
     Disj,
+    /// Equality.
     Eql,
+    /// Greater than or equal to.
     Ge,
+    /// Greater than.
     Gt,
+    /// Less than.
     Lt,
+    /// Less than or equal to.
     Le,
 }
 impl ::std::fmt::Display for Op {
@@ -402,6 +412,7 @@ pub enum Expr {
     O(Op, Vec<Expr>),
 }
 impl Expr {
+    /// Constant constructor.
     pub fn cst<C: Into<Cst>>(c: C) -> Self {
         Expr::C(c.into())
     }

@@ -1,4 +1,4 @@
-//! SMT Lib 2 result parsers.
+//! SMT-LIB 2 result parsers.
 //!
 //! Depending on the commands you plan to use, your parser will need to implement
 //!
@@ -545,12 +545,9 @@ impl<R: BufRead> SmtParser<R> {
     ///
     /// Returns `()` exactly when [`Self::try_tag`] returns `true`, and an error otherwise.
     pub fn tag_info(&mut self, tag: &str, err_msg: &str) -> SmtRes<()> {
-        println!("  try_tag(`{}`)", tag);
         if self.try_tag(tag)? {
-            println!("  - got it");
             Ok(())
         } else {
-            println!("  - fail time");
             self.fail_with(format!("expected `{}` {}", tag, err_msg))
         }
     }
@@ -1336,27 +1333,18 @@ impl<R: BufRead> SmtParser<R> {
         self.tag("(")?;
         self.try_tag("model")?;
         while !self.try_tag(")")? {
-            println!("1");
             self.tag_info("(", "opening define-fun or `)` closing model")?;
-            println!("2");
             self.tag("define-fun")?;
-            println!("3");
 
             if prune_actlits && self.try_actlit_id()? {
-                println!("4.1");
                 self.tags(&["(", ")"])?;
                 self.tag("Bool")?;
                 self.bool()?;
             } else {
-                println!("5.1");
                 let id = parser.parse_ident(self)?;
-                println!("5.2");
                 self.tags(&["(", ")"])?;
-                println!("5.3");
                 let typ = parser.parse_type(self)?;
-                println!("5.4");
                 let value = parser.parse_value(self, &id, &[], &typ)?;
-                println!("5.5");
                 model.push((id, typ, value));
             }
             self.tag(")")?;

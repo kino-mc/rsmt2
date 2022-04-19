@@ -1,4 +1,10 @@
-# v0.15.0
+# v0.16.0
+
+- fixed `success` handling, and added documentation
+- `success`-related `SmtConf` functions have been renamed, `print_success` and `parse_success` are
+    now `check_success`
+
+# v0.15.1
 
 - `eof` token has been renamed to `eoi`
 - fixed a bug in SMT-level error parsing
