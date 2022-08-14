@@ -37,8 +37,8 @@ fn future_check_sat() -> FutureCheckSat {
 /// ```rust
 /// # use rsmt2::Solver;
 /// let mut solver = Solver::default_z3(()).unwrap();
-/// //             vvvvvvvvvv~~~~ probably gonna cause an error
-/// solver.assert("(> true 7)").unwrap();
+/// //               vvvvvvvvvvvvvvvvvvvvvv~~~~ probably gonna cause an error
+/// solver.assert(r#"(> "not an integer" 7)"#).unwrap();
 /// solver.assert("(= 0 1)").unwrap();
 /// solver.assert("(= 0 2)").unwrap();
 /// solver.assert("(= 0 3)").unwrap();
@@ -50,9 +50,9 @@ fn future_check_sat() -> FutureCheckSat {
 /// assert_eq!(
 ///     &e.to_string(),
 ///     "\
-///         solver error: \"line 3 column 13: \
+///         solver error: \"line 3 column 25: \
 ///         Sort mismatch at argument #1 for function (declare-fun > (Int Int) Bool) \
-///         supplied sort is Bool\"\
+///         supplied sort is String\"\
 ///     ",
 /// );
 /// ```
@@ -69,17 +69,17 @@ fn future_check_sat() -> FutureCheckSat {
 ///
 /// let mut solver = Solver::new(conf, ()).unwrap();
 ///
-/// //                        vvvvvvvvvv~~~~ probably gonna cause an error
-/// let res = solver.assert("(> true 7)");
+/// //                         vvvvvvvvvvvvvvvvvvvvvv~~~~ probably gonna cause an error
+/// let res = solver.assert(r#"(> "not an integer" 7)"#);
 /// // did it?
 /// let e = res.unwrap_err();
 /// # println!("{}", e);
 /// assert_eq!(
 ///     &e.to_string(),
 ///     "\
-///         solver error: \"line 4 column 13: \
+///         solver error: \"line 4 column 25: \
 ///         Sort mismatch at argument #1 for function (declare-fun > (Int Int) Bool) \
-///         supplied sort is Bool\"\
+///         supplied sort is String\"\
 ///     ",
 /// );
 /// solver.assert("(= 0 1)").unwrap();
@@ -98,17 +98,17 @@ fn future_check_sat() -> FutureCheckSat {
 /// // activates `success` printing and checking.
 /// solver.print_success().unwrap();
 ///
-/// //                        vvvvvvvvvv~~~~ probably gonna cause an error
-/// let res = solver.assert("(> true 7)");
+/// //                         vvvvvvvvvvvvvvvvvvvvvv~~~~ probably gonna cause an error
+/// let res = solver.assert(r#"(> "not an integer" 7)"#);
 /// // did it?
 /// let e = res.unwrap_err();
 /// # println!("{}", e);
 /// assert_eq!(
 ///     &e.to_string(),
 ///     "\
-///         solver error: \"line 4 column 13: \
+///         solver error: \"line 4 column 25: \
 ///         Sort mismatch at argument #1 for function (declare-fun > (Int Int) Bool) \
-///         supplied sort is Bool\"\
+///         supplied sort is String\"\
 ///     ",
 /// );
 /// ```
