@@ -27,21 +27,21 @@ jobs:
       if: startsWith(matrix.os, 'windows')
       shell: powershell
       run: |
-        Invoke-WebRequest -Uri https://github.com/Z3Prover/z3/releases/download/z3-4.8.12/z3-4.8.12-x64-win.zip -OutFile z3-windows.zip
+        Invoke-WebRequest -Uri https://github.com/Z3Prover/z3/releases/download/z3-4.10.2/z3-4.10.2-x64-win.zip -OutFile z3-windows.zip
         Expand-Archive -Path z3-windows.zip -DestinationPath .
         echo "z3-windows/bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
     - name: Z3 ubuntu
       if: startsWith(matrix.os, 'ubuntu')
       run: |
-        wget https://github.com/Z3Prover/z3/releases/download/z3-4.8.12/z3-4.8.12-x64-glibc-2.31.zip
-        unzip z3-4.8.12-x64-glibc-2.31.zip
-        echo `pwd`/z3-4.8.12-x64-glibc-2.31/bin >> $GITHUB_PATH
+        wget https://github.com/Z3Prover/z3/releases/download/z3-4.10.2/z3-4.10.2-x64-glibc-2.31.zip
+        unzip z3-4.10.2-x64-glibc-2.31.zip
+        echo `pwd`/z3-4.10.2-x64-glibc-2.31/bin >> $GITHUB_PATH
     - name: Z3 macos
       if: startsWith(matrix.os, 'macos')
       run: |
-        wget https://github.com/Z3Prover/z3/releases/download/z3-4.8.12/z3-4.8.12-x64-osx-10.15.7.zip
-        unzip z3-4.8.12-x64-osx-10.15.7.zip
-        echo `pwd`/z3-4.8.12-x64-osx-10.15.7/bin >> $GITHUB_PATH
+        wget https://github.com/Z3Prover/z3/releases/download/z3-4.10.2/z3-4.10.2-x64-osx-10.16.zip
+        unzip z3-4.10.2-x64-osx-10.16.zip
+        echo `pwd`/z3-4.10.2-x64-osx-10.16/bin >> $GITHUB_PATH
 
     - name: Z3 check help
       run: z3 -h
