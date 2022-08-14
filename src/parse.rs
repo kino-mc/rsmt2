@@ -311,59 +311,91 @@ impl<R: BufRead> SmtParser<R> {
         let mut quoted_ident = false;
         let mut sexpr_start = self.cursor;
         let mut sexpr_end = sexpr_start;
+        let mut nempty = false;
 
         'load: loop {
             if sexpr_start == self.buff.len() {
                 let eoi = !self.read_line()?;
                 if eoi {
-                    return Ok(None);
+                    if nempty && !quoted_ident && op_paren == cl_paren {
+                        break 'load;
+                    } else {
+                        return Ok(None);
+                    }
                 }
             }
             debug_assert!(op_paren >= cl_paren);
 
-            for line in self.buff[sexpr_start..].lines() {
+            let mut chars = self.buff[sexpr_start..].chars();
+
+            'chars: while let Some(c) = chars.next() {
                 debug_assert!(op_paren >= cl_paren);
+                sexpr_end += 1;
 
-                let mut this_end = sexpr_start;
-                let mut chars = line.chars();
-                'this_line: while let Some(c) = chars.next() {
-                    debug_assert!(op_paren >= cl_paren);
-                    this_end += 1;
+                if quoted_ident {
+                    quoted_ident = c != '|';
+                    if !quoted_ident && op_paren == 0 {
+                        break 'load;
+                    } else {
+                        continue 'chars;
+                    }
+                }
 
-                    if quoted_ident {
-                        quoted_ident = c != '|';
-                        if !quoted_ident && op_paren == 0 {
-                            sexpr_end = this_end;
+                match c {
+                    ';' => {
+                        if nempty && op_paren == cl_paren {
+                            sexpr_end -= 1;
                             break 'load;
                         }
-                    } else {
-                        match c {
-                            ';' => break 'this_line,
-                            '|' => quoted_ident = !quoted_ident,
-                            '(' => op_paren += 1,
-                            ')' => {
-                                cl_paren += 1;
-                                if op_paren == cl_paren {
-                                    sexpr_end = this_end;
-                                    break 'load;
+                        nempty = true;
+                        // ignore comments in quoted ident
+                        if !quoted_ident {
+                            while let Some(c) = chars.next() {
+                                sexpr_end += 1;
+                                if c == '\n' {
+                                    continue 'chars;
                                 }
                             }
-                            _ => {
-                                if !c.is_whitespace() && op_paren == 0 {
-                                    // print!("... `");
-                                    'token: for c in chars {
-                                        if c.is_whitespace() {
-                                            break 'token;
-                                        }
-                                        match c {
-                                            ')' | '(' | '|' | ';' => break 'token,
-                                            _ => this_end += 1,
-                                        }
-                                    }
-                                    sexpr_end = this_end;
-                                    break 'load;
-                                }
+                        }
+                    }
+                    '|' => {
+                        if !quoted_ident && nempty && op_paren == cl_paren {
+                            sexpr_end -= 1;
+                            break 'load;
+                        }
+                        nempty = true;
+                        quoted_ident = !quoted_ident;
+                        if !quoted_ident && op_paren == 0 {
+                            // if we're not inside parens and just finished parsing a quoted
+                            // identifier, then the ident is the s-expression and we're done
+                            break 'load;
+                        }
+                    }
+                    '(' => {
+                        if nempty && op_paren == cl_paren {
+                            sexpr_end -= 1;
+                            break 'load;
+                        }
+                        nempty = true;
+                        op_paren += 1
+                    }
+                    ')' => {
+                        if op_paren == cl_paren && nempty {
+                            sexpr_end -= 1;
+                            break 'load;
+                        } else {
+                            cl_paren += 1;
+                            if op_paren == cl_paren {
+                                break 'load;
                             }
+                        }
+                    }
+                    _ => {
+                        if c.is_whitespace() && op_paren == 0 && nempty == true {
+                            sexpr_end -= 1;
+                            break 'load;
+                        } else if !c.is_whitespace() {
+                            nempty = true
                         }
                     }
                 }
