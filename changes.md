@@ -1,3 +1,7 @@
+# v0.16.1
+
+- fixed a bug in low-level SMT-LIB-loading/parsing (see issue #33)
+
 # v0.16.0
 
 - fixed `success` handling, and added documentation
