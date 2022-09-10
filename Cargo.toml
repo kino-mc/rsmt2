@@ -25,7 +25,7 @@ appveyor = { repository = "kino-mc/rsmt2" }
 codecov = { repository = "kino-mc/rsmt2", service = "github" }
 
 [dependencies]
-error-chain = "^0"
+error-chain = "0.12"
 
 [dev-dependencies]
 clap = "^2"
