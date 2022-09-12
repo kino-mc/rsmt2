@@ -1355,7 +1355,7 @@ impl<Parser> Solver<Parser> {
     /// // Let's try again, but this time we switch the arguments of `get_interpolant`.
     /// let interpolant: String = solver.get_interpolant("f_2", "f_1").unwrap();
     /// # println!("interpolant 2: {:?}", interpolant);
-    /// assert_eq!(&interpolant, "(and (= (mod n 2) 1) (<= n 7))");
+    /// assert_eq!(&interpolant, "(and (= (mod (+ n 0) 2) 1) (<= n 7))");
     /// ```
     ///
     /// [Craig interpolation]: https://en.wikipedia.org/wiki/Craig_interpolation
