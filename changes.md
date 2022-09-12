@@ -1,3 +1,9 @@
+# v0.16.2
+
+- update `error-chain` dependency version requirement to `^0.12`
+- update `clap` dev-dependency version requirement to `^3.2`
+- fix `solver.rs` interpolant test for `z3` v4.11.2
+
 # v0.16.1
 
 - fixed a bug in low-level SMT-LIB-loading/parsing (see issue #33)
