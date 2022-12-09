@@ -82,6 +82,41 @@ pub mod cvc4 {
             ),
         }
     }
+
+    #[test]
+    fn actlits_0() {
+        let mut conf = SmtConf::default_cvc4();
+        conf.incremental();
+        let mut solver = Solver::new(conf, ()).unwrap();
+        solver.declare_const("x", "Int").unwrap();
+
+        let actlit = solver.get_actlit().unwrap();
+        solver.declare_const("actlit", "Bool").unwrap();
+        solver
+            .assert_act(
+                &actlit,
+                "\
+                 (and (> x 0) (< x 3) (= (mod x 3) 0))\
+                 ",
+            )
+            .unwrap();
+        assert!(!solver.check_sat_act(Some(&actlit)).unwrap());
+        solver.de_actlit(actlit).unwrap();
+
+        let actlit = solver.get_actlit().unwrap();
+        solver
+            .assert_act(
+                &actlit,
+                "\
+                 (and (> x 7) (= (mod x 2) 0))\
+                 ",
+            )
+            .unwrap();
+        assert!(solver.check_sat_act(Some(&actlit)).unwrap());
+        solver.de_actlit(actlit).unwrap();
+
+        solver.kill().unwrap()
+    }
 }
 
 #[cfg(test)]
