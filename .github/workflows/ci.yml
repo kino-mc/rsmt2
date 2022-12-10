@@ -21,6 +21,7 @@ jobs:
 
     env:
       Z3_VERSION: "4.11.2"
+      CVC4_VERSION: "1.8"
 
     steps:
     - uses: actions/checkout@v2
@@ -46,8 +47,26 @@ jobs:
         unzip z3-${Z3_VERSION}-x64-osx-10.16.zip
         echo `pwd`/z3-${Z3_VERSION}-x64-osx-10.16/bin >> $GITHUB_PATH
 
+    # Retrieve the CVC4 binary for the platform we're on.
+    - name: CVC4 ubuntu
+      if: startsWith(matrix.os, 'ubuntu')
+      run: |
+        mkdir cvc4
+        wget -O cvc4/cvc4 https://github.com/CVC4/CVC4-archived/releases/download/${CVC4_VERSION}/cvc4-${CVC4_VERSION}-x86_64-linux-opt
+        chmod +x cvc4/cvc4
+        echo `pwd`/cvc4 >> $GITHUB_PATH
+    - name: CVC4 macos
+      if: startsWith(matrix.os, 'macos')
+      run: |
+        mkdir cvc4
+        wget -O cvc4/cvc4 https://github.com/CVC4/CVC4-archived/releases/download/${CVC4_VERSION}/cvc4-${CVC4_VERSION}-macos-opt
+        chmod +x cvc4/cvc4
+        echo `pwd`/cvc4 >> $GITHUB_PATH
+
     - name: Z3 check help
       run: z3 -h
+    - name: CVC4 check version
+      run: cvc4 --version
 
     - name: Build
       run: cargo build --verbose
@@ -56,4 +75,4 @@ jobs:
     - name: Documentation check
       run: cargo doc
     - name: Run tests
-      run: cargo test --verbose -- --skip cvc4 --skip yices_2
+      run: cargo test --verbose -- --skip yices_2
