@@ -202,8 +202,10 @@ pub mod yices_2 {
 
     #[test]
     fn scenario_1() {
-        let conf = SmtConf::default_yices_2();
+        let mut conf = SmtConf::default_yices_2();
+        conf.models();
         let mut solver = Solver::new(conf, Parser).expect("solver creation");
+        solver.path_tee("yices.smt2").unwrap();
 
         solver.set_logic(Logic::QF_LIA).expect("set-logic");
 

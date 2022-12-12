@@ -58,7 +58,7 @@ fn get_env_var(env_var: &str) -> SmtRes<Option<String>> {
 /// - [yices 2][yices 2]: full support in theory, but only partially tested. Command `get-model`
 ///   will only work on Yices 2 > `2.6.1`, and needs to be activated in [`SmtConf`] with
 ///   [`SmtConf::models`]. To understand why, see <https://github.com/SRI-CSL/yices2/issues/162>.
-///   
+///
 /// [z3]: https://github.com/Z3Prover/z3 (z3 github repository)
 /// [cvc4]: https://cvc4.github.io/ (cvc4 github pages)
 /// [yices 2]: https://yices.csl.sri.com/ (yices 2 official page)
@@ -171,7 +171,7 @@ impl SmtStyle {
         match self {
             Z3 => "z3",
             CVC4 => "cvc4",
-            Yices2 => "yices",
+            Yices2 => "yices-smt2",
         }
     }
     /// Default command for a solver style.
@@ -180,7 +180,7 @@ impl SmtStyle {
         match self {
             Z3 => "z3.exe",
             CVC4 => "cvc4.exe",
-            Yices2 => "yices.exe",
+            Yices2 => "yices-smt2.exe",
         }
     }
 
@@ -208,7 +208,7 @@ impl fmt::Display for SmtStyle {
 /// - [yices 2]: full support in theory, but only partially tested. Command `get-model`
 ///   will only work on Yices 2 > `2.6.1`, and needs to be activated with [`Self::models`]. To
 ///   understand why, see <https://github.com/SRI-CSL/yices2/issues/162>.
-///   
+///
 /// [z3]: https://github.com/Z3Prover/z3 (z3 github repository)
 /// [cvc4]: https://cvc4.github.io/ (cvc4 github pages)
 /// [yices 2]: https://yices.csl.sri.com/ (yices 2 official page)
@@ -488,7 +488,7 @@ impl SmtConf {
     ///
     /// The command used to run a particular solver is up to the end-user. As such, it **does not
     /// make sense** to use default commands for anything else than local testing. You should
-    /// explicitely pass the command to use with [`Self::yices_2`] instead.
+    /// explicitly pass the command to use with [`Self::yices_2`] instead.
     ///
     /// # Examples
     ///
@@ -496,7 +496,7 @@ impl SmtConf {
     /// # use rsmt2::SmtConf;
     /// let conf = SmtConf::default_yices_2();
     /// assert! {
-    ///     conf.get_cmd() == "yices" || conf.get_cmd() == "yices.exe"
+    ///     conf.get_cmd() == "yices-smt2" || conf.get_cmd() == "yices-smt2.exe"
     /// }
     /// ```
     #[inline]
