@@ -58,7 +58,7 @@ fn get_env_var(env_var: &str) -> SmtRes<Option<String>> {
 /// - [yices 2][yices 2]: full support in theory, but only partially tested. Command `get-model`
 ///   will only work on Yices 2 > `2.6.1`, and needs to be activated in [`SmtConf`] with
 ///   [`SmtConf::models`]. To understand why, see <https://github.com/SRI-CSL/yices2/issues/162>.
-///   
+///
 /// [z3]: https://github.com/Z3Prover/z3 (z3 github repository)
 /// [cvc4]: https://cvc4.github.io/ (cvc4 github pages)
 /// [yices 2]: https://yices.csl.sri.com/ (yices 2 official page)
@@ -107,7 +107,7 @@ impl SmtStyle {
                 check_success: false,
                 unsat_cores: false,
                 interpolants: false,
-                check_sat_assuming: unsupported(),
+                check_sat_assuming: supported("check-sat-assuming"),
             },
             Yices2 => SmtConf {
                 style: self,
@@ -208,7 +208,7 @@ impl fmt::Display for SmtStyle {
 /// - [yices 2]: full support in theory, but only partially tested. Command `get-model`
 ///   will only work on Yices 2 > `2.6.1`, and needs to be activated with [`Self::models`]. To
 ///   understand why, see <https://github.com/SRI-CSL/yices2/issues/162>.
-///   
+///
 /// [z3]: https://github.com/Z3Prover/z3 (z3 github repository)
 /// [cvc4]: https://cvc4.github.io/ (cvc4 github pages)
 /// [yices 2]: https://yices.csl.sri.com/ (yices 2 official page)
