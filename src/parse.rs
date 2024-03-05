@@ -1551,17 +1551,6 @@ where
         self.parse_type(input.get_sexpr()?)
     }
 }
-impl<'a, Br> IdentParser<&'a str, &'a str, &'a mut SmtParser<Br>> for ()
-where
-    Br: BufRead,
-{
-    fn parse_ident(self, input: &'a mut SmtParser<Br>) -> SmtRes<&'a str> {
-        input.get_sexpr()
-    }
-    fn parse_type(self, input: &'a mut SmtParser<Br>) -> SmtRes<&'a str> {
-        input.get_sexpr()
-    }
-}
 impl<'a, Br> IdentParser<String, String, &'a mut SmtParser<Br>> for ()
 where
     Br: BufRead,
@@ -1625,20 +1614,6 @@ where
         output: &Type,
     ) -> SmtRes<Value> {
         self.parse_value(input.get_sexpr()?, name, inputs, output)
-    }
-}
-impl<'a, Br> ModelParser<&'a str, &'a str, &'a str, &'a mut SmtParser<Br>> for ()
-where
-    Br: BufRead,
-{
-    fn parse_value(
-        self,
-        input: &'a mut SmtParser<Br>,
-        _name: &&'a str,
-        _inputs: &[(&'a str, &'a str)],
-        _output: &&'a str,
-    ) -> SmtRes<&'a str> {
-        input.get_sexpr()
     }
 }
 impl<'a, Br> ModelParser<String, String, String, &'a mut SmtParser<Br>> for ()
